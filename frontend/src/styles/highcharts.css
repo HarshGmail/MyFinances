@@ -1,0 +1,64 @@
+/* Highcharts global styles */
+
+/* Light mode (default) */
+.highcharts-tooltip {
+  background: #fff !important;
+  color: #18181b !important;
+  border-radius: 6px !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 8px 12px !important;
+  font-size: 0.9rem !important;
+  font-family: inherit !important;
+}
+.highcharts-tooltip text,
+.highcharts-tooltip tspan {
+  fill: #18181b !important;
+}
+
+/* Legend text color (light mode) */
+.highcharts-legend-item text,
+.highcharts-legend-item tspan {
+  fill: #18181b !important;
+  color: #18181b !important;
+}
+
+/* SVG tooltip for pie/donut charts (light mode) */
+.highcharts-tooltip-box {
+  fill: #fff !important;
+  stroke: none !important;
+}
+
+.highcharts-axis-labels {
+  .highcharts-xaxis-labels {
+    color: #18181b;
+  }
+}
+
+/* Dark mode */
+.dark .highcharts-tooltip {
+  background: #18181b !important;
+  color: #fff !important;
+}
+.dark .highcharts-tooltip text,
+.dark .highcharts-tooltip tspan {
+  fill: #fff !important;
+}
+
+/* Legend text color (dark mode) */
+.dark .highcharts-legend-item text,
+.dark .highcharts-legend-item tspan {
+  fill: #fff !important;
+  color: #fff !important;
+}
+
+/* SVG tooltip for pie/donut charts (dark mode) */
+.dark .highcharts-tooltip-box {
+  fill: #18181b !important;
+}
+
+.dark .highcharts-axis-labels {
+  .highcharts-xaxis-labels {
+    color: #fff;
+  }
+}

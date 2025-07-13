@@ -1,0 +1,459 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "OurFinance API",
+    "version": "1.1.0",
+    "description": "API documentation for OurFinance backend."
+  },
+  "servers": [
+    { "url": "http://localhost:5000", "name": "localhost" },
+    { "url": "/", "name": "Live" }
+  ],
+  "tags": [
+    { "name": "Authentication" },
+    { "name": "Crypto" },
+    { "name": "DigitalGold" },
+    { "name": "Stocks" },
+    { "name": "MutualFunds" },
+    { "name": "MutualFundsInfo" },
+    { "name": "Utility" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Utility"],
+        "summary": "Health check endpoint",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "database": { "type": "string", "example": "connected" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/signup": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User signup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created and logged in successfully"
+          },
+          "400": { "description": "Validation error" },
+          "409": { "description": "User already exists" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Invalid credentials" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User logout",
+        "responses": {
+          "200": { "description": "Logout successful" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/verify": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Verify JWT token",
+        "responses": {
+          "200": { "description": "Token is valid" },
+          "401": { "description": "Invalid or missing token" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/crypto/transaction": {
+      "post": {
+        "tags": ["Crypto"],
+        "summary": "Add a new crypto transaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CryptoTransaction" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Transaction added" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/crypto/transactions": {
+      "get": {
+        "tags": ["Crypto"],
+        "summary": "Get all crypto transactions for the authenticated user",
+        "responses": {
+          "200": { "description": "List of transactions" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/crypto/getUserCryptoBalance": {
+      "get": {
+        "tags": ["Crypto"],
+        "summary": "Get user crypto balance from CoinDCX",
+        "responses": {
+          "200": { "description": "User balances fetched" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Error fetching user balances" }
+        }
+      }
+    },
+    "/api/crypto/getCoinPrices": {
+      "post": {
+        "tags": ["Crypto"],
+        "summary": "Get current prices for multiple coins",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Coin prices fetched" },
+          "500": { "description": "Error fetching prices" }
+        }
+      }
+    },
+    "/api/crypto/candles": {
+      "get": {
+        "tags": ["Crypto"],
+        "summary": "Get coin candle data",
+        "parameters": [
+          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "interval", "in": "query", "schema": { "type": "string", "default": "1d" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 365 } },
+          { "name": "startTime", "in": "query", "schema": { "type": "integer" } },
+          { "name": "endTime", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Candle data fetched" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/gold/transaction": {
+      "post": {
+        "tags": ["DigitalGold"],
+        "summary": "Add a new digital gold transaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DigitalGoldTransaction" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Transaction added" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/gold/transactions": {
+      "get": {
+        "tags": ["DigitalGold"],
+        "summary": "Get all digital gold transactions for the authenticated user",
+        "responses": {
+          "200": { "description": "List of transactions" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/gold/safe-gold-rates": {
+      "get": {
+        "tags": ["DigitalGold"],
+        "summary": "Get SafeGold rates (public)",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "SafeGold rates fetched" },
+          "400": { "description": "Missing or invalid parameters" },
+          "500": { "description": "Failed to fetch SafeGold rates" }
+        }
+      }
+    },
+    "/api/mutual-funds/transaction": {
+      "post": {
+        "tags": ["MutualFunds"],
+        "summary": "Add a new mutual fund transaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MutualFundTransaction" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Transaction added" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/mutual-funds/transactions": {
+      "get": {
+        "tags": ["MutualFunds"],
+        "summary": "Get all mutual fund transactions for the authenticated user",
+        "responses": {
+          "200": { "description": "List of transactions" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/funds/infoAddition": {
+      "post": {
+        "tags": ["MutualFundsInfo"],
+        "summary": "Add a new mutual fund info entry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MutualFundInfo" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Info added" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/funds/infoFetch": {
+      "get": {
+        "tags": ["MutualFundsInfo"],
+        "summary": "Get all mutual fund info entries for the authenticated user",
+        "responses": {
+          "200": { "description": "List of mutual fund info entries" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/funds/nav-history": {
+      "post": {
+        "tags": ["MutualFundsInfo"],
+        "summary": "Get NAV history for multiple scheme numbers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schemeNumbers": {
+                    "type": "array",
+                    "items": { "type": "number" }
+                  },
+                  "startDate": { "type": "string", "format": "date" },
+                  "endDate": { "type": "string", "format": "date" }
+                },
+                "required": ["schemeNumbers", "startDate", "endDate"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "NAV history fetched" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/stocks/transaction": {
+      "post": {
+        "tags": ["Stocks"],
+        "summary": "Add a new stock transaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StockTransaction" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Transaction added" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/stocks/transactions": {
+      "get": {
+        "tags": ["Stocks"],
+        "summary": "Get all stock transactions for the authenticated user",
+        "responses": {
+          "200": { "description": "List of transactions" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/stocks/nse-quote": {
+      "get": {
+        "tags": ["Stocks"],
+        "summary": "Get NSE quote for a stock symbol",
+        "parameters": [
+          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "NSE quote fetched" },
+          "401": { "description": "Authentication required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserInput": {
+        "type": "object",
+        "required": ["name", "email", "password"],
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 50 },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 }
+        }
+      },
+      "CryptoTransaction": {
+        "type": "object",
+        "required": ["type", "date", "coinPrice", "quantity", "amount", "coinName", "coinSymbol"],
+        "properties": {
+          "type": { "type": "string", "enum": ["credit", "debit"] },
+          "date": { "type": "string", "format": "date-time" },
+          "coinPrice": { "type": "number" },
+          "quantity": { "type": "number" },
+          "amount": { "type": "number" },
+          "coinName": { "type": "string" },
+          "coinSymbol": { "type": "string" }
+        }
+      },
+      "DigitalGoldTransaction": {
+        "type": "object",
+        "required": ["type", "date", "goldPrice", "quantity", "amount", "tax"],
+        "properties": {
+          "type": { "type": "string", "enum": ["credit", "debit"] },
+          "date": { "type": "string", "format": "date-time" },
+          "goldPrice": { "type": "number" },
+          "quantity": { "type": "number" },
+          "amount": { "type": "number" },
+          "tax": { "type": "number" },
+          "platform": { "type": "string" }
+        }
+      },
+      "MutualFundTransaction": {
+        "type": "object",
+        "required": ["type", "date", "numOfUnits", "amount", "fundName"],
+        "properties": {
+          "type": { "type": "string", "enum": ["credit", "debit"] },
+          "date": { "type": "string", "format": "date-time" },
+          "numOfUnits": { "type": "number" },
+          "amount": { "type": "number" },
+          "platform": { "type": "string" },
+          "fundName": { "type": "string" }
+        }
+      },
+      "MutualFundInfo": {
+        "type": "object",
+        "required": ["date", "sipAmount", "fundName", "schemeNumber"],
+        "properties": {
+          "date": { "type": "string", "format": "date-time" },
+          "sipAmount": { "type": "number" },
+          "goal": { "type": "string" },
+          "platform": { "type": "string" },
+          "fundName": { "type": "string" },
+          "schemeNumber": { "type": "number" }
+        }
+      },
+      "StockTransaction": {
+        "type": "object",
+        "required": ["type", "date", "marketPrice", "numOfShares", "amount", "stockName"],
+        "properties": {
+          "type": { "type": "string", "enum": ["credit", "debit"] },
+          "date": { "type": "string", "format": "date-time" },
+          "marketPrice": { "type": "number" },
+          "numOfShares": { "type": "number" },
+          "amount": { "type": "number" },
+          "stockName": { "type": "string" }
+        }
+      }
+    }
+  }
+}

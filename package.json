@@ -1,0 +1,22 @@
+{
+  "name": "MyFinances",
+  "version": "1.0.0",
+  "description": "Maddala Family Finance Application",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "prettier:auto": "node scripts/prettier-auto.js",
+    "prettier:frontend": "cd frontend && npm run prettier:fix",
+    "prettier:backend": "cd backend && npm run prettier:fix",
+    "prettier:all": "npm run prettier:frontend && npm run prettier:backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "node-cron": "^3.0.3"
+  },
+  "dependencies": {
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.5"
+  }
+}
