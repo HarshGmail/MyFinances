@@ -1,4 +1,10 @@
+export interface User {
+  name: string | null;
+  email: string | null;
+}
+
 export interface MutualFundInfo {
+  _id: string;
   userId?: string;
   date?: string;
   sipAmount?: number;
@@ -130,3 +136,17 @@ export interface SafeGoldRatesResponse {
     frequency: string;
   };
 }
+
+export interface UserGoal {
+  _id?: string;
+  userId: string;
+  goalName: string;
+  stockSymbols?: string[];
+  mutualFundIds?: string[];
+  cryptoCurrency?: string[];
+  goldAlloted?: number;
+  description?: string;
+  targetAmount?: number;
+}
+
+export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };

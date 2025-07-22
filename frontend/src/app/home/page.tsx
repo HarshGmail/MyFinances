@@ -2,14 +2,17 @@
 
 import { useAppStore } from '@/store/useAppStore';
 import { useMemo } from 'react';
-import { useStockTransactionsQuery, useNseQuoteQuery } from '@/api/query/stocks';
 import {
+  useMutualFundTransactionsQuery,
+  useSafeGoldRatesQuery,
+  useGoldTransactionsQuery,
+  useCryptoTransactionsQuery,
+  useCryptoCoinPricesQuery,
   useMutualFundInfoFetchQuery,
   useMfapiNavHistoryBatchQuery,
-} from '@/api/query/mutual-funds-info';
-import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
-import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@/api/query/gold';
-import { useCryptoTransactionsQuery, useCryptoCoinPricesQuery } from '@/api/query/crypto';
+  useStockTransactionsQuery,
+  useNseQuoteQuery,
+} from '@/api/query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { Card } from '@/components/ui/card';
@@ -18,7 +21,6 @@ import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
 import dynamic from 'next/dynamic';
 
-// Type definitions
 interface CryptoPortfolioItem {
   coinName: string;
   currency: string;
@@ -564,15 +566,15 @@ export default function Home() {
         {/* Below: Chart and Portfolio Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="flex items-stretch">
-            <Skeleton className="w-full h-[400px]" />
+            <Skeleton className="w-full h-[420px]" />
           </div>
           <div className="flex flex-col gap-6">
-            <Skeleton className="w-full h-[300px]" />
-            <Skeleton className="w-full h-[300px]" />
+            <Skeleton className="w-full h-[200px]" />
+            <Skeleton className="w-full h-[200px]" />
           </div>
           <div className="flex flex-col gap-6">
-            <Skeleton className="w-full h-[300px]" />
-            <Skeleton className="w-full h-[300px]" />
+            <Skeleton className="w-full h-[200px]" />
+            <Skeleton className="w-full h-[200px]" />
           </div>
         </div>
       </div>
@@ -771,7 +773,7 @@ export default function Home() {
       </div>
       {/* Quick Stats */}
       <div className="text-center text-muted-foreground">
-        <p>Welcome back, {user}! Your comprehensive portfolio overview is ready.</p>
+        <p>Welcome back, {user?.name}! Your comprehensive portfolio overview is ready.</p>
         <p className="text-sm mt-2">
           Total Assets: {stockPortfolioData.length} Stocks • {mfPortfolioData.length} Mutual Funds •{' '}
           {goldPortfolioData.length} Gold • {cryptoPortfolioData.length} Crypto

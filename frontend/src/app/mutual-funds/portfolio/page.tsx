@@ -24,9 +24,20 @@ import { Input } from '@/components/ui/input';
 import { AddMfTransactionForm } from '@/components/AddMfTransactionForm';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
 import { MutualFundInfo } from '@/api/dataInterface';
+import { useSearchMutualFundsQuery } from '@/api/query';
+import { debounce } from 'lodash';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 
 const mutualFundFormSchema = z.object({
   fundName: z.string().min(1, 'Mutual Fund Name is required'),
+  schemeNumber: z.number({ invalid_type_error: 'Scheme Number is required' }), // <-- add this
   sipAmount: z
     .number({ invalid_type_error: 'SIP Amount is required' })
     .min(1, 'SIP Amount must be at least 1'),
@@ -67,6 +78,15 @@ export default function MutualFundsPortfolioPage() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const id = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const [fundNameInput, setFundNameInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  // removed unused selectedSuggestion
+  const { data: fundSuggestions } = useSearchMutualFundsQuery(fundNameInput);
+
+  // Debounced handler
+  const debouncedSetFundNameInput = debounce((val: string) => {
+    setFundNameInput(val);
+  }, 1000);
 
   // Mutual Fund Add Form logic
   const { mutate: addMutualFund, isPending: isAdding } = useAddMutualFundInfoMutation();
@@ -74,6 +94,7 @@ export default function MutualFundsPortfolioPage() {
     resolver: zodResolver(mutualFundFormSchema),
     defaultValues: {
       fundName: '',
+      schemeNumber: 0, // <-- add this
       sipAmount: 0,
       goal: '',
       platform: '',
@@ -96,10 +117,7 @@ export default function MutualFundsPortfolioPage() {
             } else if (key === 'sipAmount' && typeof value === 'string') {
               v = Number(value);
             }
-            mfForm.setValue(
-              key as keyof MutualFundFormValues,
-              v as MutualFundFormValues[keyof MutualFundFormValues]
-            );
+            mfForm.setValue(key as keyof MutualFundFormValues, v as string);
           }
         });
       } catch {}
@@ -128,6 +146,7 @@ export default function MutualFundsPortfolioPage() {
     addMutualFund(
       {
         fundName: values.fundName,
+        schemeNumber: values.schemeNumber,
         sipAmount: values.sipAmount,
         goal: values.goal || undefined,
         platform: values.platform || undefined,
@@ -335,11 +354,66 @@ export default function MutualFundsPortfolioPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Enter mutual fund name" {...field} />
+                          <div className="relative">
+                            <Input
+                              placeholder="Enter mutual fund name"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                debouncedSetFundNameInput(e.target.value);
+                                setShowSuggestions(true);
+                                mfForm.setValue('schemeNumber', 0);
+                              }}
+                              onFocus={() => setShowSuggestions(true)}
+                              autoComplete="off"
+                            />
+
+                            {showSuggestions && fundNameInput.length >= 2 && (
+                              <div className="absolute z-20 mt-1 w-full">
+                                <Command className="border rounded-md bg-white dark:bg-neutral-900 shadow max-h-[250px] overflow-y-auto">
+                                  <CommandInput
+                                    value={fundNameInput}
+                                    onValueChange={(val) => {
+                                      setFundNameInput(val);
+                                      debouncedSetFundNameInput(val);
+                                    }}
+                                    placeholder="Search mutual funds..."
+                                  />
+                                  <CommandList>
+                                    {fundSuggestions?.length ? (
+                                      <CommandGroup heading="Suggestions">
+                                        {/* @ts-expect-error this is expected*/}
+                                        {fundSuggestions.map((fund) => (
+                                          <CommandItem
+                                            key={fund.schemeCode}
+                                            onSelect={() => {
+                                              mfForm.setValue('fundName', fund.schemeName);
+                                              mfForm.setValue('schemeNumber', fund.schemeCode);
+                                              setShowSuggestions(false);
+                                            }}
+                                          >
+                                            {fund.schemeName}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    ) : (
+                                      <CommandEmpty>No results found</CommandEmpty>
+                                    )}
+                                  </CommandList>
+                                </Command>
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
+
                         <FormMessage />
                       </FormItem>
                     )}
+                  />
+                  {/* Hidden field for schemeNumber to ensure it's in the form state */}
+                  <input
+                    type="hidden"
+                    {...mfForm.register('schemeNumber', { valueAsNumber: true })}
                   />
 
                   <FormLabel>SIP Amount</FormLabel>
@@ -410,7 +484,7 @@ export default function MutualFundsPortfolioPage() {
                     name="date"
                     render={({ field }) => (
                       <FormItem>
-                        <OtpDateInput value={field.value} onChange={field.onChange} />
+                        <OtpDateInput value={field.value || ''} onChange={field.onChange} />
                         <FormMessage />
                       </FormItem>
                     )}

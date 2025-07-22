@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import config from '../config';
 
 export interface AuthRequest extends Request {
-  user?: { name: string; email: string };
+  user?: { name: string; email: string; userId: string };
 }
 
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction): void {
@@ -26,7 +26,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ success: false, message: 'Invalid or expired token' });
       return;
     }
-    req.user = user as { name: string; email: string };
+    req.user = user as { name: string; email: string; userId: string };
     next();
   });
 }

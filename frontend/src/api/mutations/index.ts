@@ -6,3 +6,4 @@ export * from './mutual-funds';
 export * from './mutual-funds-info';
 export * from './signup';
 export * from './stocks';
+export * from './userGoals';

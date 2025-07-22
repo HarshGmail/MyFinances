@@ -58,8 +58,8 @@ export async function signup(req: Request, res: Response) {
       success: true,
       message: 'User created and logged in successfully',
       data: {
-        id: result.insertedId,
-        ...userWithoutPassword,
+        email: userData.email,
+        name: userData.name,
       },
     });
   } catch (error) {
@@ -129,8 +129,8 @@ export async function login(req: Request, res: Response) {
       success: true,
       message: 'Login successful',
       data: {
-        id: user._id,
-        ...userWithoutPassword,
+        email: user.email,
+        name: user.name,
       },
     });
   } catch (error) {

@@ -7,6 +7,7 @@ export interface MutualFundInfoPayload {
   fundName: string;
   platform?: string;
   goal?: string;
+  schemeNumber: number;
 }
 
 async function addMutualFundInfo(data: MutualFundInfoPayload) {

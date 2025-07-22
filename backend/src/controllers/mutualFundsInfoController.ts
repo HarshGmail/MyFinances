@@ -97,3 +97,31 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
     res.status(500).json({ success: false, message: 'Failed to fetch NAV history' });
   }
 }
+
+// Fuzzy search helper
+function fuzzyMatch(str: string, pattern: string) {
+  return str.toLowerCase().includes(pattern.toLowerCase());
+}
+
+export async function searchMutualFundsByName(req: Request, res: Response) {
+  try {
+    const { query } = req.query;
+    if (!query || typeof query !== 'string' || query.length < 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Query string is required and should be at least 2 characters.',
+      });
+      return;
+    }
+    // Fetch all mutual funds from mfapi.in
+    const response = await axios.get('https://api.mfapi.in/mf');
+    const allFunds = response.data;
+    // Fuzzy match schemeName
+    const matches = allFunds.filter((fund: any) => fuzzyMatch(fund.schemeName, query));
+    // Optionally, sort by closeness (e.g., Levenshtein distance) for better ranking
+    res.status(200).json({ success: true, data: matches });
+  } catch (error) {
+    console.error('Error searching mutual funds by name:', error);
+    res.status(500).json({ success: false, message: 'Failed to search mutual funds' });
+  }
+}

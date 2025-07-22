@@ -22,6 +22,9 @@ export function useAddCryptoTransactionMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: addCryptoTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crypto-transactions'] });
+    },
   });
 
   const cancelRequest = () => {

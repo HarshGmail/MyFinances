@@ -23,11 +23,20 @@ export function useAddGoldTransactionMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: addGoldTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goldTransactions'] });
+    },
   });
 
   const cancelRequest = () => {
     queryClient.cancelQueries();
   };
 
-  return { ...mutation, cancelRequest };
+  return {
+    ...mutation,
+    cancelRequest,
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+  };
 }

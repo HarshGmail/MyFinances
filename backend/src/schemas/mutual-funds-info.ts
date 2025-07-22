@@ -7,7 +7,6 @@ export const mutualFundInfoSchema = z.object({
   userId: z.instanceof(ObjectId),
   date: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
   sipAmount: z.number().nonnegative(),
-  goal: z.string().optional(),
   platform: z.string().optional(),
   fundName: z.string(),
   schemeNumber: z.number(),

@@ -1,12 +1,13 @@
 import { create } from 'zustand';
+import { User } from '@/api/dataInterface';
 
 interface FilterState {
   [key: string]: string[];
 }
 
 interface AppState {
-  user: string | null;
-  setUser: (user: string | null) => void;
+  user: User | null;
+  setUser: (user: User | null) => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   // Filter state
@@ -20,16 +21,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   user: null,
-  setUser: (user) => {
-    if (typeof window !== 'undefined') {
-      if (user) {
-        localStorage.setItem('user', user);
-      } else {
-        localStorage.removeItem('user');
-      }
-    }
-    set({ user });
-  },
+  setUser: (user) => set({ user }),
   theme: 'dark',
   setTheme: (theme) => set({ theme }),
   // Filter state

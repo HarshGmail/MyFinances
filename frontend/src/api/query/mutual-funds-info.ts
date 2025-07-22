@@ -13,6 +13,22 @@ export function useMutualFundInfoFetchQuery() {
   });
 }
 
+export function useSearchMutualFundsQuery(query: string) {
+  return useQuery({
+    queryKey: ['search-mutual-funds', query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      const response = await apiRequest({
+        endpoint: `/mutual-funds/search?query=${encodeURIComponent(query)}`,
+        method: 'GET',
+      });
+      return response.data || [];
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 60 * 1000,
+  });
+}
+
 export function useMfapiNavHistoryQuery(schemeNumber: string | number) {
   return useQuery({
     queryKey: ['mfapi-nav-history', schemeNumber],

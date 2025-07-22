@@ -37,7 +37,7 @@ export async function apiRequest<T = any>({
     // Handle 401 Unauthorized: remove user from localStorage and reload
     if (response.status === 401) {
       localStorage.removeItem('user');
-      window.location.reload();
+      window.location.assign('/');
     }
     throw errorObj;
   }

@@ -1,28 +1,33 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
+import { User } from '../dataInterface';
 
 interface LoginData {
   email: string;
   password: string;
 }
 
-async function login(data: LoginData) {
-  return apiRequest({
-    endpoint: '/auth/login',
-    method: 'POST',
-    body: data,
-  });
-}
-
 export function useLoginMutation() {
-  const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: login,
+    mutationFn: async (data: LoginData) => {
+      const response = await apiRequest({
+        endpoint: '/auth/login',
+        method: 'POST',
+        body: data,
+      });
+      return response.data as User;
+    },
   });
 
   const cancelRequest = () => {
-    queryClient.cancelQueries();
+    mutation.reset();
   };
 
-  return { ...mutation, cancelRequest };
+  return {
+    ...mutation,
+    cancelRequest,
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+  };
 }

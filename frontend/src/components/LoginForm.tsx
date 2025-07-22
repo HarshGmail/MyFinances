@@ -18,6 +18,8 @@ import { useLoginMutation } from '@/api/mutations';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
+import { setItemToLocalStorage } from '@/utils/localStorageHelpers';
+import { User } from '@/api/dataInterface';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -38,8 +40,9 @@ export function LoginForm() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     mutate(values, {
-      onSuccess: (data) => {
-        setUser(data.data.name);
+      onSuccess: (user: User) => {
+        setUser(user);
+        setItemToLocalStorage('user', user);
         toast.success('Login successful!');
         router.push('/home');
       },

@@ -22,6 +22,9 @@ export function useAddStockTransactionMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: addStockTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+    },
   });
 
   const cancelRequest = () => {

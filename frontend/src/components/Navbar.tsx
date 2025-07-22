@@ -17,6 +17,7 @@ import {
   Building2,
   PiggyBank,
   Wallet,
+  Goal,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useLogoutMutation } from '@/api/mutations';
@@ -182,7 +183,7 @@ export function Navbar() {
 
                 {/* Mutual Funds */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger onClick={() => router.push('/mutual-funds/portfolio')}>
+                  <NavigationMenuTrigger onClick={() => router.push('/mutual-funds/dashboard')}>
                     <PieChart className="w-4 h-4 mr-2" />
                     Mutual Funds
                   </NavigationMenuTrigger>
@@ -293,6 +294,14 @@ export function Navbar() {
                           </Link>
                         </NavigationMenuLink>
                       </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link href="/goals" className="flex-row items-center gap-2">
+                            <Goal className="w-4 h-4" />
+                            Goals
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
                     </ul>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
@@ -304,7 +313,7 @@ export function Navbar() {
         <div className="flex flex-row items-center gap-4">
           {user && (
             <span className="font-medium" onClick={profileClick} style={{ cursor: 'pointer' }}>
-              {user}
+              {user.name}
             </span>
           )}
           <button

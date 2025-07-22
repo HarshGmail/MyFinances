@@ -24,7 +24,7 @@ export function useAddMutualFundTransactionMutation() {
   const mutation = useMutation({
     mutationFn: addMutualFundTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mutual-funds'] });
+      queryClient.invalidateQueries({ queryKey: ['mutual-fund-transactions'] });
     },
   });
 

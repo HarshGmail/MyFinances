@@ -1,6 +1,6 @@
 import config from './config';
 import express from 'express';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import * as fs from 'fs';
@@ -14,7 +14,9 @@ import {
   mutualFundsRouter,
   mutualFundsInfoRouter,
   stocksRouter,
+  userGoalsRouter,
 } from './routes';
+import { requestLogger } from './middleware';
 
 const app = express();
 const port = config.PORT;
@@ -37,6 +39,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(requestLogger);
 
 // Load swagger.json
 const swaggerDocument = JSON.parse(fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8'));
@@ -50,6 +53,7 @@ app.use('/api/crypto', cryptoRouter);
 app.use('/api/mutual-funds', mutualFundsRouter);
 app.use('/api/funds', mutualFundsInfoRouter);
 app.use('/api/stocks', stocksRouter);
+app.use('/api/goals', userGoalsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/health', (req, res) => {
