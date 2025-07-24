@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { AddMfTransactionForm } from '@/components/AddMfTransactionForm';
+import { AddMfTransactionForm } from '@/app/mutual-funds/portfolio/AddMfTransactionForm';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
 import { MutualFundInfo } from '@/api/dataInterface';
 import { useSearchMutualFundsQuery } from '@/api/query';
@@ -80,6 +80,7 @@ export default function MutualFundsPortfolioPage() {
   const ref = useRef<HTMLDivElement>(null);
   const [fundNameInput, setFundNameInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isPeriodic, setIsPeriodic] = useState(false);
   // removed unused selectedSuggestion
   const { data: fundSuggestions } = useSearchMutualFundsQuery(fundNameInput);
 
@@ -327,6 +328,9 @@ export default function MutualFundsPortfolioPage() {
                     setActive(null);
                   }}
                   onCancel={() => setShowTransactionForm(false)}
+                  isPeriodic={isPeriodic}
+                  setIsPeriodic={setIsPeriodic}
+                  setShowTransactionForm={setShowTransactionForm}
                 />
               )}
             </motion.div>
