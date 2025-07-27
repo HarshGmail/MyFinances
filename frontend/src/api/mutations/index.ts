@@ -6,6 +6,7 @@ export * from './login';
 export * from './logout';
 export * from './mutual-funds-info';
 export * from './mutual-funds';
+export * from './profile';
 export * from './recurring-deposits';
 export * from './signup';
 export * from './stocks';

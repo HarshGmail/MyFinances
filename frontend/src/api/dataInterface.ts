@@ -1,5 +1,25 @@
 export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
+export interface AdjClose {
+  adjclose: number[];
+}
+
+export interface Chart {
+  result: ChartResult[];
+  error: ChartError | null;
+}
+
+export interface ChartError {
+  code: string;
+  description: string;
+}
+
+export interface ChartResult {
+  meta: Meta;
+  timestamp: number[];
+  indicators: Indicators;
+}
+
 export interface CoinCandle {
   open: number;
   high: number;
@@ -65,6 +85,12 @@ export interface CryptoTransaction {
   updatedAt?: string;
 }
 
+export interface CurrentTradingPeriod {
+  pre: TradingPeriod;
+  regular: TradingPeriod;
+  post: TradingPeriod;
+}
+
 export interface EpfAccount {
   _id: string;
   userId: string;
@@ -124,6 +150,39 @@ export interface GoldTransaction {
   updatedAt?: string;
 }
 
+export interface Indicators {
+  quote: Quote[];
+  adjclose: AdjClose[];
+}
+
+export interface Meta {
+  currency: string;
+  symbol: string;
+  exchangeName: string;
+  fullExchangeName: string;
+  instrumentType: string;
+  firstTradeDate: number;
+  regularMarketTime: number;
+  hasPrePostMarketData: boolean;
+  gmtoffset: number;
+  timezone: string;
+  exchangeTimezoneName: string;
+  regularMarketPrice: number;
+  fiftyTwoWeekHigh: number;
+  fiftyTwoWeekLow: number;
+  regularMarketDayHigh: number;
+  regularMarketDayLow: number;
+  regularMarketVolume: number;
+  longName: string;
+  shortName: string;
+  chartPreviousClose: number;
+  priceHint: number;
+  currentTradingPeriod: CurrentTradingPeriod;
+  dataGranularity: string;
+  range: string;
+  validRanges: string[];
+}
+
 export interface MutualFundInfo {
   _id: string;
   userId?: string;
@@ -133,6 +192,31 @@ export interface MutualFundInfo {
   platform?: string;
   fundName?: string;
   schemeNumber: number;
+}
+
+export interface MutualFundMeta {
+  fund_house: string;
+  scheme_type: string;
+  scheme_category: string;
+  scheme_code: number;
+  scheme_name: string;
+  isin_growth: string;
+  isin_div_reinvestment: string | null;
+}
+
+export interface MutualFundNavHistory {
+  [schemeCode: string]: MutualFundNavHistoryItem;
+}
+
+export interface MutualFundNavHistoryData {
+  date: string;
+  nav: string;
+}
+
+export interface MutualFundNavHistoryItem {
+  meta: MutualFundMeta;
+  data: MutualFundNavHistoryData[];
+  status: string;
 }
 
 export interface MutualFundTransaction {
@@ -147,6 +231,14 @@ export interface MutualFundTransaction {
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface Quote {
+  open: number[];
+  volume: number[];
+  close: number[];
+  low: number[];
+  high: number[];
 }
 
 export interface RecurringDeposit {
@@ -183,6 +275,10 @@ export interface SafeGoldRatesResponse {
   };
 }
 
+export interface StockData {
+  chart: Chart;
+}
+
 export interface StockTransaction {
   id: string;
   type: 'credit' | 'debit';
@@ -207,6 +303,13 @@ export interface TimelineRow {
   interestCreditDate?: string;
 }
 
+export interface TradingPeriod {
+  timezone: string;
+  start: number;
+  end: number;
+  gmtoffset: number;
+}
+
 export interface User {
   name: string | null;
   email: string | null;
@@ -222,4 +325,16 @@ export interface UserGoal {
   goldAlloted?: number;
   description?: string;
   targetAmount?: number;
+}
+
+export interface UserProfile {
+  userName: string;
+  userEmail: string;
+  dob: string;
+  joined: string;
+  monthlySalary: number;
+  session: {
+    loginTime: Date | null;
+    expiry: Date | null;
+  };
 }

@@ -13,6 +13,15 @@ interface CoinDCXTicker {
   timestamp: number;
 }
 
+interface CoinCandle {
+  open: string;
+  high: number;
+  low: number;
+  volume: number;
+  close: number;
+  time: number;
+}
+
 interface CoinDCXBalance {
   currency: string;
   balance: string;
@@ -205,7 +214,7 @@ class CoinDCXService {
     limit?: number;
     startTime?: number;
     endTime?: number;
-  }): Promise<any[]> {
+  }): Promise<CoinCandle[]> {
     try {
       if (typeof startTime !== 'number' || typeof endTime !== 'number') {
         throw new Error('startTime and endTime are required and must be numbers');

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthRequest } from './jwt'; // This gives access to req.user
 
 export function requestLogger(req: AuthRequest, res: Response, next: NextFunction): void {

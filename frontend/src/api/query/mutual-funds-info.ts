@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { MutualFundInfo } from '@/api/dataInterface';
+import { MutualFundInfo, MutualFundNavHistory } from '@/api/dataInterface';
 
 export function useMutualFundInfoFetchQuery() {
   return useQuery<MutualFundInfo[]>({
@@ -47,7 +47,7 @@ export function useMfapiNavHistoryQuery(schemeNumber: string | number) {
 }
 
 export function useMfapiNavHistoryBatchQuery(schemeNumbers: (string | number)[]) {
-  return useQuery({
+  return useQuery<MutualFundNavHistory>({
     queryKey: ['mfapi-nav-history-batch', schemeNumbers],
     queryFn: async () => {
       if (!schemeNumbers.length) return {};

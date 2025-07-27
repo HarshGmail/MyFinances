@@ -4,7 +4,8 @@ import './globals.css';
 import { Navbar, RouteGuard, Toaster, ThemeSyncer } from '@/components';
 import Providers from './providers';
 import { AuthProvider } from '@/context/AuthContext';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Navbar />
                 <div className="flex-1 overflow-auto pb-4">{children}</div>
                 <SpeedInsights />
+                <Analytics />
                 <Toaster />
               </div>
             </RouteGuard>

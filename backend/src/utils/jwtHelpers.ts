@@ -45,7 +45,7 @@ export function authenticateUser(res: Response, userData: UserData): string {
 
 export function getUserFromRequest(
   req: Request
-): { userId: string; name?: string; email?: string } | null {
+): { userId: string; name?: string; email?: string; iat?: number; exp?: number } | null {
   const token = req.cookies?.token;
   if (!token) return null;
   try {
@@ -53,6 +53,8 @@ export function getUserFromRequest(
       userId: string;
       name?: string;
       email?: string;
+      iat?: number;
+      exp?: number;
     };
     return payload;
   } catch {

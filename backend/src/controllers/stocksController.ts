@@ -5,6 +5,84 @@ import { stocksSchema } from '../schemas/stocks';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
 
+export interface TradingPeriod {
+  timezone: string;
+  start: number;
+  end: number;
+  gmtoffset: number;
+}
+
+export interface CurrentTradingPeriod {
+  pre: TradingPeriod;
+  regular: TradingPeriod;
+  post: TradingPeriod;
+}
+
+export interface Meta {
+  currency: string;
+  symbol: string;
+  exchangeName: string;
+  fullExchangeName: string;
+  instrumentType: string;
+  firstTradeDate: number;
+  regularMarketTime: number;
+  hasPrePostMarketData: boolean;
+  gmtoffset: number;
+  timezone: string;
+  exchangeTimezoneName: string;
+  regularMarketPrice: number;
+  fiftyTwoWeekHigh: number;
+  fiftyTwoWeekLow: number;
+  regularMarketDayHigh: number;
+  regularMarketDayLow: number;
+  regularMarketVolume: number;
+  longName: string;
+  shortName: string;
+  chartPreviousClose: number;
+  priceHint: number;
+  currentTradingPeriod: CurrentTradingPeriod;
+  dataGranularity: string;
+  range: string;
+  validRanges: string[];
+}
+
+export interface Quote {
+  open: number[];
+  volume: number[];
+  close: number[];
+  low: number[];
+  high: number[];
+}
+
+export interface AdjClose {
+  adjclose: number[];
+}
+
+export interface Indicators {
+  quote: Quote[];
+  adjclose: AdjClose[];
+}
+
+export interface ChartResult {
+  meta: Meta;
+  timestamp: number[];
+  indicators: Indicators;
+}
+
+export interface ChartError {
+  code: string;
+  description: string;
+}
+
+export interface Chart {
+  result: ChartResult[];
+  error: ChartError | null;
+}
+
+export interface StockData {
+  chart: Chart;
+}
+
 export async function addStockTransaction(req: Request, res: Response) {
   try {
     const user = getUserFromRequest(req);
@@ -62,7 +140,7 @@ export async function getNSEQuote(req: Request, res: Response) {
     }
 
     // Throttle: Only one Yahoo Finance API call per second
-    const results: [string, any][] = [];
+    const results: [string, StockData | null][] = [];
     for (const symbol of symbols) {
       try {
         const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;

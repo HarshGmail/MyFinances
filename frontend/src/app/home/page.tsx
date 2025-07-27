@@ -12,6 +12,10 @@ import {
   useMfapiNavHistoryBatchQuery,
   useStockTransactionsQuery,
   useNseQuoteQuery,
+  useEpfQuery,
+  useEpfTimelineQuery,
+  useFixedDepositsQuery,
+  useRecurringDepositsQuery,
 } from '@/api/query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
@@ -21,6 +25,7 @@ import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
 import dynamic from 'next/dynamic';
 import { getProfitLossColor } from '@/utils/text';
+import { differenceInDays, differenceInMonths } from 'date-fns';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -33,14 +38,38 @@ interface CryptoPortfolioItem {
   profitLossPercentage: number;
 }
 
+const calculateCompoundInterest = (principal: number, rate: number, timeInMonths: number) => {
+  const quarterlyRate = rate / 400;
+  const quarters = Math.floor(timeInMonths / 3);
+  const remainingMonths = timeInMonths % 3;
+
+  let amount = principal * Math.pow(1 + quarterlyRate, quarters);
+
+  if (remainingMonths > 0) {
+    const monthlyRate = rate / 1200;
+    amount = amount * (1 + monthlyRate * remainingMonths);
+  }
+
+  return amount - principal;
+};
+
 export default function Home() {
   const user = useAppStore((state) => state.user);
 
   // ===== STOCKS DATA =====
   const { data: stockTransactions, isLoading: stockTransactionsLoading } =
     useStockTransactionsQuery();
+  const { data: mutualFundsTransactionsData, isLoading: mfTransactionsLoading } =
+    useMutualFundTransactionsQuery();
+  const { data: mfInfoData, isLoading: mfInfoLoading } = useMutualFundInfoFetchQuery();
+  const { data: goldTransactions, isLoading: goldTransactionsLoading } = useGoldTransactionsQuery();
+  const { data: cryptoTransactions, isLoading: cryptoTransactionsLoading } =
+    useCryptoTransactionsQuery();
+  const { data: epfData, isLoading: epfLoading } = useEpfQuery();
+  const { data: epfTimelineData, isLoading: epfTimelineLoading } = useEpfTimelineQuery();
+  const { data: fdData, isLoading: fdLoading } = useFixedDepositsQuery();
+  const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
 
-  // Group and aggregate stock data by stockName
   const stockGroupedRows = useMemo(() => {
     if (!stockTransactions) return [];
     const grouped = _.groupBy(stockTransactions, 'stockName');
@@ -93,21 +122,14 @@ export default function Home() {
   }, [stockGroupedRows, nseQuoteData]);
 
   // ===== MUTUAL FUNDS DATA =====
-  const { data: mfInfoData, isLoading: mfInfoLoading } = useMutualFundInfoFetchQuery();
-  const { data: mutualFundsTransactionsData, isLoading: mfTransactionsLoading } =
-    useMutualFundTransactionsQuery();
-
-  // Get unique schemeNumbers
   const schemeNumbers = useMemo(() => {
     if (!mfInfoData) return [];
     return Array.from(new Set(mfInfoData.map((info) => info.schemeNumber)));
   }, [mfInfoData]);
 
-  // Fetch NAV data for mutual funds
   const { data: navHistoryBatch, isLoading: navHistoryLoading } =
     useMfapiNavHistoryBatchQuery(schemeNumbers);
 
-  // Build navDataMap from batch query
   const navDataMap = useMemo(() => {
     const map: Record<string, { nav: number; navDate: string } | null> = {};
     schemeNumbers.forEach((schemeNumber) => {
@@ -124,19 +146,16 @@ export default function Home() {
     return map;
   }, [schemeNumbers, navHistoryBatch]);
 
-  // Group mutual fund transactions by fundName
   const mfGrouped = useMemo(() => {
     if (!mutualFundsTransactionsData) return {};
     return _.groupBy(mutualFundsTransactionsData, 'fundName');
   }, [mutualFundsTransactionsData]);
 
-  // Process mutual fund portfolio data
   const mfPortfolioData = useMemo(() => {
     if (!mutualFundsTransactionsData || !mfInfoData) return [];
     return Object.entries(mfGrouped).map(([fundName, txs]) => {
       const totalUnits = txs.reduce((sum, tx) => sum + tx.numOfUnits, 0);
       const totalInvested = txs.reduce((sum, tx) => sum + tx.amount, 0);
-      // Find schemeNumber for this fundName
       const info = mfInfoData.find((info) => info.fundName === fundName);
       const schemeNumber = info?.schemeNumber;
       const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
@@ -159,11 +178,8 @@ export default function Home() {
   }, [mfGrouped, mfInfoData, mutualFundsTransactionsData, navDataMap]);
 
   // ===== GOLD DATA =====
-  const { data: goldTransactions, isLoading: goldTransactionsLoading } = useGoldTransactionsQuery();
-
-  // Get current gold rate (fetch yesterday and today for current rate)
   const endDate = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // Yesterday
+  const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const { data: goldRatesData, isLoading: goldRatesLoading } = useSafeGoldRatesQuery({
     startDate,
     endDate,
@@ -182,10 +198,8 @@ export default function Home() {
       0
     );
 
-    // Get current gold rate from the fetched data
     let currentGoldRate = 0;
     if (goldRatesData?.data && goldRatesData.data.length > 0) {
-      // Use the latest available rate (last entry in the array)
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
     }
 
@@ -206,9 +220,6 @@ export default function Home() {
   }, [goldTransactions, goldRatesData]);
 
   // ===== CRYPTO DATA =====
-  const { data: cryptoTransactions, isLoading: cryptoTransactionsLoading } =
-    useCryptoTransactionsQuery();
-
   const cryptoInvestedMap = useMemo(() => {
     if (!cryptoTransactions) return {};
     const grouped = _.groupBy(
@@ -272,6 +283,96 @@ export default function Home() {
     return portfolioItems;
   }, [coinPrices, cryptoInvestedMap, validCoins]);
 
+  // ===== EPF DATA =====
+  const epfPortfolioData = useMemo(() => {
+    if (!epfTimelineData)
+      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
+
+    const invested = epfTimelineData.totalCurrentBalance || 0;
+    const currentValue = invested; // For EPF, current value is the balance
+    const profitLoss = 0; // EPF doesn't show profit/loss in the same way
+    const profitLossPercentage = 0;
+
+    return { invested, currentValue, profitLoss, profitLossPercentage };
+  }, [epfTimelineData]);
+
+  // ===== NEW FD DATA PROCESSING =====
+  const fdPortfolioData = useMemo(() => {
+    if (!fdData || fdData.length === 0)
+      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
+
+    const processedFDs = fdData.map((fd) => {
+      const creationDate = new Date(fd.dateOfCreation);
+      const maturityDate = new Date(fd.dateOfMaturity);
+      const currentDate = new Date();
+
+      const totalDays = differenceInDays(maturityDate, creationDate);
+      const daysCompleted = Math.min(differenceInDays(currentDate, creationDate), totalDays);
+
+      const annualRate = fd.rateOfInterest / 100;
+      const currentInterest = (fd.amountInvested * annualRate * daysCompleted) / 365;
+      const currentValue = fd.amountInvested + currentInterest;
+
+      return {
+        ...fd,
+        currentValue,
+        currentInterest,
+      };
+    });
+
+    const totalInvested = processedFDs.reduce((sum, fd) => sum + fd.amountInvested, 0);
+    const totalCurrentValue = processedFDs.reduce((sum, fd) => sum + fd.currentValue, 0);
+    const totalProfitLoss = totalCurrentValue - totalInvested;
+    const profitLossPercentage = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
+
+    return {
+      invested: totalInvested,
+      currentValue: totalCurrentValue,
+      profitLoss: totalProfitLoss,
+      profitLossPercentage,
+    };
+  }, [fdData]);
+
+  // ===== NEW RD DATA PROCESSING =====
+  const rdPortfolioData = useMemo(() => {
+    if (!rdData || rdData.length === 0)
+      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
+
+    const processedRDs = rdData.map((rd) => {
+      const creationDate = new Date(rd.dateOfCreation);
+      const maturityDate = new Date(rd.dateOfMaturity);
+      const currentDate = new Date();
+
+      const totalMonths = differenceInMonths(maturityDate, creationDate);
+      const monthsCompleted = Math.min(differenceInMonths(currentDate, creationDate), totalMonths);
+
+      const currentInterest = calculateCompoundInterest(
+        rd.amountInvested,
+        rd.rateOfInterest,
+        monthsCompleted
+      );
+      const currentValue = rd.amountInvested + currentInterest;
+
+      return {
+        ...rd,
+        currentValue,
+        currentInterest,
+      };
+    });
+
+    const totalInvested = processedRDs.reduce((sum, rd) => sum + rd.amountInvested, 0);
+    const totalCurrentValue = processedRDs.reduce((sum, rd) => sum + rd.currentValue, 0);
+    const totalProfitLoss = totalCurrentValue - totalInvested;
+    const profitLossPercentage = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
+
+    return {
+      invested: totalInvested,
+      currentValue: totalCurrentValue,
+      profitLoss: totalProfitLoss,
+      profitLossPercentage,
+    };
+  }, [rdData]);
+
   // ===== AGGREGATE PORTFOLIO SUMMARY =====
   const portfolioSummary = useMemo(() => {
     // Stocks summary
@@ -314,12 +415,23 @@ export default function Home() {
 
     // Overall totals
     const totalInvested =
-      stockTotalInvested + mfTotalInvested + goldTotalInvested + cryptoTotalInvested;
+      stockTotalInvested +
+      mfTotalInvested +
+      goldTotalInvested +
+      cryptoTotalInvested +
+      epfPortfolioData.invested +
+      fdPortfolioData.invested +
+      rdPortfolioData.invested;
+
     const totalCurrentValue =
       stockTotalCurrentValue +
       mfTotalCurrentValue +
       goldTotalCurrentValue +
-      cryptoTotalCurrentValue;
+      cryptoTotalCurrentValue +
+      epfPortfolioData.currentValue +
+      fdPortfolioData.currentValue +
+      rdPortfolioData.currentValue;
+
     const totalProfitLoss = totalCurrentValue - totalInvested;
     const totalProfitLossPercentage =
       totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
@@ -352,6 +464,9 @@ export default function Home() {
         profitLossPercentage:
           cryptoTotalInvested > 0 ? (cryptoTotalProfitLoss / cryptoTotalInvested) * 100 : 0,
       },
+      epf: epfPortfolioData,
+      fd: fdPortfolioData,
+      rd: rdPortfolioData,
       total: {
         invested: totalInvested,
         currentValue: totalCurrentValue,
@@ -359,7 +474,15 @@ export default function Home() {
         profitLossPercentage: totalProfitLossPercentage,
       },
     };
-  }, [stockPortfolioData, mfPortfolioData, goldPortfolioData, cryptoPortfolioData]);
+  }, [
+    stockPortfolioData,
+    mfPortfolioData,
+    goldPortfolioData,
+    cryptoPortfolioData,
+    epfPortfolioData,
+    fdPortfolioData,
+    rdPortfolioData,
+  ]);
 
   // ===== XIRR CALCULATIONS =====
   const stockXirr = useMemo(() => {
@@ -368,7 +491,6 @@ export default function Home() {
       amount: tx.type === 'credit' ? -tx.amount : tx.amount,
       when: new Date(tx.date),
     }));
-    // Add current stock portfolio value as final positive cash flow
     const stockCurrentValue = stockPortfolioData.reduce(
       (sum, stock) => sum + stock.currentValuation,
       0
@@ -389,7 +511,6 @@ export default function Home() {
       amount: tx.type === 'credit' ? -tx.amount : tx.amount,
       when: new Date(tx.date),
     }));
-    // Add current mutual fund portfolio value as final positive cash flow
     const mfCurrentValue = mfPortfolioData.reduce((sum, fund) => sum + (fund.currentValue ?? 0), 0);
     if (mfCurrentValue > 0) {
       cashFlows.push({ amount: mfCurrentValue, when: new Date() });
@@ -407,7 +528,6 @@ export default function Home() {
       amount: tx.type === 'credit' ? -tx.amount : tx.amount,
       when: new Date(tx.date),
     }));
-    // Add current gold portfolio value as final positive cash flow
     const goldCurrentValue = goldPortfolioData.reduce((sum, gold) => sum + gold.currentValue, 0);
     if (goldCurrentValue > 0) {
       cashFlows.push({ amount: goldCurrentValue, when: new Date() });
@@ -425,7 +545,6 @@ export default function Home() {
       amount: tx.type === 'credit' ? -tx.amount : tx.amount,
       when: new Date(tx.date),
     }));
-    // Add current crypto portfolio value as final positive cash flow
     const cryptoCurrentValue = cryptoPortfolioData.reduce(
       (sum, coin) => sum + coin.currentValue,
       0
@@ -484,6 +603,54 @@ export default function Home() {
       });
     }
 
+    // Add EPF as negative cash flows (contributions)
+    if (epfData) {
+      epfData.forEach((epf, index) => {
+        const startDate = new Date(epf.startDate);
+        const currentDate = new Date();
+
+        // Determine the end date for this EPF entry
+        const nextStartDate =
+          index < epfData.length - 1 ? new Date(epfData[index + 1].startDate) : currentDate;
+
+        // Calculate months difference between startDate and nextStartDate/currentDate
+        const monthsDiff = differenceInMonths(nextStartDate, startDate);
+
+        for (let i = 0; i < monthsDiff; i++) {
+          const contributionDate = new Date(startDate);
+          contributionDate.setMonth(contributionDate.getMonth() + i);
+          contributionDate.setDate(epf.creditDay); // Use credit day from entry
+
+          if (contributionDate <= currentDate) {
+            allCashFlows.push({
+              amount: -epf.epfAmount, // Negative because it's an investment
+              when: contributionDate,
+            });
+          }
+        }
+      });
+    }
+
+    // Add FD transactions
+    if (fdData) {
+      fdData.forEach((fd) => {
+        allCashFlows.push({
+          amount: -fd.amountInvested, // Negative because it's an investment
+          when: new Date(fd.dateOfCreation),
+        });
+      });
+    }
+
+    // Add RD transactions
+    if (rdData) {
+      rdData.forEach((rd) => {
+        allCashFlows.push({
+          amount: -rd.amountInvested, // Negative because it's an investment
+          when: new Date(rd.dateOfCreation),
+        });
+      });
+    }
+
     // Add current portfolio value as final positive cash flow
     if (portfolioSummary.total.currentValue > 0) {
       allCashFlows.push({
@@ -491,6 +658,7 @@ export default function Home() {
         when: new Date(),
       });
     }
+    console.log(allCashFlows);
 
     // Calculate XIRR
     if (allCashFlows.length > 1) {
@@ -507,24 +675,33 @@ export default function Home() {
     mutualFundsTransactionsData,
     goldTransactions,
     cryptoTransactions,
+    epfData,
+    fdData,
+    rdData,
     portfolioSummary.total.currentValue,
   ]);
 
   const Chart = dynamic(() => import('./Chart'), { ssr: false });
 
   // Prepare data for chart
-  const polarCategories = ['Stocks', 'Mutual Funds', 'Gold', 'Crypto'];
+  const polarCategories = ['Stocks', 'Mutual Funds', 'Gold', 'Crypto', 'EPF', 'FD', 'RD'];
   const investedData = [
     portfolioSummary.stocks.invested,
     portfolioSummary.mutualFunds.invested,
     portfolioSummary.gold.invested,
     portfolioSummary.crypto.invested,
+    portfolioSummary.epf.invested,
+    portfolioSummary.fd.invested,
+    portfolioSummary.rd.invested,
   ];
   const currentValueData = [
     portfolioSummary.stocks.currentValue,
     portfolioSummary.mutualFunds.currentValue,
     portfolioSummary.gold.currentValue,
     portfolioSummary.crypto.currentValue,
+    portfolioSummary.epf.currentValue,
+    portfolioSummary.fd.currentValue,
+    portfolioSummary.rd.currentValue,
   ];
 
   // Loading states
@@ -537,7 +714,11 @@ export default function Home() {
     goldTransactionsLoading ||
     goldRatesLoading ||
     cryptoTransactionsLoading ||
-    cryptoPricesLoading;
+    cryptoPricesLoading ||
+    epfLoading ||
+    epfTimelineLoading ||
+    fdLoading ||
+    rdLoading;
 
   if (isLoading) {
     return (
@@ -564,6 +745,12 @@ export default function Home() {
             <Skeleton className="w-full h-[200px]" />
           </div>
         </div>
+        {/* New Row: EPF, FD, RD Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <Skeleton className="w-full h-[200px]" />
+          <Skeleton className="w-full h-[200px]" />
+          <Skeleton className="w-full h-[200px]" />
+        </div>
       </div>
     );
   }
@@ -589,7 +776,6 @@ export default function Home() {
           value={
             <span className={getProfitLossColor(portfolioSummary.total.profitLoss)}>
               {formatCurrency(portfolioSummary.total.currentValue)}{' '}
-              <span>({formatToPercentage(portfolioSummary.total.profitLossPercentage)})</span>
             </span>
           }
           valueClassName={getProfitLossColor(portfolioSummary.total.profitLoss)}
@@ -607,7 +793,8 @@ export default function Home() {
           }
         />
       </div>
-      {/* Below: Chart and Portfolio Cards */}
+
+      {/* 3rd Row: Chart and Portfolio Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         {/* Left: Chart */}
         <div className="flex items-stretch">
@@ -628,66 +815,80 @@ export default function Home() {
           {/* Stocks Portfolio */}
           <Card className="p-6 flex-1">
             <h3 className="text-lg font-semibold mb-1">Stocks Portfolio</h3>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span>Invested:</span>
-                <span>{formatCurrency(portfolioSummary.stocks.invested)}</span>
+            {stockPortfolioData.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Invested:</span>
+                  <span>{formatCurrency(portfolioSummary.stocks.invested)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Value:</span>
+                  <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
+                    {formatCurrency(portfolioSummary.stocks.currentValue)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>P&L:</span>
+                  <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
+                    {formatCurrency(portfolioSummary.stocks.profitLoss)} (
+                    {formatToPercentage(portfolioSummary.stocks.profitLossPercentage)})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>XIRR:</span>
+                  <span
+                    className={
+                      stockXirr !== null && stockXirr >= 0 ? 'text-green-600' : 'text-red-600'
+                    }
+                  >
+                    {stockXirr !== null ? `${stockXirr.toFixed(2)}%` : 'N/A'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Current Value:</span>
-                <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
-                  {formatCurrency(portfolioSummary.stocks.currentValue)}
-                </span>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-muted-foreground">
+                <p className="text-sm">No stock investments found</p>
               </div>
-              <div className="flex justify-between">
-                <span>P&L:</span>
-                <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
-                  {formatCurrency(portfolioSummary.stocks.profitLoss)} (
-                  {formatToPercentage(portfolioSummary.stocks.profitLossPercentage)})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>XIRR:</span>
-                <span
-                  className={
-                    stockXirr !== null && stockXirr >= 0 ? 'text-green-600' : 'text-red-600'
-                  }
-                >
-                  {stockXirr !== null ? `${stockXirr.toFixed(2)}%` : 'N/A'}
-                </span>
-              </div>
-            </div>
+            )}
           </Card>
           {/* Gold Portfolio */}
           <Card className="p-6 flex-1">
             <h3 className="text-lg font-semibold mb-1">Gold Portfolio</h3>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span>Invested:</span>
-                <span>{formatCurrency(portfolioSummary.gold.invested)}</span>
+            {goldPortfolioData.length > 0 && goldPortfolioData[0].totalInvested > 0 ? (
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Invested:</span>
+                  <span>{formatCurrency(portfolioSummary.gold.invested)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Value:</span>
+                  <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
+                    {formatCurrency(portfolioSummary.gold.currentValue)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>P&L:</span>
+                  <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
+                    {formatCurrency(portfolioSummary.gold.profitLoss)} (
+                    {formatToPercentage(portfolioSummary.gold.profitLossPercentage)})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>XIRR:</span>
+                  <span
+                    className={
+                      goldXirr !== null && goldXirr >= 0 ? 'text-green-600' : 'text-red-600'
+                    }
+                  >
+                    {goldXirr !== null ? `${goldXirr.toFixed(2)}%` : 'N/A'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Current Value:</span>
-                <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
-                  {formatCurrency(portfolioSummary.gold.currentValue)}
-                </span>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-muted-foreground">
+                <p className="text-sm">No gold investments found</p>
               </div>
-              <div className="flex justify-between">
-                <span>P&L:</span>
-                <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
-                  {formatCurrency(portfolioSummary.gold.profitLoss)} (
-                  {formatToPercentage(portfolioSummary.gold.profitLossPercentage)})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>XIRR:</span>
-                <span
-                  className={goldXirr !== null && goldXirr >= 0 ? 'text-green-600' : 'text-red-600'}
-                >
-                  {goldXirr !== null ? `${goldXirr.toFixed(2)}%` : 'N/A'}
-                </span>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
         {/* Right: Mutual Funds & Crypto */}
@@ -695,75 +896,218 @@ export default function Home() {
           {/* Mutual Funds Portfolio */}
           <Card className="p-6 flex-1">
             <h3 className="text-lg font-semibold mb-1">Mutual Funds Portfolio</h3>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span>Invested:</span>
-                <span>{formatCurrency(portfolioSummary.mutualFunds.invested)}</span>
+            {mfPortfolioData.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Invested:</span>
+                  <span>{formatCurrency(portfolioSummary.mutualFunds.invested)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Value:</span>
+                  <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
+                    {formatCurrency(portfolioSummary.mutualFunds.currentValue)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>P&L:</span>
+                  <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
+                    {formatCurrency(portfolioSummary.mutualFunds.profitLoss)} (
+                    {formatToPercentage(portfolioSummary.mutualFunds.profitLossPercentage)})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>XIRR:</span>
+                  <span
+                    className={mfXirr !== null && mfXirr >= 0 ? 'text-green-600' : 'text-red-600'}
+                  >
+                    {mfXirr !== null ? `${mfXirr.toFixed(2)}%` : 'N/A'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Current Value:</span>
-                <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
-                  {formatCurrency(portfolioSummary.mutualFunds.currentValue)}
-                </span>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-muted-foreground">
+                <p className="text-sm">No mutual fund investments found</p>
               </div>
-              <div className="flex justify-between">
-                <span>P&L:</span>
-                <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
-                  {formatCurrency(portfolioSummary.mutualFunds.profitLoss)} (
-                  {formatToPercentage(portfolioSummary.mutualFunds.profitLossPercentage)})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>XIRR:</span>
-                <span
-                  className={mfXirr !== null && mfXirr >= 0 ? 'text-green-600' : 'text-red-600'}
-                >
-                  {mfXirr !== null ? `${mfXirr.toFixed(2)}%` : 'N/A'}
-                </span>
-              </div>
-            </div>
+            )}
           </Card>
           {/* Crypto Portfolio */}
           <Card className="p-6 flex-1">
             <h3 className="text-lg font-semibold mb-1">Crypto Portfolio</h3>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span>Invested:</span>
-                <span>{formatCurrency(portfolioSummary.crypto.invested)}</span>
+            {cryptoPortfolioData.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Invested:</span>
+                  <span>{formatCurrency(portfolioSummary.crypto.invested)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Value:</span>
+                  <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
+                    {formatCurrency(portfolioSummary.crypto.currentValue)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>P&L:</span>
+                  <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
+                    {formatCurrency(portfolioSummary.crypto.profitLoss)} (
+                    {formatToPercentage(portfolioSummary.crypto.profitLossPercentage)})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>XIRR:</span>
+                  <span
+                    className={
+                      cryptoXirr !== null && cryptoXirr >= 0 ? 'text-green-600' : 'text-red-600'
+                    }
+                  >
+                    {cryptoXirr !== null ? `${cryptoXirr.toFixed(2)}%` : 'N/A'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Current Value:</span>
-                <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
-                  {formatCurrency(portfolioSummary.crypto.currentValue)}
-                </span>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-muted-foreground">
+                <p className="text-sm">No crypto investments found</p>
               </div>
-              <div className="flex justify-between">
-                <span>P&L:</span>
-                <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
-                  {formatCurrency(portfolioSummary.crypto.profitLoss)} (
-                  {formatToPercentage(portfolioSummary.crypto.profitLossPercentage)})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>XIRR:</span>
-                <span
-                  className={
-                    cryptoXirr !== null && cryptoXirr >= 0 ? 'text-green-600' : 'text-red-600'
-                  }
-                >
-                  {cryptoXirr !== null ? `${cryptoXirr.toFixed(2)}%` : 'N/A'}
-                </span>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>
+
+      {/* 4th Row: EPF, FD, RD Portfolio Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {/* EPF Portfolio */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-1">EPF Portfolio</h3>
+          {epfData && epfData.length > 0 ? (
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Total Balance:</span>
+                <span className="text-blue-600 font-medium">
+                  {formatCurrency(portfolioSummary.epf.currentValue)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active Accounts:</span>
+                <span>{epfData.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Monthly Contribution:</span>
+                <span>{formatCurrency(epfData.reduce((sum, epf) => sum + epf.epfAmount, 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Annual Contribution:</span>
+                <span>
+                  {formatCurrency(epfData.reduce((sum, epf) => sum + epf.epfAmount * 12, 0))}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-24 text-muted-foreground">
+              <p className="text-sm">No EPF accounts found</p>
+            </div>
+          )}
+        </Card>
+
+        {/* Fixed Deposits Portfolio */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-1">Fixed Deposits Portfolio</h3>
+          {fdData && fdData.length > 0 ? (
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Invested:</span>
+                <span>{formatCurrency(portfolioSummary.fd.invested)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Current Value:</span>
+                <span className={getProfitLossColor(portfolioSummary.fd.profitLoss)}>
+                  {formatCurrency(portfolioSummary.fd.currentValue)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Interest Earned:</span>
+                <span className="text-green-600 font-medium">
+                  {formatCurrency(portfolioSummary.fd.profitLoss)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active FDs:</span>
+                <span>
+                  {fdData.filter((fd) => new Date(fd.dateOfMaturity) > new Date()).length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avg Rate:</span>
+                <span>
+                  {fdData.length > 0
+                    ? (
+                        fdData.reduce((sum, fd) => sum + fd.rateOfInterest, 0) / fdData.length
+                      ).toFixed(2)
+                    : '0.00'}
+                  %
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-24 text-muted-foreground">
+              <p className="text-sm">No fixed deposits found</p>
+            </div>
+          )}
+        </Card>
+
+        {/* Recurring Deposits Portfolio */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-1">Recurring Deposits Portfolio</h3>
+          {rdData && rdData.length > 0 ? (
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Invested:</span>
+                <span>{formatCurrency(portfolioSummary.rd.invested)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Current Value:</span>
+                <span className={getProfitLossColor(portfolioSummary.rd.profitLoss)}>
+                  {formatCurrency(portfolioSummary.rd.currentValue)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Interest Earned:</span>
+                <span className="text-green-600 font-medium">
+                  {formatCurrency(portfolioSummary.rd.profitLoss)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active RDs:</span>
+                <span>
+                  {rdData.filter((rd) => new Date(rd.dateOfMaturity) > new Date()).length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avg Rate:</span>
+                <span>
+                  {rdData.length > 0
+                    ? (
+                        rdData.reduce((sum, rd) => sum + rd.rateOfInterest, 0) / rdData.length
+                      ).toFixed(2)
+                    : '0.00'}
+                  %
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-24 text-muted-foreground">
+              <p className="text-sm">No recurring deposits found</p>
+            </div>
+          )}
+        </Card>
+      </div>
+
       {/* Quick Stats */}
       <div className="text-center text-muted-foreground">
         <p>Welcome back, {user?.name}! Your comprehensive portfolio overview is ready.</p>
         <p className="text-sm mt-2">
           Total Assets: {stockPortfolioData.length} Stocks • {mfPortfolioData.length} Mutual Funds •{' '}
-          {goldPortfolioData.length} Gold • {cryptoPortfolioData.length} Crypto
+          {goldPortfolioData.filter((g) => g.totalInvested > 0).length} Gold •{' '}
+          {cryptoPortfolioData.length} Crypto • {epfData?.length || 0} EPF • {fdData?.length || 0}{' '}
+          FDs • {rdData?.length || 0} RDs
         </p>
       </div>
     </div>

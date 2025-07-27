@@ -58,7 +58,9 @@ export async function fetchUserBalance(req: Request, res: Response) {
       message: 'User balances fetched',
       data: userData,
     });
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.log('Error while fetching user balance from coin dcx', error.message);
     res.status(500).json({
       success: false,
       message: 'Error fetching user balances',
@@ -74,7 +76,9 @@ export async function fetchMultipleCoinBalances(req: Request, res: Response) {
       message: 'coin balances fetched',
       data: coinData,
     });
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.log('Error while fetching coin prices from coin dcx', error.message);
     res.status(500).json({
       success: false,
       message: 'Error fetching user balances',

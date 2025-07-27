@@ -5,6 +5,27 @@ import { mutualFundInfoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
 
+export interface MutualFundNavHistoryData {
+  date: string;
+  nav: string;
+}
+
+export interface MutualFundMeta {
+  fund_house: string;
+  scheme_type: string;
+  scheme_category: string;
+  scheme_code: number;
+  scheme_name: string;
+  isin_growth: string;
+  isin_div_reinvestment: string | null;
+}
+
+export interface MutualFundNavHistoryItem {
+  meta: MutualFundMeta;
+  data: MutualFundNavHistoryData[];
+  status: string;
+}
+
 export async function addMutualFundInfo(req: Request, res: Response) {
   try {
     const user = getUserFromRequest(req);
@@ -83,7 +104,7 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
     const results = await Promise.all(navHistoryPromises);
 
     // Create a map with scheme numbers as keys
-    const navHistoryMap: Record<string, any> = {};
+    const navHistoryMap: Record<string, MutualFundNavHistoryItem> = {};
     results.forEach((result) => {
       navHistoryMap[result.schemeNumber] = result.data;
     });
@@ -117,7 +138,14 @@ export async function searchMutualFundsByName(req: Request, res: Response) {
     const response = await axios.get('https://api.mfapi.in/mf');
     const allFunds = response.data;
     // Fuzzy match schemeName
-    const matches = allFunds.filter((fund: any) => fuzzyMatch(fund.schemeName, query));
+    const matches = allFunds.filter((fund: unknown) => {
+      if (typeof fund === 'object' && fund !== null && 'schemeName' in fund) {
+        const schemeName = (fund as Record<string, unknown>).schemeName;
+        return typeof schemeName === 'string' && fuzzyMatch(schemeName, query);
+      }
+      return false;
+    });
+
     // Optionally, sort by closeness (e.g., Levenshtein distance) for better ranking
     res.status(200).json({ success: true, data: matches });
   } catch (error) {

@@ -25,15 +25,33 @@ const app = express();
 const port = config.PORT;
 
 // CORS configuration
-const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5000',
-    'https://my-finances-alpha.vercel.app',
-  ],
-  credentials: true, // Allow cookies to be sent
+import { CorsOptions } from 'cors';
+
+const corsOptions: CorsOptions = {
+  origin: function (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ): void {
+    // Allow tools like Postman or curl
+    if (!origin) return callback(null, true);
+
+    const allowedExact = [
+      'http://localhost:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5000',
+      'https://my-finances-alpha.vercel.app',
+    ];
+
+    const vercelRegex = /^https:\/\/.*\.vercel\.app$/;
+
+    if (allowedExact.includes(origin) || vercelRegex.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
   optionsSuccessStatus: 200,
 };
 
