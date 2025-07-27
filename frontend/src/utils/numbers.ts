@@ -12,8 +12,22 @@ export function formatToTwoDecimals(value: numberInput): number {
   return Number(value.toFixed(2));
 }
 
-export function formatToPercentage(numerator: numberInput, denominator: numberInputSafe): number {
-  if (numerator === null || numerator == undefined) return 0;
-  const fraction = formatToTwoDecimals(numerator / denominator);
-  return fraction * 100;
+export function formatToPercentage(numerator: numberInput, denominator?: numberInputSafe): number {
+  if (numerator === null || numerator === undefined) return 0;
+
+  if (denominator === undefined) {
+    return Number(numerator.toFixed(2));
+  }
+
+  const fraction = Number(((numerator / denominator) * 100).toFixed(2));
+  // console.log("numbers", numerator, denominator, fraction * 100);
+  return fraction;
 }
+
+export const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+  }).format(amount);
+};

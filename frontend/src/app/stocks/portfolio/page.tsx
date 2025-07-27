@@ -10,26 +10,36 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import _ from 'lodash';
-import { useMemo } from 'react';
-import { formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
+import { useMemo, useRef, useState } from 'react';
+import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(amount);
-
-const formatPercentage = (percentage: number) =>
-  `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
-
-const getProfitLossColor = (profitLoss: number) =>
-  profitLoss >= 0 ? 'text-green-600' : 'text-red-600';
+import Highcharts from 'highcharts';
+import HighchartsReact from 'highcharts-react-official';
+import { useAppStore } from '@/store/useAppStore';
+import { getTimeframes, getPastDate } from '@/utils/chartHelpers';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getProfitLossColor } from '@/utils/text';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function StocksPortfolioPage() {
+  const { theme } = useAppStore();
+  const isDark = theme === 'dark';
+  const TIMEFRAMES = getTimeframes('1y');
+  const [timeframe, setTimeframe] = useState(TIMEFRAMES[4].label);
+  const selectedTimeframe = TIMEFRAMES.find((tf) => tf.label === timeframe) || TIMEFRAMES[1];
+  const timeframeStart = getPastDate(selectedTimeframe.days);
+
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [selectedStock, setSelectedStock] = useState('All');
+
   // Fetch stock transactions
   const {
     data: stockTransactions,
@@ -75,19 +85,36 @@ export default function StocksPortfolioPage() {
     return groupedRows.map((row) => {
       const stockData = nseQuoteData?.[row.stockName];
       const currentPrice = stockData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+
+      // Get previous day's close from the close array (second last element)
+      const closeArray = stockData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      const previousClose =
+        closeArray && closeArray.length >= 2 ? closeArray[closeArray.length - 2] : null;
+
       const currentValuation = currentPrice ? currentPrice * row.numOfShares : 0;
       const investedAmount = parseFloat(row.avgPrice) * row.numOfShares;
       const profitLoss = currentValuation - investedAmount;
       const profitLossPercentage =
         investedAmount > 0 ? formatToPercentage(profitLoss, investedAmount) : 0;
 
+      // Calculate 1 day change
+      const oneDayPriceChange = currentPrice && previousClose ? currentPrice - previousClose : 0;
+      const oneDayChange = oneDayPriceChange * row.numOfShares;
+      const oneDayChangePercentage =
+        previousClose && previousClose > 0
+          ? formatToPercentage(oneDayPriceChange, previousClose)
+          : 0;
+
       return {
         ...row,
         currentPrice: currentPrice || 0,
+        previousClose: previousClose || 0,
         currentValuation,
         investedAmount,
         profitLoss,
         profitLossPercentage,
+        oneDayChange,
+        oneDayChangePercentage,
         isDataAvailable: !!currentPrice,
       };
     });
@@ -107,14 +134,250 @@ export default function StocksPortfolioPage() {
     const totalProfitLossPercentage =
       totalInvested > 0 ? formatToPercentage(totalProfitLoss, totalInvested) : 0;
 
+    // Calculate total 1 day change
+    const totalOneDayChange = processedPortfolioData.reduce(
+      (sum, stock) => sum + stock.oneDayChange,
+      0
+    );
+    const totalCurrentPrice = processedPortfolioData.reduce(
+      (sum, stock) => sum + stock.oneDayChange,
+      0
+    );
+    const totalPreviousClose = processedPortfolioData.reduce(
+      (sum, stock) => sum + stock.oneDayChange,
+      0
+    );
+
+    const totalOneDayChangePercentage = formatToPercentage(
+      totalCurrentPrice - totalPreviousClose,
+      totalPreviousClose
+    );
+
     return {
       totalInvested,
       totalCurrentValue,
       totalProfitLoss,
       totalProfitLossPercentage,
+      totalOneDayChange,
+      totalOneDayChangePercentage,
     };
   }, [processedPortfolioData]);
 
+  // Process historical data for charts
+  const chartData = useMemo(() => {
+    if (!processedPortfolioData.length || !nseQuoteData) return null;
+
+    const stockSeries: unknown[] | null = [];
+    const colors = [
+      '#FF6B6B',
+      '#4ECDC4',
+      '#45B7D1',
+      '#FFA07A',
+      '#98D8C8',
+      '#F7DC6F',
+      '#BB8FCE',
+      '#85C1E9',
+      '#F8C471',
+      '#82E0AA',
+    ];
+
+    processedPortfolioData.forEach((stock, index) => {
+      const stockData = nseQuoteData[stock.stockName];
+      if (!stockData?.chart?.result?.[0]) return;
+
+      const timestamps: number[] = stockData.chart.result[0].timestamp || [];
+      const closes = stockData.chart.result[0].indicators?.quote?.[0]?.close || [];
+
+      if (!timestamps.length || !closes.length) return;
+
+      // Create series data for this stock
+      const seriesData = timestamps
+        .map((timestamp, idx) => {
+          const closePrice = closes[idx];
+          const timeMs = timestamp * 1000;
+          if (!closePrice || timeMs < timeframeStart) return null;
+          const portfolioValue = closePrice * stock.numOfShares;
+          return [timeMs, portfolioValue];
+        })
+        .filter(Boolean);
+
+      if (seriesData.length > 0) {
+        stockSeries.push({
+          name: stock.stockName,
+          data: seriesData,
+          color: colors[index % colors.length],
+          lineWidth: 2,
+          marker: {
+            enabled: false,
+            states: {
+              hover: {
+                enabled: true,
+                radius: 4,
+              },
+            },
+          },
+        });
+      }
+    });
+
+    return stockSeries;
+  }, [processedPortfolioData, nseQuoteData, timeframeStart]);
+
+  // Chart configuration
+  const chartOptions = useMemo(() => {
+    if (!chartData) return null;
+
+    return {
+      chart: {
+        type: 'line',
+        height: 500,
+        backgroundColor: 'transparent',
+        style: {
+          fontFamily: 'inherit',
+        },
+      },
+      title: {
+        text: 'Portfolio Performance Over Time',
+        style: {
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: isDark ? '#fff' : '#374151',
+        },
+      },
+      subtitle: {
+        text: 'Individual Stock Holdings Value',
+        style: {
+          color: isDark ? '#d1d5db' : '#6b7280',
+        },
+      },
+      xAxis: {
+        type: 'datetime',
+        title: {
+          text: 'Date',
+          style: {
+            color: isDark ? '#fff' : '#374151',
+          },
+        },
+        labels: {
+          style: {
+            color: isDark ? '#d1d5db' : '#6b7280',
+          },
+        },
+        gridLineWidth: 1,
+        gridLineColor: isDark ? '#374151' : '#e5e7eb',
+        lineColor: isDark ? '#4b5563' : '#d1d5db',
+      },
+      yAxis: {
+        title: {
+          text: 'Portfolio Value (₹)',
+          style: {
+            color: isDark ? '#fff' : '#374151',
+          },
+        },
+        labels: {
+          style: {
+            color: isDark ? '#d1d5db' : '#6b7280',
+          },
+          formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
+            return '₹' + Highcharts.numberFormat(this.value as number, 0);
+          },
+        },
+        gridLineWidth: 1,
+        gridLineColor: isDark ? '#374151' : '#e5e7eb',
+      },
+      tooltip: {
+        shared: true,
+        crosshairs: true,
+        backgroundColor: isDark ? '#1f2937' : 'rgba(255, 255, 255, 0.95)',
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        borderRadius: 8,
+        shadow: true,
+        useHTML: true,
+        style: {
+          color: isDark ? '#fff' : '#374151',
+        },
+        formatter: function (this: unknown): string {
+          // @ts-expect-error highcharts
+          let tooltip: string = `<b style="color: ${isDark ? '#fff' : '#374151'}">${Highcharts.dateFormat('%e %b %Y', this.x as number)}</b><br/>`;
+          // @ts-expect-error highcharts
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (this.points ?? []).forEach((point: any) => {
+            tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
+          });
+
+          return tooltip;
+        },
+      },
+      legend: {
+        enabled: true,
+        align: 'center',
+        verticalAlign: 'bottom',
+        layout: 'horizontal',
+        itemStyle: {
+          fontSize: '12px',
+          color: isDark ? '#d1d5db' : '#6b7280',
+        },
+        itemHoverStyle: {
+          color: isDark ? '#fff' : '#374151',
+        },
+      },
+      plotOptions: {
+        line: {
+          animation: {
+            duration: 1000,
+          },
+          marker: {
+            enabled: false,
+            states: {
+              hover: {
+                enabled: true,
+                radius: 4,
+              },
+            },
+          },
+          states: {
+            hover: {
+              lineWidth: 3,
+            },
+          },
+        },
+        series: {
+          events: {
+            legendItemClick: function () {},
+          },
+        },
+      },
+      series:
+        selectedStock === 'All'
+          ? chartData
+          : chartData.filter(
+              (s) =>
+                typeof s === 'object' &&
+                s !== null &&
+                'name' in s &&
+                (s as { name: string }).name === selectedStock
+            ),
+      credits: {
+        enabled: false,
+      },
+      responsive: {
+        rules: [
+          {
+            condition: {
+              maxWidth: 500,
+            },
+            chartOptions: {
+              legend: {
+                layout: 'horizontal',
+                align: 'center',
+                verticalAlign: 'bottom',
+              },
+            },
+          },
+        ],
+      },
+    };
+  }, [chartData, isDark, selectedStock]);
   // Calculate overall portfolio XIRR
   const allStockTxs = useMemo(() => {
     if (!stockTransactions) return [];
@@ -146,7 +409,8 @@ export default function StocksPortfolioPage() {
         <h2 className="text-xl font-bold mb-4 text-center">Stocks Portfolio</h2>
 
         {/* Portfolio Summary Cards Skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Skeleton className="w-full h-[120px]" />
           <Skeleton className="w-full h-[120px]" />
           <Skeleton className="w-full h-[120px]" />
           <Skeleton className="w-full h-[120px]" />
@@ -157,7 +421,7 @@ export default function StocksPortfolioPage() {
           <div className="border rounded-lg">
             {/* Table Header Skeleton */}
             <div className="bg-muted/50 p-4 border-b">
-              <div className="grid grid-cols-10 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {[
                   'S.No',
                   'Stock Name',
@@ -166,6 +430,8 @@ export default function StocksPortfolioPage() {
                   'Amount',
                   'Current Price',
                   'Current Valuation',
+                  '1 Day Change',
+                  '1 Day Change%',
                   'P/L (₹)',
                   'P/L %',
                   'XIRR %',
@@ -181,7 +447,7 @@ export default function StocksPortfolioPage() {
             <div className="divide-y">
               {[1, 2, 3, 4, 5].map((row) => (
                 <div key={row} className="p-4">
-                  <div className="grid grid-cols-10 gap-4">
+                  <div className="grid grid-cols-12 gap-4">
                     <Skeleton className="h-4 w-8" />
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-4 w-16" />
@@ -189,6 +455,8 @@ export default function StocksPortfolioPage() {
                     <Skeleton className="h-4 w-20" />
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
                     <Skeleton className="h-4 w-20" />
                     <Skeleton className="h-4 w-16" />
                     <Skeleton className="h-4 w-16" />
@@ -216,7 +484,7 @@ export default function StocksPortfolioPage() {
       <h2 className="text-xl font-bold mb-4 text-center">Stocks Portfolio</h2>
 
       {/* Portfolio Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {/* Total Invested Card */}
         <SummaryStatCard
           label="Total Invested"
@@ -237,10 +505,23 @@ export default function StocksPortfolioPage() {
           value={
             <span className={getProfitLossColor(portfolioTotals.totalProfitLoss)}>
               {formatCurrency(formatToTwoDecimals(portfolioTotals.totalCurrentValue))}{' '}
-              <span>({formatPercentage(portfolioTotals.totalProfitLossPercentage)})</span>
+              <span>({formatToPercentage(portfolioTotals.totalProfitLossPercentage)}%)</span>
             </span>
           }
           valueClassName={getProfitLossColor(portfolioTotals.totalProfitLoss)}
+          loading={isLoading}
+        />
+
+        {/* 1 Day Change Card */}
+        <SummaryStatCard
+          label="1 Day Change"
+          value={
+            <span className={getProfitLossColor(portfolioTotals.totalOneDayChange)}>
+              {formatCurrency(formatToTwoDecimals(portfolioTotals.totalOneDayChange))} (
+              {portfolioTotals.totalOneDayChangePercentage}%)
+            </span>
+          }
+          valueClassName={getProfitLossColor(portfolioTotals.totalOneDayChange)}
           loading={isLoading}
         />
 
@@ -255,8 +536,49 @@ export default function StocksPortfolioPage() {
         />
       </div>
 
+      {chartData && chartOptions && (
+        <div className="relative mb-6" ref={chartRef}>
+          {/* Timeframe Tabs in top-right */}
+          <div className="absolute right-6 top-3 z-10">
+            <Tabs value={timeframe} onValueChange={setTimeframe}>
+              <TabsList className="bg-transparent p-0 h-auto gap-1">
+                {TIMEFRAMES.map((tf) => (
+                  <TabsTrigger
+                    key={tf.label}
+                    value={tf.label}
+                    className="border border-gray-400 text-gray-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors duration-150 data-[state=active]:bg-gray-400 data-[state=active]:text-black data-[state=active]:border-gray-400 data-[state=active]:shadow-none focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  >
+                    {tf.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+
+          <div className="absolute left-6 top-3 z-10">
+            <Select value={selectedStock} onValueChange={setSelectedStock}>
+              <SelectTrigger className="w-[160px] border border-black text-black dark:border-white dark:text-white dark:bg-transparent">
+                <SelectValue placeholder="Select stock" />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-gray-900 text-black dark:text-white border border-black dark:border-white">
+                <SelectItem value="All">All</SelectItem>
+                {processedPortfolioData.map((stock) => (
+                  <SelectItem key={stock.stockName} value={stock.stockName}>
+                    {stock.stockName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="bg-transparent rounded-lg border border-border p-4">
+            <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+          </div>
+        </div>
+      )}
+
       {processedPortfolioData.length > 0 && (
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full mx-auto rounded-lg border p-1">
           <Table>
             <TableHeader>
               <TableRow>
@@ -267,6 +589,8 @@ export default function StocksPortfolioPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Current Price</TableHead>
                 <TableHead>Current Valuation</TableHead>
+                <TableHead>1 Day Change</TableHead>
+                <TableHead>1 Day Change%</TableHead>
                 <TableHead>P/L (₹)</TableHead>
                 <TableHead>P/L %</TableHead>
                 <TableHead>XIRR %</TableHead>
@@ -292,15 +616,46 @@ export default function StocksPortfolioPage() {
                   }
                 }
                 return (
-                  <TableRow key={row.stockName || idx}>
+                  <TableRow
+                    key={row.stockName}
+                    className={`cursor-pointer hover:bg-muted transition ${
+                      selectedStock === row.stockName ? 'bg-muted' : ''
+                    }`}
+                    onClick={() => {
+                      setSelectedStock(row.stockName || 'All');
+                      chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                  >
                     <TableCell>{idx + 1}</TableCell>
-                    <TableCell>{row.stockName || '-'}</TableCell>
+                    <TableCell className="underline">{row.stockName || '-'}</TableCell>
                     <TableCell>{row.numOfShares}</TableCell>
                     <TableCell>{row.avgPrice}</TableCell>
                     <TableCell>₹{row.investedAmount.toFixed(2)}</TableCell>
                     <TableCell>{row.isDataAvailable ? `₹${row.currentPrice}` : '-'}</TableCell>
                     <TableCell>
                       {row.isDataAvailable ? `₹${row.currentValuation.toFixed(2)}` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {row.isDataAvailable ? (
+                        <div className="flex flex-col">
+                          <span className={getProfitLossColor(row.oneDayChange)}>
+                            {formatCurrency(formatToTwoDecimals(row.oneDayChange))}
+                          </span>
+                        </div>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.isDataAvailable ? (
+                        <div className="flex flex-col">
+                          <span className={`text-sm ${getProfitLossColor(row.oneDayChange)}`}>
+                            {row.oneDayChangePercentage}
+                          </span>
+                        </div>
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={getProfitLossColor(row.profitLoss)}>
@@ -311,7 +666,7 @@ export default function StocksPortfolioPage() {
                     </TableCell>
                     <TableCell>
                       <span className={getProfitLossColor(row.profitLoss)}>
-                        {row.isDataAvailable ? formatPercentage(row.profitLossPercentage) : '-'}
+                        {row.isDataAvailable ? formatToPercentage(row.profitLossPercentage) : '-'}
                       </span>
                     </TableCell>
                     <TableCell>

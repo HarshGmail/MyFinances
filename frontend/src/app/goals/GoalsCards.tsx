@@ -20,14 +20,7 @@ import _ from 'lodash';
 import { Pencil } from 'lucide-react';
 import GoalEditDrawer from './GoalEditDrawer';
 import type { AssetOption } from './GoalAssetSelector';
-
-// Helper functions
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(amount);
+import { formatCurrency } from '@/utils/numbers';
 
 const getProgressColor = (percentage: number) => {
   if (percentage >= 100) return 'bg-green-500';

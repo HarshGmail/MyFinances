@@ -1,46 +1,4 @@
-export interface User {
-  name: string | null;
-  email: string | null;
-}
-
-export interface MutualFundInfo {
-  _id: string;
-  userId?: string;
-  date?: string;
-  sipAmount?: number;
-  goal?: string;
-  platform?: string;
-  fundName?: string;
-  schemeNumber: number;
-}
-
-// Response interfaces for transaction data
-export interface MutualFundTransaction {
-  id: string;
-  type: 'credit' | 'debit';
-  date: string;
-  fundPrice: number;
-  numOfUnits: number;
-  amount: number;
-  fundName: string;
-  platform?: string;
-  userId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface StockTransaction {
-  id: string;
-  type: 'credit' | 'debit';
-  date: string;
-  marketPrice: number;
-  numOfShares: number;
-  amount: number;
-  stockName: string;
-  userId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
 export interface CoinCandle {
   open: number;
@@ -49,6 +7,48 @@ export interface CoinCandle {
   close: number;
   volume: number;
   time: number;
+}
+
+export interface CoinDCXBalance {
+  balance: number;
+  locked_balance: number;
+  currency: string;
+}
+
+export interface CoinDCXUserBalanceResponse {
+  success: boolean;
+  message: string;
+  data: CoinDCXBalance[];
+}
+
+export interface CoinPricesResponse {
+  success: boolean;
+  message: string;
+  data: { [coinName: string]: number | null };
+}
+
+export interface CryptoPortfolioItem {
+  coinName: string;
+  totalQuantity: number;
+  totalInvested: number;
+  avgPurchasePrice: number;
+  currentPrice: number;
+  currentValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  lastUpdated: string;
+}
+
+export interface CryptoPortfolioResponse {
+  data: CryptoPortfolioItem[];
+  summary: CryptoPortfolioSummary;
+}
+
+export interface CryptoPortfolioSummary {
+  totalInvested: number;
+  totalCurrentValue: number;
+  totalProfitLoss: number;
+  totalProfitLossPercentage: number;
 }
 
 export interface CryptoTransaction {
@@ -65,6 +65,51 @@ export interface CryptoTransaction {
   updatedAt?: string;
 }
 
+export interface EpfAccount {
+  _id: string;
+  userId: string;
+  organizationName: string;
+  epfAmount: number;
+  creditDay: number;
+  startDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EpfAccountPayload {
+  organizationName: string;
+  epfAmount: number;
+  creditDay: number;
+  startDate: Date;
+}
+
+export interface EpfTimelineSummary {
+  totalCurrentBalance: number;
+  totalContributions: number;
+  totalInterest: number;
+  timeline: TimelineRow[];
+}
+
+export interface FixedDeposit {
+  _id: string;
+  userId: string;
+  dateOfCreation: Date;
+  dateOfMaturity: Date;
+  amountInvested: number;
+  platform?: string;
+  fixedDepositName: string;
+  rateOfInterest: number;
+}
+
+export interface FixedDepositPayload {
+  dateOfCreation: string;
+  dateOfMaturity: string;
+  amountInvested: number;
+  platform?: string;
+  fixedDepositName: string;
+  rateOfInterest: number;
+}
+
 export interface GoldTransaction {
   id: string;
   type: 'credit' | 'debit';
@@ -79,48 +124,49 @@ export interface GoldTransaction {
   updatedAt?: string;
 }
 
-export interface CryptoPortfolioItem {
-  coinName: string;
-  totalQuantity: number;
-  totalInvested: number;
-  avgPurchasePrice: number;
-  currentPrice: number;
-  currentValue: number;
-  profitLoss: number;
-  profitLossPercentage: number;
-  lastUpdated: string;
+export interface MutualFundInfo {
+  _id: string;
+  userId?: string;
+  date?: string;
+  sipAmount?: number;
+  goal?: string;
+  platform?: string;
+  fundName?: string;
+  schemeNumber: number;
 }
 
-export interface CryptoPortfolioSummary {
-  totalInvested: number;
-  totalCurrentValue: number;
-  totalProfitLoss: number;
-  totalProfitLossPercentage: number;
+export interface MutualFundTransaction {
+  id: string;
+  type: 'credit' | 'debit';
+  date: string;
+  fundPrice: number;
+  numOfUnits: number;
+  amount: number;
+  fundName: string;
+  platform?: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface CryptoPortfolioResponse {
-  data: CryptoPortfolioItem[];
-  summary: CryptoPortfolioSummary;
+export interface RecurringDeposit {
+  _id: string;
+  userId: string;
+  dateOfCreation: Date;
+  dateOfMaturity: Date;
+  amountInvested: number;
+  platform?: string;
+  recurringDepositName: string;
+  rateOfInterest: number;
 }
 
-// New interface for CoinDCX user balances
-export interface CoinDCXBalance {
-  balance: number;
-  locked_balance: number;
-  currency: string;
-}
-
-export interface CoinDCXUserBalanceResponse {
-  success: boolean;
-  message: string;
-  data: CoinDCXBalance[];
-}
-
-// Interface for coin prices response
-export interface CoinPricesResponse {
-  success: boolean;
-  message: string;
-  data: { [coinName: string]: number | null };
+export interface RecurringDepositPayload {
+  dateOfCreation: string;
+  dateOfMaturity: string;
+  amountInvested: number;
+  platform?: string;
+  recurringDepositName: string;
+  rateOfInterest: number;
 }
 
 export interface SafeGoldRate {
@@ -137,6 +183,35 @@ export interface SafeGoldRatesResponse {
   };
 }
 
+export interface StockTransaction {
+  id: string;
+  type: 'credit' | 'debit';
+  date: string;
+  marketPrice: number;
+  numOfShares: number;
+  amount: number;
+  stockName: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TimelineRow {
+  type: 'contribution' | 'interest';
+  organization?: string;
+  monthlyContribution?: number;
+  startDate?: string;
+  endDate?: string;
+  totalContribution: number;
+  financialYear?: string;
+  interestCreditDate?: string;
+}
+
+export interface User {
+  name: string | null;
+  email: string | null;
+}
+
 export interface UserGoal {
   _id?: string;
   userId: string;
@@ -148,5 +223,3 @@ export interface UserGoal {
   description?: string;
   targetAmount?: number;
 }
-
-export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };

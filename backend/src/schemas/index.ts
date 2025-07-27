@@ -1,7 +1,10 @@
-// Export all schemas from this file for cleaner imports
-export * from './user';
-export * from './digitalGold';
 export * from './crypto';
-export * from './mutual-funds';
+export * from './digitalGold';
+export * from './epf';
+export * from './fixedDeposits';
 export * from './mutual-funds-info';
+export * from './mutual-funds';
+export * from './recurringDeposits';
 export * from './stocks';
+export * from './user';
+export * from './userGoals';

@@ -8,29 +8,16 @@ import HighchartsReact from 'highcharts-react-official';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import xirr, { XirrTransaction } from '@/utils/xirr';
-
-const TIMEFRAMES = [
-  { label: '1w', days: 7 },
-  { label: '1m', days: 30 },
-  { label: '3m', days: 90 },
-  { label: '6m', days: 180 },
-  { label: '1y', days: 365 },
-  { label: '3y', days: 1095 },
-  { label: '5y', days: 1825 },
-];
-
-function getPastDate(daysAgo: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().slice(0, 10);
-}
+import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
+import { formatCurrency } from '@/utils/numbers';
 
 export default function GoldPortfolioPage() {
   const { theme } = useAppStore();
+  const TIMEFRAMES = getTimeframes();
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[1].label); // default '1m'
   const endDate = new Date().toISOString().slice(0, 10);
   const selectedTimeframe = TIMEFRAMES.find((tf) => tf.label === timeframe) || TIMEFRAMES[1];
-  const startDate = getPastDate(selectedTimeframe.days);
+  const startDate = getPastDate(selectedTimeframe.days, 'ymd');
 
   const { data, isLoading, error } = useSafeGoldRatesQuery({ startDate, endDate });
   const { data: transactions } = useGoldTransactionsQuery();
@@ -59,7 +46,6 @@ export default function GoldPortfolioPage() {
     }));
     // Add current value as final positive cash flow
     cashFlows.push({ amount: currentValue, when: new Date() });
-    console.log('Gold XIRR cashFlows:', cashFlows);
     let xirrValue: number | null = null;
     try {
       xirrValue = xirr(cashFlows) * 100;
@@ -75,13 +61,6 @@ export default function GoldPortfolioPage() {
       xirrValue,
     };
   }, [transactions, data]);
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount);
 
   const chartOptions = useMemo(() => {
     if (!data?.data) return {};

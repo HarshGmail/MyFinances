@@ -5,3 +5,6 @@ export * from './mutualFundsController';
 export * from './stocksController';
 export * from './mutualFundsInfoController';
 export * from './userGoalsController';
+export * from './epfController';
+export * from './fixedDepositsController';
+export * from './recurringDepositsController';

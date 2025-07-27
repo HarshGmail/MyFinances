@@ -18,8 +18,9 @@ import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { Card } from '@/components/ui/card';
 import _ from 'lodash';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
-import { formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
+import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
 import dynamic from 'next/dynamic';
+import { getProfitLossColor } from '@/utils/text';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -31,20 +32,6 @@ interface CryptoPortfolioItem {
   profitLoss: number;
   profitLossPercentage: number;
 }
-
-// Helper functions
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-  }).format(amount);
-
-const formatPercentage = (percentage: number) =>
-  `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
-
-const getProfitLossColor = (profitLoss: number) =>
-  profitLoss >= 0 ? 'text-green-600' : 'text-red-600';
 
 export default function Home() {
   const user = useAppStore((state) => state.user);
@@ -602,14 +589,14 @@ export default function Home() {
           value={
             <span className={getProfitLossColor(portfolioSummary.total.profitLoss)}>
               {formatCurrency(portfolioSummary.total.currentValue)}{' '}
-              <span>({formatPercentage(portfolioSummary.total.profitLossPercentage)})</span>
+              <span>({formatToPercentage(portfolioSummary.total.profitLossPercentage)})</span>
             </span>
           }
           valueClassName={getProfitLossColor(portfolioSummary.total.profitLoss)}
         />
         <SummaryStatCard
           label="Total P&L %"
-          value={formatPercentage(portfolioSummary.total.profitLossPercentage)}
+          value={formatToPercentage(portfolioSummary.total.profitLossPercentage)}
           valueClassName={getProfitLossColor(portfolioSummary.total.profitLoss)}
         />
         <SummaryStatCard
@@ -656,7 +643,7 @@ export default function Home() {
                 <span>P&L:</span>
                 <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
                   {formatCurrency(portfolioSummary.stocks.profitLoss)} (
-                  {formatPercentage(portfolioSummary.stocks.profitLossPercentage)})
+                  {formatToPercentage(portfolioSummary.stocks.profitLossPercentage)})
                 </span>
               </div>
               <div className="flex justify-between">
@@ -689,7 +676,7 @@ export default function Home() {
                 <span>P&L:</span>
                 <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
                   {formatCurrency(portfolioSummary.gold.profitLoss)} (
-                  {formatPercentage(portfolioSummary.gold.profitLossPercentage)})
+                  {formatToPercentage(portfolioSummary.gold.profitLossPercentage)})
                 </span>
               </div>
               <div className="flex justify-between">
@@ -723,7 +710,7 @@ export default function Home() {
                 <span>P&L:</span>
                 <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
                   {formatCurrency(portfolioSummary.mutualFunds.profitLoss)} (
-                  {formatPercentage(portfolioSummary.mutualFunds.profitLossPercentage)})
+                  {formatToPercentage(portfolioSummary.mutualFunds.profitLossPercentage)})
                 </span>
               </div>
               <div className="flex justify-between">
@@ -754,7 +741,7 @@ export default function Home() {
                 <span>P&L:</span>
                 <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
                   {formatCurrency(portfolioSummary.crypto.profitLoss)} (
-                  {formatPercentage(portfolioSummary.crypto.profitLossPercentage)})
+                  {formatToPercentage(portfolioSummary.crypto.profitLossPercentage)})
                 </span>
               </div>
               <div className="flex justify-between">

@@ -22,6 +22,8 @@ import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { useAppStore } from '@/store/useAppStore';
+import { formatCurrency } from '@/utils/numbers';
+import { getProfitLossColor } from '@/utils/text';
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });
 
@@ -134,13 +136,6 @@ export default function MutualFundsDashboardPage() {
   }, [tableData, mutualFundsTransactionsData]);
   // today, week and pie chart
 
-  const formatCurrency = (amount: number) =>
-    `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-
-  const getProfitLossColor = (profitLoss: number | null) => {
-    if (profitLoss === null) return '';
-    return profitLoss >= 0 ? 'text-green-600' : 'text-red-600';
-  };
   const getProfitLossBadgeVariant = (profitLoss: number | null) => {
     if (profitLoss === null) return 'default';
     return profitLoss >= 0 ? 'default' : 'destructive';

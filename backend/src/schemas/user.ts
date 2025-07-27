@@ -6,6 +6,7 @@ export const userSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
   name: z.string().min(2).max(50),
   email: z.string().email(),
+  dob: z.date(),
   password: z.string().min(6),
   createdAt: z.date(),
   updatedAt: z.date(),

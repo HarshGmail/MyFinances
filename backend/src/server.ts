@@ -1,6 +1,6 @@
 import config from './config';
 import express from 'express';
-import cors, { CorsOptions } from 'cors';
+import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import * as fs from 'fs';
@@ -15,6 +15,9 @@ import {
   mutualFundsInfoRouter,
   stocksRouter,
   userGoalsRouter,
+  epfRouter,
+  fixedDepositsRouter,
+  recurringDepositsRouter,
 } from './routes';
 import { requestLogger } from './middleware';
 
@@ -54,6 +57,9 @@ app.use('/api/mutual-funds', mutualFundsRouter);
 app.use('/api/funds', mutualFundsInfoRouter);
 app.use('/api/stocks', stocksRouter);
 app.use('/api/goals', userGoalsRouter);
+app.use('/api/epf', epfRouter);
+app.use('/api/fixed-deposit', fixedDepositsRouter);
+app.use('/api/recurring-deposit', recurringDepositsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/health', (req, res) => {

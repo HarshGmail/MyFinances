@@ -21,6 +21,8 @@ import Highcharts from 'highcharts';
 import { useAppStore } from '@/store/useAppStore';
 import { useCoinCandlesQuery } from '@/api/query/crypto';
 import { CryptoTransaction, CoinCandle } from '@/api/dataInterface';
+import { formatCurrency, formatToPercentage } from '@/utils/numbers';
+import { getProfitLossColor } from '@/utils/text';
 
 interface PortfolioItem {
   coinName: string;
@@ -168,22 +170,6 @@ export default function CryptoPortfolioPage() {
       return null;
     }
   }, [cashFlows]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const formatPercentage = (percentage: number) => {
-    return `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
-  };
-
-  const getProfitLossColor = (profitLoss: number) => {
-    return profitLoss >= 0 ? 'text-green-600' : 'text-red-600';
-  };
 
   const getProfitLossBadgeVariant = (profitLoss: number) => {
     return profitLoss >= 0 ? 'default' : 'destructive';
@@ -387,7 +373,7 @@ export default function CryptoPortfolioPage() {
             value={
               <span className={getProfitLossColor(summary.totalProfitLoss)}>
                 {formatCurrency(summary.totalCurrentValue)}{' '}
-                <span>({formatPercentage(summary.totalProfitLossPercentage)})</span>
+                <span>({formatToPercentage(summary.totalProfitLossPercentage)})</span>
               </span>
             }
             valueClassName={getProfitLossColor(summary.totalProfitLoss)}
@@ -495,7 +481,7 @@ export default function CryptoPortfolioPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={getProfitLossBadgeVariant(item.profitLoss)}>
-                        {formatPercentage(item.profitLossPercentage)}
+                        {formatToPercentage(item.profitLossPercentage)}
                       </Badge>
                     </TableCell>
                     <TableCell>

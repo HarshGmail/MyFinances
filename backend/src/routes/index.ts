@@ -1,4 +1,3 @@
-// Export all routes from this file for cleaner imports
 export { default as authRoutes } from './auth';
 export { default as verifyRoutes } from './verify';
 export { default as goldRouter } from './gold';
@@ -7,3 +6,6 @@ export { default as mutualFundsRouter } from './mutual-funds';
 export { default as mutualFundsInfoRouter } from './mutual-funds-info';
 export { default as stocksRouter } from './stocks';
 export { default as userGoalsRouter } from './userGoals';
+export { default as epfRouter } from './epf';
+export { default as fixedDepositsRouter } from './fixedDeposits';
+export { default as recurringDepositsRouter } from './recurringDeposits';

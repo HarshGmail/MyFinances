@@ -18,6 +18,7 @@ import {
   PiggyBank,
   Wallet,
   Goal,
+  ChartNoAxesCombined,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useLogoutMutation } from '@/api/mutations';
@@ -109,6 +110,12 @@ export function Navbar() {
           <div className="flex">
             <NavigationMenu viewport={false}>
               <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger onClick={() => router.push('/home')}>
+                    <ChartNoAxesCombined className="w-4 h-4 mr-2" />
+                    Home
+                  </NavigationMenuTrigger>
+                </NavigationMenuItem>
                 {/* Stocks */}
                 <NavigationMenuItem>
                   <NavigationMenuTrigger onClick={() => router.push('/stocks/portfolio')}>
