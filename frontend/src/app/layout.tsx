@@ -4,6 +4,7 @@ import './globals.css';
 import { Navbar, RouteGuard, Toaster, ThemeSyncer } from '@/components';
 import Providers from './providers';
 import { AuthProvider } from '@/context/AuthContext';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Our Finance',
+  title: 'My Finance',
   description: 'Manage Your Finances',
 };
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="flex flex-col min-h-screen">
                 <Navbar />
                 <div className="flex-1 overflow-auto pb-4">{children}</div>
+                <SpeedInsights />
                 <Toaster />
               </div>
             </RouteGuard>
