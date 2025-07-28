@@ -23,6 +23,16 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAddCryptoTransactionMutation } from '@/api/mutations';
+import { useSearchCryptoQuery } from '@/api/query';
+import { debounce } from 'lodash';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 
 const formSchema = z.object({
   type: z.enum(['credit', 'debit'], { required_error: 'Type is required' }),
@@ -33,11 +43,10 @@ const formSchema = z.object({
   quantity: z.number().min(0, 'Quantity must be at least 0'),
   amount: z.number().min(0, 'Amount must be at least 0'),
   coinName: z.string().min(1, 'Coin name is required'),
+  coinSymbol: z.string().min(1, 'Coin symbol is required'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-const coinNameSuggestions = ['Bitcoin', 'Ethereum', 'Solana', 'Polygon Ecosystem Token'];
 
 const CACHE_KEY = 'cryptoTransactionFormCache';
 
@@ -51,11 +60,23 @@ export default function CryptoUpdateCryptoPage() {
       quantity: 0,
       amount: 0,
       coinName: '',
+      coinSymbol: '',
     },
   });
+
   const [dateOpen, setDateOpen] = useState(false);
+  const [coinNameInput, setCoinNameInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const router = useRouter();
   const { mutate, isPending } = useAddCryptoTransactionMutation();
+
+  // Search crypto query with debounced input
+  const { data: coinSuggestions } = useSearchCryptoQuery(coinNameInput);
+
+  // Debounced handler for coin search
+  const debouncedSetCoinNameInput = debounce((val: string) => {
+    setCoinNameInput(val);
+  }, 1000);
 
   // Load cached values if present
   useEffect(() => {
@@ -300,7 +321,7 @@ export default function CryptoUpdateCryptoPage() {
               )}
             />
 
-            {/* Coin Name (with suggestions) */}
+            {/* Coin Name (with search suggestions) */}
             <FormLabel className="self-center">Coin Name</FormLabel>
             <FormField
               control={form.control}
@@ -308,26 +329,79 @@ export default function CryptoUpdateCryptoPage() {
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormControl>
-                    <input
-                      type="text"
-                      list="coin-name-suggestions"
-                      placeholder="Enter coin name"
-                      className="w-full border rounded-md px-3 py-2 bg-background text-foreground"
-                      {...field}
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder="Search and select coin"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          debouncedSetCoinNameInput(e.target.value);
+                          setShowSuggestions(true);
+                          // Reset coin symbol when user types manually
+                          form.setValue('coinSymbol', '');
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        autoComplete="off"
+                      />
+
+                      {showSuggestions && coinNameInput.length >= 2 && (
+                        <div className="absolute z-20 mt-1 w-full">
+                          <Command className="border rounded-md bg-white dark:bg-neutral-900 shadow max-h-[250px] overflow-y-auto">
+                            <CommandInput
+                              value={coinNameInput}
+                              onValueChange={(val) => {
+                                setCoinNameInput(val);
+                                debouncedSetCoinNameInput(val);
+                              }}
+                              placeholder="Search cryptocurrencies..."
+                            />
+                            <CommandList>
+                              {coinSuggestions?.length ? (
+                                <CommandGroup heading="Cryptocurrencies">
+                                  {coinSuggestions
+                                    .sort((a, b) => a.rank - b.rank)
+                                    .map((coin) => (
+                                      <CommandItem
+                                        key={coin.id}
+                                        value={coin.name.toLowerCase()}
+                                        onSelect={() => {
+                                          form.setValue('coinName', coin.name);
+                                          form.setValue('coinSymbol', coin.symbol);
+                                          setShowSuggestions(false);
+                                        }}
+                                        className="flex justify-between items-center"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-muted-foreground">
+                                            #{coin.rank}
+                                          </span>
+                                          <span>{coin.name}</span>
+                                        </div>
+                                        <span className="text-sm text-muted-foreground uppercase">
+                                          {coin.symbol}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              ) : (
+                                <CommandEmpty>No cryptocurrencies found</CommandEmpty>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
-                  <datalist id="coin-name-suggestions">
-                    {coinNameSuggestions.slice(0, 2).map((option) => (
-                      <option value={option} key={option} />
-                    ))}
-                  </datalist>
                   <FormDescription>
-                    Suggestions: {coinNameSuggestions.slice(0, 2).join(', ')}
+                    Search and select from available cryptocurrencies
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Hidden field for coinSymbol */}
+            <input type="hidden" {...form.register('coinSymbol')} />
 
             {/* Submit button, spans both columns */}
             <div className="md:col-span-2 col-span-1">

@@ -5,6 +5,7 @@ import {
   fetchUserBalance,
   fetchMultipleCoinBalances,
   getCoinCandles,
+  searchCryptoCoinsByName,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -23,4 +24,5 @@ router.post('/getCoinPrices', authenticateToken, fetchMultipleCoinBalances);
 // GET /crypto/candles - Public endpoint for coin candles
 router.get('/candles', authenticateToken, getCoinCandles);
 
+router.get('/search', authenticateToken, searchCryptoCoinsByName);
 export default router;

@@ -11,7 +11,7 @@ export const cryptoSchema = z.object({
   quantity: z.number().positive(),
   amount: z.number().nonnegative(),
   coinName: z.string(),
-  coinSymbol: z.string().optional(),
+  coinSymbol: z.string(),
 });
 
 // TypeScript type for digitalGold

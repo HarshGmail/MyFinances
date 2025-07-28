@@ -15,7 +15,7 @@ export interface ChartError {
 }
 
 export interface ChartResult {
-  meta: Meta;
+  meta: StockMeta;
   timestamp: number[];
   indicators: Indicators;
 }
@@ -45,6 +45,16 @@ export interface CoinPricesResponse {
   success: boolean;
   message: string;
   data: { [coinName: string]: number | null };
+}
+
+export interface CoinSearchResult {
+  id: string;
+  name: string;
+  symbol: string;
+  rank: number;
+  is_new: boolean;
+  is_active: boolean;
+  type: 'coin' | 'token';
 }
 
 export interface CryptoPortfolioItem {
@@ -155,34 +165,6 @@ export interface Indicators {
   adjclose: AdjClose[];
 }
 
-export interface Meta {
-  currency: string;
-  symbol: string;
-  exchangeName: string;
-  fullExchangeName: string;
-  instrumentType: string;
-  firstTradeDate: number;
-  regularMarketTime: number;
-  hasPrePostMarketData: boolean;
-  gmtoffset: number;
-  timezone: string;
-  exchangeTimezoneName: string;
-  regularMarketPrice: number;
-  fiftyTwoWeekHigh: number;
-  fiftyTwoWeekLow: number;
-  regularMarketDayHigh: number;
-  regularMarketDayLow: number;
-  regularMarketVolume: number;
-  longName: string;
-  shortName: string;
-  chartPreviousClose: number;
-  priceHint: number;
-  currentTradingPeriod: CurrentTradingPeriod;
-  dataGranularity: string;
-  range: string;
-  validRanges: string[];
-}
-
 export interface MutualFundInfo {
   _id: string;
   userId?: string;
@@ -277,6 +259,34 @@ export interface SafeGoldRatesResponse {
 
 export interface StockData {
   chart: Chart;
+}
+
+export interface StockMeta {
+  currency: string;
+  symbol: string;
+  exchangeName: string;
+  fullExchangeName: string;
+  instrumentType: string;
+  firstTradeDate: number;
+  regularMarketTime: number;
+  hasPrePostMarketData: boolean;
+  gmtoffset: number;
+  timezone: string;
+  exchangeTimezoneName: string;
+  regularMarketPrice: number;
+  fiftyTwoWeekHigh: number;
+  fiftyTwoWeekLow: number;
+  regularMarketDayHigh: number;
+  regularMarketDayLow: number;
+  regularMarketVolume: number;
+  longName: string;
+  shortName: string;
+  chartPreviousClose: number;
+  priceHint: number;
+  currentTradingPeriod: CurrentTradingPeriod;
+  dataGranularity: string;
+  range: string;
+  validRanges: string[];
 }
 
 export interface StockTransaction {

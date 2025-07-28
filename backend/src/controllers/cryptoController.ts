@@ -4,6 +4,7 @@ import database from '../database';
 import { cryptoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import coindcxService from '../services/coindcxService';
+import axios from 'axios';
 
 export async function addCryptoTransaction(req: Request, res: Response) {
   try {
@@ -104,5 +105,47 @@ export async function getCoinCandles(req: Request, res: Response) {
   } catch (error) {
     console.error('Error in getCoinCandles:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+function fuzzyMatchName(name: string, query: string): boolean {
+  return name.toLowerCase().includes(query.toLowerCase());
+}
+
+type coinNames = {
+  id: string;
+  name: string;
+  symbol: string;
+  rank: string;
+  is_new: string;
+  is_active: string;
+  type: string;
+};
+
+export async function searchCryptoCoinsByName(req: Request, res: Response) {
+  try {
+    const { query } = req.query;
+
+    if (!query || typeof query !== 'string' || query.length < 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Query string is required and should be at least 2 characters.',
+      });
+      return;
+    }
+
+    // Fetch all coins from CoinPaprika
+    const response = await axios.get('https://api.coinpaprika.com/v1/coins');
+    const allCoins = response.data;
+
+    // Filter coins where `name` matches the search query
+    const matches = allCoins.filter((coin: coinNames) => {
+      return typeof coin.name === 'string' && fuzzyMatchName(coin.name, query);
+    });
+
+    res.status(200).json({ success: true, data: matches });
+  } catch (error) {
+    console.error('Error searching crypto coins by name:', error);
+    res.status(500).json({ success: false, message: 'Failed to search coins' });
   }
 }

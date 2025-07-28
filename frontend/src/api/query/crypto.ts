@@ -6,6 +6,7 @@ import {
   CoinDCXUserBalanceResponse,
   CoinPricesResponse,
   CoinCandle,
+  CoinSearchResult,
 } from '@/api/dataInterface';
 
 export function useCryptoTransactionsQuery() {
@@ -92,5 +93,21 @@ export function useCoinCandlesQuery(symbol: string, interval: string = '1d', lim
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!symbol,
+  });
+}
+
+export function useSearchCryptoQuery(query: string) {
+  return useQuery<CoinSearchResult[]>({
+    queryKey: ['search-crypto', query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      const response = await apiRequest({
+        endpoint: `/crypto/search?query=${encodeURIComponent(query)}`,
+        method: 'GET',
+      });
+      return response.data || [];
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 60 * 1000,
   });
 }
