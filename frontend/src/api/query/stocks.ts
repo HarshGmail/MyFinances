@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { StockTransaction } from '@/api/dataInterface';
+import { StockSearchResponse, StockTransaction } from '@/api/dataInterface';
 
 export function useStockTransactionsQuery() {
   return useQuery<StockTransaction[]>({
@@ -26,5 +26,22 @@ export function useNseQuoteQuery(symbols: string[]) {
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     enabled: symbols.length > 0,
+  });
+}
+
+export function useSearchStockByNameQuery(symbol: string) {
+  return useQuery<StockSearchResponse[]>({
+    queryKey: ['stock-stock-name', symbol],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: `/stocks/search?query=${symbol}`,
+        method: 'GET',
+      });
+      console.log(1, response);
+      console.log(Array.isArray(response?.data) ? response.data : []);
+      return Array.isArray(response?.data) ? response.data : [];
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: symbol.length > 3,
   });
 }

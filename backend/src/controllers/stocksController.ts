@@ -18,7 +18,7 @@ export interface CurrentTradingPeriod {
   post: TradingPeriod;
 }
 
-export interface Meta {
+export interface StockMeta {
   currency: string;
   symbol: string;
   exchangeName: string;
@@ -64,7 +64,7 @@ export interface Indicators {
 }
 
 export interface ChartResult {
-  meta: Meta;
+  meta: StockMeta;
   timestamp: number[];
   indicators: Indicators;
 }
@@ -146,9 +146,11 @@ export async function getNSEQuote(req: Request, res: Response) {
         const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1y`;
         const response = await axios.get(url);
+        console.log('Symbol', symbol, ' yfSymbol', yfSymbol, ' status', response.status);
         results.push([symbol, response.data]);
-      } catch (err) {
-        console.log(err);
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.log('error fetching api data from yahoo', error.message);
         results.push([symbol, null]);
       }
       // Wait 1 second before next call, unless it's the last symbol
@@ -161,5 +163,61 @@ export async function getNSEQuote(req: Request, res: Response) {
   } catch (error) {
     console.error('Fetch Yahoo Finance quote error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export interface StockSearchResponse {
+  exchange: string;
+  shortname: string;
+  quoteType: string;
+  symbol: string;
+  index: string;
+  score: string;
+  typeDisp: string;
+  longname: string;
+  exchDisp: string;
+  sector: string;
+  sectorDisp: string;
+  industry: string;
+  industryDisp: string;
+  isYahooFinance: boolean;
+}
+
+export async function searchStocksByName(req: Request, res: Response) {
+  try {
+    const { query } = req.query;
+    if (!query || typeof query !== 'string' || query.length < 2) {
+      res.status(400).json({
+        message: 'Query string is required and should be at least 2 characters.',
+      });
+      return;
+    }
+
+    const url =
+      `https://query2.finance.yahoo.com/v1/finance/search` +
+      `?q=${encodeURIComponent(query)}` +
+      `&lang=en-US&region=US&quotesCount=6&newsCount=3&listsCount=2` +
+      `&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query` +
+      `&multiQuoteQueryId=multi_quote_single_token_query` +
+      `&newsQueryId=news_cie_vespa&enableCb=false&enableNavLinks=true` +
+      `&enableEnhancedTrivialQuery=true&enableResearchReports=true` +
+      `&enableCulturalAssets=true&enableLogoUrl=true&enableLists=false` +
+      `&recommendCount=5&enablePrivateCompany=true`;
+
+    const response = await axios.get(url);
+    const quotes: StockSearchResponse[] = response.data.quotes || [];
+
+    const filtered = quotes
+      .filter((q) => q.exchange === 'NSI')
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ isYahooFinance, ...rest }) => rest); // Remove `isYahooFinance`
+
+    res.status(200).json({
+      success: true,
+      data: filtered,
+    });
+  } catch (err) {
+    console.error('Error searching stocks by name:', err);
+    res.status(500).json({ message: 'Failed to search stocks' });
   }
 }

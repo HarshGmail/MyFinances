@@ -84,46 +84,54 @@ class CoinDCXService {
   }
 
   // Map coin names to CoinDCX market pairs (INR pairs)
-  private mapCoinToMarketPair(coinName: string): string | null {
-    const coinMappings: { [key: string]: string } = {
-      bitcoin: 'BTCINR',
-      btc: 'BTCINR',
-      ethereum: 'ETHINR',
-      eth: 'ETHINR',
-      'binance coin': 'BNBINR',
-      bnb: 'BNBINR',
-      cardano: 'ADAINR',
-      ada: 'ADAINR',
-      solana: 'SOLINR',
-      sol: 'SOLINR',
-      polkadot: 'DOTINR',
-      dot: 'DOTINR',
-      ripple: 'XRPINR',
-      xrp: 'XRPINR',
-      dogecoin: 'DOGEINR',
-      doge: 'DOGEINR',
-      litecoin: 'LTCINR',
-      ltc: 'LTCINR',
-      chainlink: 'LINKINR',
-      link: 'LINKINR',
-      uniswap: 'UNIINR',
-      uni: 'UNIINR',
-      avalanche: 'AVAXINR',
-      avax: 'AVAXINR',
-      pol: 'POLINR',
-      matic: 'MATICINR',
-    };
+  // private mapCoinToMarketPair(coinName: string): string | null {
+  //   const coinMappings: { [key: string]: string } = {
+  //     bitcoin: 'BTCINR',
+  //     btc: 'BTCINR',
+  //     ethereum: 'ETHINR',
+  //     eth: 'ETHINR',
+  //     'binance coin': 'BNBINR',
+  //     bnb: 'BNBINR',
+  //     cardano: 'ADAINR',
+  //     ada: 'ADAINR',
+  //     solana: 'SOLINR',
+  //     sol: 'SOLINR',
+  //     polkadot: 'DOTINR',
+  //     dot: 'DOTINR',
+  //     ripple: 'XRPINR',
+  //     xrp: 'XRPINR',
+  //     dogecoin: 'DOGEINR',
+  //     doge: 'DOGEINR',
+  //     litecoin: 'LTCINR',
+  //     ltc: 'LTCINR',
+  //     chainlink: 'LINKINR',
+  //     link: 'LINKINR',
+  //     uniswap: 'UNIINR',
+  //     uni: 'UNIINR',
+  //     avalanche: 'AVAXINR',
+  //     avax: 'AVAXINR',
+  //     pol: 'POLINR',
+  //     matic: 'MATICINR',
+  //   };
 
-    const normalizedCoinName = coinName.toLowerCase().trim();
-    const marketPair = coinMappings[normalizedCoinName];
+  //   const normalizedCoinName = coinName.toLowerCase().trim();
+  //   const marketPair = coinMappings[normalizedCoinName];
 
-    if (!marketPair) {
-      console.warn(
-        `No market pair mapping found for coin: ${coinName} (normalized: ${normalizedCoinName})`
-      );
-    }
+  //   if (!marketPair) {
+  //     console.warn(
+  //       `No market pair mapping found for coin: ${coinName} (normalized: ${normalizedCoinName})`
+  //     );
+  //   }
 
-    return marketPair || null;
+  //   return marketPair || null;
+  // }
+
+  private mapCoinToMarketPair(coinName: string): string {
+    // Since coinName is already in uppercase symbol format (BTC, ETH, etc.)
+    // Just append INR to create the market pair
+    const marketPair = `${coinName.toUpperCase().trim()}INR`;
+    console.log(`Mapped ${coinName} to ${marketPair}`);
+    return marketPair;
   }
 
   // Get multiple current prices at once
@@ -135,11 +143,11 @@ class CoinDCXService {
 
       for (const coinName of coinNames) {
         const marketPair = this.mapCoinToMarketPair(coinName);
-        if (marketPair) {
-          const ticker = tickers.find((t) => t.market === marketPair);
-          prices[coinName] = ticker ? parseFloat(ticker.last_price) : null;
-        } else {
-          prices[coinName] = null;
+        const ticker = tickers.find((t) => t.market === marketPair);
+        prices[coinName] = ticker ? parseFloat(ticker.last_price) : null;
+
+        if (!ticker) {
+          console.warn(`No ticker found for market pair: ${marketPair}`);
         }
       }
 

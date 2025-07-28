@@ -111,6 +111,47 @@ export default function CryptoUpdateCryptoPage() {
     return () => subscription.unsubscribe();
   }, [form]);
 
+  // Helper function to handle number input changes with proper decimal support
+  const handleNumberInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldOnChange: (value: unknown) => void
+  ) => {
+    const val = e.target.value;
+
+    // Allow empty string
+    if (val === '') {
+      fieldOnChange('');
+      return;
+    }
+
+    // Allow valid decimal patterns (including trailing decimal point)
+    const decimalPattern = /^\d*\.?\d*$/;
+    if (decimalPattern.test(val)) {
+      // If it's a valid number, convert to number, otherwise keep as string for intermediate states
+      const numVal = parseFloat(val);
+      if (!isNaN(numVal)) {
+        fieldOnChange(numVal);
+      } else if (val.endsWith('.') || val === '0.') {
+        // Keep as string for intermediate decimal states like "1." or "0."
+        fieldOnChange(val);
+      }
+    }
+  };
+
+  // Helper function to get display value for number inputs
+  const getNumberDisplayValue = (value: unknown): string => {
+    if (value === '' || value === undefined || value === null) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (value === 0) {
+      return '';
+    }
+    return value.toString();
+  };
+
   function onSubmit(values: FormValues) {
     mutate(
       {
@@ -223,25 +264,22 @@ export default function CryptoUpdateCryptoPage() {
                   <FormControl>
                     <Input
                       type="number"
-                      step="any"
+                      step="0.00000001"
                       min="0"
-                      placeholder="Enter coin price"
-                      {...field}
-                      value={field.value?.toString() === '0' ? '' : field.value}
+                      placeholder="Enter coin price (e.g., 50000.25)"
+                      value={getNumberDisplayValue(field.value)}
                       onFocus={() => {
-                        if (field.value?.toString() === '0') field.onChange('');
+                        if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
+                        if (field.value === undefined) {
+                          field.onChange(0);
+                        } else if (typeof field.value === 'string') {
+                          const numVal = parseFloat(field.value);
+                          field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
                       }}
+                      onChange={(e) => handleNumberInputChange(e, field.onChange)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -259,25 +297,22 @@ export default function CryptoUpdateCryptoPage() {
                   <FormControl>
                     <Input
                       type="number"
-                      step="any"
+                      step="0.00000001"
                       min="0"
-                      placeholder="Enter quantity"
-                      {...field}
-                      value={field.value?.toString() === '0' ? '' : field.value}
+                      placeholder="Enter quantity (e.g., 1.5678)"
+                      value={getNumberDisplayValue(field.value)}
                       onFocus={() => {
-                        if (field.value?.toString() === '0') field.onChange('');
+                        if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
+                        if (field.value === undefined) {
+                          field.onChange(0);
+                        } else if (typeof field.value === 'string') {
+                          const numVal = parseFloat(field.value);
+                          field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
                       }}
+                      onChange={(e) => handleNumberInputChange(e, field.onChange)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -295,25 +330,22 @@ export default function CryptoUpdateCryptoPage() {
                   <FormControl>
                     <Input
                       type="number"
-                      step="any"
+                      step="0.01"
                       min="0"
-                      placeholder="Enter amount"
-                      {...field}
-                      value={field.value?.toString() === '0' ? '' : field.value}
+                      placeholder="Enter amount (e.g., 1250.75)"
+                      value={getNumberDisplayValue(field.value)}
                       onFocus={() => {
-                        if (field.value?.toString() === '0') field.onChange('');
+                        if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
+                        if (field.value === undefined) {
+                          field.onChange(0);
+                        } else if (typeof field.value === 'string') {
+                          const numVal = parseFloat(field.value);
+                          field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
                       }}
+                      onChange={(e) => handleNumberInputChange(e, field.onChange)}
                     />
                   </FormControl>
                   <FormMessage />

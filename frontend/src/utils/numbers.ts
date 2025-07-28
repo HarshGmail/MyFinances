@@ -20,7 +20,6 @@ export function formatToPercentage(numerator: numberInput, denominator?: numberI
   }
 
   const fraction = Number(((numerator / denominator) * 100).toFixed(2));
-  // console.log("numbers", numerator, denominator, fraction * 100);
   return fraction;
 }
 

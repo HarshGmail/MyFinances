@@ -289,6 +289,22 @@ export interface StockMeta {
   validRanges: string[];
 }
 
+export interface StockSearchResponse {
+  exchange: string;
+  shortname: string;
+  quoteType: string;
+  symbol: string;
+  index: string;
+  score: string;
+  typeDisp: string;
+  longname: string;
+  exchDisp: string;
+  sector: string;
+  sectorDisp: string;
+  industry: string;
+  industryDisp: string;
+}
+
 export interface StockTransaction {
   id: string;
   type: 'credit' | 'debit';

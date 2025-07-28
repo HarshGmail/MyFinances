@@ -658,7 +658,6 @@ export default function Home() {
         when: new Date(),
       });
     }
-    console.log(allCashFlows);
 
     // Calculate XIRR
     if (allCashFlows.length > 1) {
