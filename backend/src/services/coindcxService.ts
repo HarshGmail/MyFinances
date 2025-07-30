@@ -240,6 +240,47 @@ class CoinDCXService {
     }
   }
 
+  private async delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async getMultipleCoinCandles({
+    symbols,
+    interval = '1d',
+    limit = 365,
+    startTime,
+    endTime,
+  }: {
+    symbols: string[];
+    interval?: string;
+    limit?: number;
+    startTime: number;
+    endTime: number;
+  }): Promise<Record<string, CoinCandle[]>> {
+    const results: Record<string, CoinCandle[]> = {};
+
+    for (const symbol of symbols) {
+      try {
+        const candles = await this.getCoinCandles({
+          symbol,
+          interval,
+          limit,
+          startTime,
+          endTime,
+        });
+        results[symbol] = candles;
+      } catch (err) {
+        console.error(`Failed to fetch candles for ${symbol}:`, err);
+        results[symbol] = [];
+      }
+
+      // Wait 5 seconds before next request
+      await this.delay(5000);
+    }
+
+    return results;
+  }
+
   // Test the service
   async testConnection(): Promise<boolean> {
     try {

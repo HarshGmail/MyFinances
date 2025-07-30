@@ -96,6 +96,38 @@ export function useCoinCandlesQuery(symbol: string, interval: string = '1d', lim
   });
 }
 
+export function useMultipleCoinCandlesQuery(
+  symbols: string[],
+  interval: string = '1d',
+  limit: number = 365
+) {
+  const endTime = getRoundedEndTime(5); // 5 minutes
+  const startTime = endTime - limit * 24 * 60 * 60 * 1000;
+
+  return useQuery<Record<string, CoinCandle[]>>({
+    queryKey: ['multiple-coin-candles', symbols, interval, limit, endTime],
+    queryFn: async () => {
+      if (!symbols || symbols.length === 0) return {};
+      const params = new URLSearchParams({
+        symbols: symbols.join(','),
+        interval,
+        limit: String(limit),
+        startTime: String(startTime),
+        endTime: String(endTime),
+      });
+
+      const response = await apiRequest({
+        endpoint: `/crypto/multipleCoinCandles?${params.toString()}`,
+        method: 'GET',
+      });
+
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: symbols.length > 0,
+  });
+}
+
 export function useSearchCryptoQuery(query: string) {
   return useQuery<CoinSearchResult[]>({
     queryKey: ['search-crypto', query],

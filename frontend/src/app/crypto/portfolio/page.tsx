@@ -1,6 +1,7 @@
 'use client';
 
 import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@/api/query';
+import { useMultipleCoinCandlesQuery } from '@/api/query/crypto';
 import {
   Table,
   TableHeader,
@@ -10,19 +11,25 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import groupBy from 'lodash/groupBy';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
-import { PerformerStatCard } from '@/components/custom/PerformerStatCard';
-import { Card } from '@/components/ui/card';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts';
 import { useAppStore } from '@/store/useAppStore';
-import { useCoinCandlesQuery } from '@/api/query/crypto';
-import { CryptoTransaction, CoinCandle } from '@/api/dataInterface';
+import { CryptoTransaction } from '@/api/dataInterface';
 import { formatCurrency, formatToPercentage } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface PortfolioItem {
   coinName: string;
@@ -35,25 +42,63 @@ interface PortfolioItem {
   profitLossPercentage: number;
 }
 
-function getPeriodPerformance(candles: CoinCandle[], days: number) {
-  if (!candles.length) {
-    return { change: 0, high: 0, low: 0 };
-  }
-  const periodCandles = candles.slice(-days);
-  if (periodCandles.length < 2) {
-    return { change: 0, high: 0, low: 0 };
-  }
-  const first = periodCandles[0].close;
-  const last = periodCandles[periodCandles.length - 1].close;
-  const high = Math.max(...periodCandles.map((c) => c.high));
-  const low = Math.min(...periodCandles.map((c) => c.low));
-  const change = ((last - first) / first) * 100;
-  return { change, high, low };
+// Extended timeframes for crypto (can go back further than stocks)
+const CRYPTO_TIMEFRAMES = [
+  { label: '1D', days: 1 },
+  { label: '3D', days: 3 },
+  { label: '7D', days: 7 },
+  { label: '1M', days: 30 },
+  { label: '3M', days: 90 },
+  { label: '6M', days: 180 },
+  { label: '1Y', days: 365 },
+  { label: '2Y', days: 730 },
+  { label: '3Y', days: 1095 },
+  { label: '5Y', days: 1825 },
+];
+
+// Define a consistent color palette for coins
+const COIN_COLORS = [
+  '#FF6B6B', // Red
+  '#4ECDC4', // Teal
+  '#45B7D1', // Blue
+  '#FFA07A', // Light Salmon
+  '#98D8C8', // Light Teal
+  '#F7DC6F', // Yellow
+  '#BB8FCE', // Purple
+  '#85C1E9', // Light Blue
+  '#F8C471', // Orange
+  '#82E0AA', // Light Green
+  '#F1948A', // Light Red
+  '#76D7C4', // Aqua
+  '#AED6F1', // Sky Blue
+  '#D7BDE2', // Lavender
+  '#F9E79F', // Light Yellow
+];
+
+function getPastDate(days: number): number {
+  return Date.now() - days * 24 * 60 * 60 * 1000;
 }
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });
 
 export default function CryptoPortfolioPage() {
+  const { theme } = useAppStore();
+  const isDark = theme === 'dark';
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [timeframe, setTimeframe] = useState(CRYPTO_TIMEFRAMES[6].label); // Default to 1Y
+  const [selectedCoin, setSelectedCoin] = useState('All');
+
+  // Track the maximum timeframe we've fetched data for
+  const [maxFetchedDays, setMaxFetchedDays] = useState(0);
+
+  const selectedTimeframe =
+    CRYPTO_TIMEFRAMES.find((tf) => tf.label === timeframe) || CRYPTO_TIMEFRAMES[6];
+  const timeframeStart = getPastDate(selectedTimeframe.days);
+
+  // Determine if we need to fetch new data
+  const needsNewData = selectedTimeframe.days > maxFetchedDays;
+  const fetchDays = needsNewData ? selectedTimeframe.days : maxFetchedDays;
+
   const {
     data: transactions,
     isLoading: transactionsLoading,
@@ -127,6 +172,15 @@ export default function CryptoPortfolioPage() {
     return portfolioItems;
   }, [coinPrices, investedMap, validCoins]);
 
+  // Create a color mapping for coins based on their order in portfolioData
+  const coinColorMap = useMemo(() => {
+    const colorMap: Record<string, string> = {};
+    portfolioData.forEach((coin, index) => {
+      colorMap[coin.currency] = COIN_COLORS[index % COIN_COLORS.length];
+    });
+    return colorMap;
+  }, [portfolioData]);
+
   const summary = useMemo(() => {
     const totalInvested = portfolioData.reduce((sum, item) => sum + item.investedAmount, 0);
     const totalCurrentValue = portfolioData.reduce((sum, item) => sum + item.currentValue, 0);
@@ -175,79 +229,292 @@ export default function CryptoPortfolioPage() {
     return profitLoss >= 0 ? 'default' : 'destructive';
   };
 
-  const bestPerformer = useMemo(() => {
-    if (!portfolioData.length) return null;
-    return portfolioData.reduce((best, item) =>
-      item.profitLossPercentage > best.profitLossPercentage ? item : best
-    );
+  // Create a stable list of coin symbols to fetch data for
+  const coinSymbols = useMemo(() => {
+    return portfolioData.map((coin) => coin.currency).filter(Boolean);
   }, [portfolioData]);
 
-  const worstPerformer = useMemo(() => {
-    if (!portfolioData.length) return null;
-    return portfolioData.reduce((worst, item) =>
-      item.profitLossPercentage < worst.profitLossPercentage ? item : worst
-    );
-  }, [portfolioData]);
-
-  // For sparkline, use last 30 days of candle data if available, else fallback to useCoinPriceHistory
-  const bestHistoryCandles = useCoinCandlesQuery(bestPerformer?.currency ?? '', '1d', 30).data;
-  const worstHistoryCandles = useCoinCandlesQuery(worstPerformer?.currency ?? '', '1d', 30).data;
-
-  const bestHistory = useMemo(() => {
-    if (bestHistoryCandles && bestHistoryCandles.length > 0) {
-      return bestHistoryCandles.map((c) => ({ x: c.time, y: c.close }));
-    }
-    return [];
-  }, [bestHistoryCandles]);
-
-  const worstHistory = useMemo(() => {
-    if (worstHistoryCandles && worstHistoryCandles.length > 0) {
-      return worstHistoryCandles.map((c) => ({ x: c.time, y: c.close }));
-    }
-    return [];
-  }, [worstHistoryCandles]);
-
-  const { data: bestCandles } = useCoinCandlesQuery(bestPerformer?.currency ?? '', '1d', 7);
-  const { data: worstCandles } = useCoinCandlesQuery(worstPerformer?.currency ?? '', '1d', 7);
-
-  const [bestWeek, setBestWeek] = useState<{ change: number; high: number; low: number } | null>(
-    null
-  );
-  const [worstWeek, setWorstWeek] = useState<{ change: number; high: number; low: number } | null>(
-    null
+  // Fetch historical data for all coins using the new multiple coins query
+  // Only fetch more data if we need a longer timeframe than what we already have
+  const { data: multipleCoinCandles, isLoading: candlesLoading } = useMultipleCoinCandlesQuery(
+    coinSymbols,
+    '1d',
+    fetchDays
   );
 
+  // Update maxFetchedDays when we successfully get new data
   useEffect(() => {
-    if (bestCandles && bestCandles.length > 0) {
-      setBestWeek(getPeriodPerformance(bestCandles, 7));
-    } else {
-      setBestWeek(null);
+    if (multipleCoinCandles && needsNewData) {
+      setMaxFetchedDays(fetchDays);
     }
-  }, [bestCandles]);
+  }, [multipleCoinCandles, needsNewData, fetchDays]);
 
-  useEffect(() => {
-    if (worstCandles && worstCandles.length > 0) {
-      setWorstWeek(getPeriodPerformance(worstCandles, 7));
-    } else {
-      setWorstWeek(null);
-    }
-  }, [worstCandles]);
+  // Process historical data for charts
+  const chartData = useMemo(() => {
+    if (!portfolioData.length || !multipleCoinCandles) return null;
 
-  const theme = useAppStore((state) => state.theme);
+    const coinSeries: unknown[] = [];
 
-  // Pie chart data for invested amount per coin
+    portfolioData.forEach((coin) => {
+      const candles = multipleCoinCandles[coin.currency];
+
+      if (!candles || !candles.length) return;
+
+      // Create series data for this coin
+      const seriesData = candles
+        .map((candle) => {
+          // Convert timestamp to milliseconds (candle.time might be in seconds)
+          const timeMs = candle.time > 1000000000000 ? candle.time : candle.time * 1000;
+          if (timeMs < timeframeStart) return null;
+          const portfolioValue = candle.close * coin.balance;
+          return [timeMs, portfolioValue];
+        })
+        .filter(Boolean);
+
+      if (seriesData.length > 0) {
+        coinSeries.push({
+          name: coin.currency,
+          data: seriesData,
+          color: coinColorMap[coin.currency], // Use synchronized color
+          lineWidth: 2,
+          marker: {
+            enabled: false,
+            states: {
+              hover: {
+                enabled: true,
+                radius: 4,
+              },
+            },
+          },
+        });
+      }
+    });
+
+    return coinSeries;
+  }, [portfolioData, multipleCoinCandles, timeframeStart, coinColorMap]);
+
+  // Chart configuration
+  const chartOptions = useMemo(() => {
+    if (!chartData) return null;
+
+    return {
+      chart: {
+        type: 'line',
+        height: 500,
+        backgroundColor: 'transparent',
+        style: {
+          fontFamily: 'inherit',
+        },
+      },
+      title: {
+        text: 'Crypto Portfolio Performance Over Time',
+        style: {
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: isDark ? '#fff' : '#374151',
+        },
+      },
+      subtitle: {
+        text: 'Individual Coin Holdings Value',
+        style: {
+          color: isDark ? '#d1d5db' : '#6b7280',
+        },
+      },
+      xAxis: {
+        type: 'datetime',
+        title: {
+          text: 'Date',
+          style: {
+            color: isDark ? '#fff' : '#374151',
+          },
+        },
+        labels: {
+          style: {
+            color: isDark ? '#d1d5db' : '#6b7280',
+          },
+          formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
+            // Format based on timeframe for better readability
+            if (selectedTimeframe.days <= 7) {
+              // For 7 days or less, show day and month
+              return Highcharts.dateFormat('%e %b', this.value as number);
+            } else if (selectedTimeframe.days <= 90) {
+              // For up to 3 months, show day and month
+              return Highcharts.dateFormat('%e %b', this.value as number);
+            } else if (selectedTimeframe.days <= 365) {
+              // For up to 1 year, show month and year
+              return Highcharts.dateFormat('%b %Y', this.value as number);
+            } else {
+              // For longer periods, show month and year
+              return Highcharts.dateFormat('%b %Y', this.value as number);
+            }
+          },
+        },
+        gridLineWidth: 1,
+        gridLineColor: isDark ? '#374151' : '#e5e7eb',
+        lineColor: isDark ? '#4b5563' : '#d1d5db',
+        tickInterval:
+          selectedTimeframe.days <= 7
+            ? 24 * 3600 * 1000 // Daily for 7D
+            : selectedTimeframe.days <= 30
+              ? 7 * 24 * 3600 * 1000 // Weekly for 1M
+              : selectedTimeframe.days <= 90
+                ? 15 * 24 * 3600 * 1000 // Bi-weekly for 3M
+                : selectedTimeframe.days <= 365
+                  ? 30 * 24 * 3600 * 1000 // Monthly for 1Y
+                  : 90 * 24 * 3600 * 1000, // Quarterly for longer periods
+      },
+      yAxis: {
+        title: {
+          text: 'Portfolio Value (₹)',
+          style: {
+            color: isDark ? '#fff' : '#374151',
+          },
+        },
+        labels: {
+          style: {
+            color: isDark ? '#d1d5db' : '#6b7280',
+          },
+          formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
+            return '₹' + Highcharts.numberFormat(this.value as number, 0);
+          },
+        },
+        gridLineWidth: 1,
+        gridLineColor: isDark ? '#374151' : '#e5e7eb',
+      },
+      tooltip: {
+        shared: true,
+        crosshairs: true,
+        backgroundColor: isDark ? '#1f2937' : 'rgba(255, 255, 255, 0.95)',
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        borderRadius: 8,
+        shadow: true,
+        useHTML: true,
+        style: {
+          color: isDark ? '#fff' : '#374151',
+        },
+        formatter: function (this: unknown): string {
+          // @ts-expect-error highcharts
+          let tooltip: string = `<b style="color: ${isDark ? '#fff' : '#374151'}">${Highcharts.dateFormat('%e %b %Y', this.x as number)}</b><br/>`;
+
+          // @ts-expect-error highcharts
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (this.points ?? []).forEach((point: any) => {
+            if (selectedCoin === 'All') {
+              // Show portfolio valuation when viewing all coins
+              tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
+            } else {
+              // Show coin price when viewing a single coin
+              const coin = portfolioData.find((c) => c.currency === point.series.name);
+              if (coin && multipleCoinCandles && multipleCoinCandles[coin.currency]) {
+                // Find the candle data for this specific timestamp
+                const candles = multipleCoinCandles[coin.currency];
+                const targetTime = (point.x as number) / 1000; // Convert back to seconds
+                const candle = candles.find((c) => {
+                  const candleTime = c.time > 1000000000000 ? c.time / 1000 : c.time;
+                  return Math.abs(candleTime - targetTime) < 43200; // Within 12 hours
+                });
+
+                if (candle) {
+                  tooltip += `<span style="color:${point.color}">●</span> ${point.series.name} Price: <b>₹${Highcharts.numberFormat(candle.close, 2)}</b><br/>`;
+                  tooltip += `<span style="color:${point.color}">●</span> Holdings Value: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
+                } else {
+                  // Fallback to portfolio value if we can't find the candle
+                  tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
+                }
+              } else {
+                // Fallback to portfolio value
+                tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
+              }
+            }
+          });
+
+          return tooltip;
+        },
+      },
+      legend: {
+        enabled: true,
+        align: 'center',
+        verticalAlign: 'bottom',
+        layout: 'horizontal',
+        itemStyle: {
+          fontSize: '12px',
+          color: isDark ? '#d1d5db' : '#6b7280',
+        },
+        itemHoverStyle: {
+          color: isDark ? '#fff' : '#374151',
+        },
+      },
+      plotOptions: {
+        line: {
+          animation: {
+            duration: 1000,
+          },
+          marker: {
+            enabled: false,
+            states: {
+              hover: {
+                enabled: true,
+                radius: 4,
+              },
+            },
+          },
+          states: {
+            hover: {
+              lineWidth: 3,
+            },
+          },
+        },
+        series: {
+          events: {
+            legendItemClick: function () {},
+          },
+        },
+      },
+      series:
+        selectedCoin === 'All'
+          ? chartData
+          : chartData.filter(
+              (s) =>
+                typeof s === 'object' &&
+                s !== null &&
+                'name' in s &&
+                (s as { name: string }).name === selectedCoin
+            ),
+      credits: {
+        enabled: false,
+      },
+      responsive: {
+        rules: [
+          {
+            condition: {
+              maxWidth: 500,
+            },
+            chartOptions: {
+              legend: {
+                layout: 'horizontal',
+                align: 'center',
+                verticalAlign: 'bottom',
+              },
+            },
+          },
+        ],
+      },
+    };
+  }, [chartData, isDark, selectedTimeframe.days, selectedCoin, portfolioData, multipleCoinCandles]);
+
+  // Pie chart data for invested amount per coin with synchronized colors
   const pieData = useMemo(
     () =>
       portfolioData.map((item) => ({
         name: item.currency,
         y: item.investedAmount,
         coinName: item.coinName,
+        color: coinColorMap[item.currency], // Use synchronized color
       })),
-    [portfolioData]
+    [portfolioData, coinColorMap]
   );
 
-  // Highcharts does not export TooltipFormatterContextObject in all builds, so use 'any' for formatter context
-  // See PerformerStatCard.tsx for similar usage
+  // Update your pieOptions useMemo to include the click handler:
   const pieOptions = useMemo(
     () => ({
       chart: {
@@ -303,6 +570,17 @@ export default function CryptoPortfolioPage() {
               textOutline: 'none',
             },
           },
+          point: {
+            events: {
+              click: function (this: Highcharts.Point) {
+                if (this.name === selectedCoin) setSelectedCoin('All');
+                else {
+                  setSelectedCoin(this.name);
+                  chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              },
+            },
+          },
         },
       },
       series: [
@@ -320,11 +598,13 @@ export default function CryptoPortfolioPage() {
         },
       },
     }),
-    [pieData, theme]
+    [theme, pieData, selectedCoin] // Add dependencies
   );
 
   const isLoading = transactionsLoading || pricesLoading;
   const error = transactionsError || pricesError;
+  // Only show chart loading when we're actually fetching new data
+  const isChartLoading = candlesLoading && needsNewData;
 
   if (isLoading) {
     return (
@@ -357,7 +637,7 @@ export default function CryptoPortfolioPage() {
 
       {/* Portfolio Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2 mb-6 mx-9 place-items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <SummaryStatCard label="Total Invested" value={formatCurrency(summary.totalInvested)} />
 
           {/* Merged Current Value + Total P&L Card */}
@@ -373,7 +653,7 @@ export default function CryptoPortfolioPage() {
             value={
               <span className={getProfitLossColor(summary.totalProfitLoss)}>
                 {formatCurrency(summary.totalCurrentValue)}{' '}
-                <span>({formatToPercentage(summary.totalProfitLossPercentage)})</span>
+                <span>({formatToPercentage(summary.totalProfitLossPercentage)}%)</span>
               </span>
             }
             valueClassName={getProfitLossColor(summary.totalProfitLoss)}
@@ -386,118 +666,201 @@ export default function CryptoPortfolioPage() {
               xirrValue !== null && xirrValue >= 0 ? 'text-green-600' : 'text-red-600'
             }
           />
+        </div>
+      )}
 
-          {bestPerformer && (
-            <PerformerStatCard
-              label="Best Performer"
-              performer={bestPerformer}
-              history={bestHistory}
-              weekStats={bestWeek}
-              color="green"
-              symbol={bestPerformer.currency}
-            />
-          )}
+      {/* Portfolio Performance Chart */}
+      {portfolioData.length > 0 && (
+        <div className="relative mb-6" ref={chartRef}>
+          {/* Timeframe Tabs in top-right */}
+          <div className="absolute right-6 top-3 z-10">
+            <Tabs value={timeframe} onValueChange={setTimeframe}>
+              <TabsList className="bg-transparent p-0 h-auto gap-1">
+                {CRYPTO_TIMEFRAMES.map((tf) => (
+                  <TabsTrigger
+                    key={tf.label}
+                    value={tf.label}
+                    className="border border-gray-400 text-gray-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors 
+                    duration-150 data-[state=active]:bg-gray-400 data-[state=active]:text-black data-[state=active]:border-gray-400 data-[state=active]:shadow-none 
+                    focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  >
+                    {tf.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
 
-          {worstPerformer && (
-            <PerformerStatCard
-              label="Worst Performer"
-              performer={worstPerformer}
-              history={worstHistory}
-              weekStats={worstWeek}
-              color="red"
-              symbol={worstPerformer.currency}
-            />
-          )}
+          {/* Coin Filter in top-left */}
+          <div className="absolute left-6 top-3 z-10">
+            <Select value={selectedCoin} onValueChange={setSelectedCoin}>
+              <SelectTrigger className="w-[160px] border border-black text-black dark:border-white dark:text-white dark:bg-transparent">
+                <SelectValue placeholder="Select coin" />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-gray-900 text-black dark:text-white border border-black dark:border-white">
+                <SelectItem value="All">All</SelectItem>
+                {portfolioData.map((coin) => (
+                  <SelectItem key={coin.currency} value={coin.currency}>
+                    {coin.currency}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          {/* Pie Chart Card */}
-          <Card className="w-full min-w-[180px] flex flex-col items-center justify-center py-8 min-h-[180px]">
-            <div
-              className="w-full flex flex-col items-center"
-              style={{ height: 220, minHeight: 180 }}
-            >
-              <HighchartsReact
-                highcharts={Highcharts}
-                options={pieOptions}
-                containerProps={{ style: { width: '100%', height: '100%' } }}
-              />
-            </div>
-          </Card>
+          <div className="bg-transparent rounded-lg border border-border p-4">
+            {isChartLoading ? (
+              <div className="h-[500px] flex flex-col space-y-4">
+                {/* Chart Title Skeleton */}
+                <div className="text-center">
+                  <Skeleton className="h-6 w-80 mx-auto mb-2" />
+                  <Skeleton className="h-4 w-60 mx-auto" />
+                </div>
+
+                {/* Chart Area Skeleton */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-full h-full relative">
+                    {/* Y-axis labels skeleton */}
+                    <div className="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between py-8">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <Skeleton key={i} className="h-4 w-12" />
+                      ))}
+                    </div>
+
+                    {/* Main chart area skeleton */}
+                    <div className="ml-16 mr-4 h-full flex flex-col">
+                      <div className="flex-1 bg-gradient-to-b from-muted/20 to-muted/5 rounded animate-pulse"></div>
+
+                      {/* X-axis labels skeleton */}
+                      <div className="flex justify-between mt-2 px-4">
+                        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                          <Skeleton key={i} className="h-4 w-12" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Legend Skeleton */}
+                <div className="flex justify-center space-x-6 pt-4">
+                  {portfolioData.slice(0, 4).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <Skeleton className="h-3 w-3 rounded-full" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : chartData && chartOptions ? (
+              <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+            ) : (
+              <div className="h-[500px] flex items-center justify-center text-muted-foreground">
+                <Skeleton className="h-3 w-16 rounded-full" />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Portfolio Table */}
       {portfolioData.length > 0 && (
-        <div className="max-w-7xl mx-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>S.No</TableHead>
-                <TableHead>Coin Name</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Avg Price (₹)</TableHead>
-                <TableHead>Current Price (₹)</TableHead>
-                <TableHead>Invested Amount (₹)</TableHead>
-                <TableHead>Current Value (₹)</TableHead>
-                <TableHead>P&L (₹)</TableHead>
-                <TableHead>P&L %</TableHead>
-                <TableHead>XIRR %</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {portfolioData.map((item, idx) => {
-                // Per-coin XIRR calculation
-                const coinTxs = getCoinTransactions(item.currency.toUpperCase());
-                let coinXirr: number | null = null;
-                if (coinTxs.length > 0) {
-                  const cashFlows: XirrCashFlow[] = coinTxs.map((tx) => ({
-                    amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-                    when: new Date(tx.date),
-                  }));
-                  // Add current value as final positive cash flow
-                  cashFlows.push({ amount: item.currentValue, when: new Date() });
-                  try {
-                    coinXirr = xirr(cashFlows) * 100;
-                  } catch {
-                    coinXirr = null;
+        <div className="max-w-full mx-auto flex flex-row gap-4">
+          <div className="w-3/4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>S.No</TableHead>
+                  <TableHead>Coin Name</TableHead>
+                  <TableHead>Balance</TableHead>
+                  <TableHead>Avg Price (₹)</TableHead>
+                  <TableHead>Current Price (₹)</TableHead>
+                  <TableHead>Invested Amount (₹)</TableHead>
+                  <TableHead>Current Value (₹)</TableHead>
+                  <TableHead>P&L (₹)</TableHead>
+                  <TableHead>P&L %</TableHead>
+                  <TableHead>XIRR %</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {portfolioData.map((item, idx) => {
+                  // Per-coin XIRR calculation
+                  const coinTxs = getCoinTransactions(item.currency.toUpperCase());
+                  let coinXirr: number | null = null;
+                  if (coinTxs.length > 0) {
+                    const cashFlows: XirrCashFlow[] = coinTxs.map((tx) => ({
+                      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+                      when: new Date(tx.date),
+                    }));
+                    // Add current value as final positive cash flow
+                    cashFlows.push({ amount: item.currentValue, when: new Date() });
+                    try {
+                      coinXirr = xirr(cashFlows) * 100;
+                    } catch {
+                      coinXirr = null;
+                    }
                   }
-                }
-                return (
-                  <TableRow key={item.currency || idx}>
-                    <TableCell>{idx + 1}</TableCell>
-                    <TableCell className="font-medium">{item.coinName}</TableCell>
-                    <TableCell>{item.balance.toFixed(6)}</TableCell>
-                    <TableCell>
-                      {item.balance > 0
-                        ? formatCurrency(Number((item.investedAmount / item.balance).toFixed(2)))
-                        : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
-                    </TableCell>
-                    <TableCell>{formatCurrency(item.investedAmount)}</TableCell>
-                    <TableCell>{formatCurrency(item.currentValue)}</TableCell>
-                    <TableCell className={getProfitLossColor(item.profitLoss)}>
-                      {formatCurrency(item.profitLoss)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getProfitLossBadgeVariant(item.profitLoss)}>
-                        {formatToPercentage(item.profitLossPercentage)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {coinXirr !== null ? (
-                        <Badge variant={coinXirr >= 0 ? 'default' : 'destructive'}>
-                          {coinXirr.toFixed(2)}%
+                  return (
+                    <TableRow
+                      key={item.currency || idx}
+                      className={`cursor-pointer hover:bg-muted transition ${
+                        selectedCoin === item.currency ? 'bg-muted' : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedCoin(item.currency || 'All');
+                        chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                    >
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell className="font-medium underline">{item.coinName}</TableCell>
+                      <TableCell>{item.balance.toFixed(6)}</TableCell>
+                      <TableCell>
+                        {item.balance > 0
+                          ? formatCurrency(Number((item.investedAmount / item.balance).toFixed(2)))
+                          : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
+                      </TableCell>
+                      <TableCell>{formatCurrency(item.investedAmount)}</TableCell>
+                      <TableCell>{formatCurrency(item.currentValue)}</TableCell>
+                      <TableCell className={getProfitLossColor(item.profitLoss)}>
+                        {formatCurrency(item.profitLoss)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getProfitLossBadgeVariant(item.profitLoss)}>
+                          {formatToPercentage(item.profitLossPercentage)}
                         </Badge>
-                      ) : (
-                        'N/A'
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        {coinXirr !== null ? (
+                          <Badge variant={coinXirr >= 0 ? 'default' : 'destructive'}>
+                            {coinXirr.toFixed(2)}%
+                          </Badge>
+                        ) : (
+                          'N/A'
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          {/* Pie Chart Card */}
+          <div className="w-1/4">
+            <div className="w-full min-w-[180px] flex flex-col items-center justify-center min-h-[180px]">
+              <div
+                className="w-full flex flex-col items-center"
+                style={{ height: 220, minHeight: 180 }}
+              >
+                <HighchartsReact
+                  highcharts={Highcharts}
+                  options={pieOptions}
+                  containerProps={{ style: { width: '100%', height: '100%' } }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -108,6 +108,35 @@ export async function getCoinCandles(req: Request, res: Response) {
   }
 }
 
+export async function getMultipleCoinCandles(req: Request, res: Response) {
+  try {
+    const { symbols, interval = '1d', limit = '365', startTime, endTime } = req.query;
+
+    if (!symbols || typeof symbols !== 'string') {
+      res.status(400).json({
+        success: false,
+        message: 'symbols is required and must be a comma-separated string',
+      });
+      return;
+    }
+
+    const symbolList = symbols.split(',').map((s) => s.trim().toUpperCase());
+
+    const candles = await coindcxService.getMultipleCoinCandles({
+      symbols: symbolList,
+      interval: typeof interval === 'string' ? interval : '1d',
+      limit: Number(limit),
+      startTime: Number(startTime),
+      endTime: Number(endTime),
+    });
+
+    res.status(200).json({ success: true, data: candles });
+  } catch (error) {
+    console.error('Error in getMultipleCoinCandles:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 function fuzzyMatchName(name: string, query: string): boolean {
   return name.toLowerCase().includes(query.toLowerCase());
 }
