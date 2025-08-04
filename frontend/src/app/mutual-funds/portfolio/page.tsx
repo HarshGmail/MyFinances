@@ -230,7 +230,10 @@ export default function MutualFundsPortfolioPage() {
             <motion.div
               key={`${fund.fundName ?? 'fund'}-${idx}`}
               layoutId={`card-${fund.fundName ?? 'fund'}-${id}-${idx}`}
-              onClick={() => setActive(fund)}
+              onClick={() => {
+                setActive(fund);
+                setShowTransactionForm(false);
+              }}
               className="bg-white dark:bg-neutral-900 rounded-xl shadow p-4 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 flex flex-col justify-between min-h-[200px]"
             >
               <div className="flex justify-between items-center mb-2">
@@ -282,7 +285,7 @@ export default function MutualFundsPortfolioPage() {
             <motion.div
               layoutId={`card-${active.fundName ?? 'fund'}-${id}`}
               ref={ref}
-              className="w-full max-w-[400px] flex flex-col bg-white dark:bg-neutral-900 rounded-3xl overflow-hidden shadow-lg p-6"
+              className="w-full max-w-[700px] flex flex-col bg-white dark:bg-neutral-900 rounded-3xl overflow-hidden shadow-lg p-6"
               onClick={(e) => e.stopPropagation()}
             >
               {!showTransactionForm ? (

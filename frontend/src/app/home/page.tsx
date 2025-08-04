@@ -781,7 +781,7 @@ export default function Home() {
         />
         <SummaryStatCard
           label="Total P&L %"
-          value={formatToPercentage(portfolioSummary.total.profitLossPercentage)}
+          value={`${formatToPercentage(portfolioSummary.total.profitLossPercentage)}%`}
           valueClassName={getProfitLossColor(portfolioSummary.total.profitLoss)}
         />
         <SummaryStatCard
@@ -830,7 +830,7 @@ export default function Home() {
                   <span>P&L:</span>
                   <span className={getProfitLossColor(portfolioSummary.stocks.profitLoss)}>
                     {formatCurrency(portfolioSummary.stocks.profitLoss)} (
-                    {formatToPercentage(portfolioSummary.stocks.profitLossPercentage)})
+                    {formatToPercentage(portfolioSummary.stocks.profitLossPercentage)}%)
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -869,7 +869,7 @@ export default function Home() {
                   <span>P&L:</span>
                   <span className={getProfitLossColor(portfolioSummary.gold.profitLoss)}>
                     {formatCurrency(portfolioSummary.gold.profitLoss)} (
-                    {formatToPercentage(portfolioSummary.gold.profitLossPercentage)})
+                    {formatToPercentage(portfolioSummary.gold.profitLossPercentage)}%)
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -911,7 +911,7 @@ export default function Home() {
                   <span>P&L:</span>
                   <span className={getProfitLossColor(portfolioSummary.mutualFunds.profitLoss)}>
                     {formatCurrency(portfolioSummary.mutualFunds.profitLoss)} (
-                    {formatToPercentage(portfolioSummary.mutualFunds.profitLossPercentage)})
+                    {formatToPercentage(portfolioSummary.mutualFunds.profitLossPercentage)}%)
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -948,7 +948,7 @@ export default function Home() {
                   <span>P&L:</span>
                   <span className={getProfitLossColor(portfolioSummary.crypto.profitLoss)}>
                     {formatCurrency(portfolioSummary.crypto.profitLoss)} (
-                    {formatToPercentage(portfolioSummary.crypto.profitLossPercentage)})
+                    {formatToPercentage(portfolioSummary.crypto.profitLossPercentage)}%)
                   </span>
                 </div>
                 <div className="flex justify-between">

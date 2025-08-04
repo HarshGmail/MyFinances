@@ -9,7 +9,7 @@ export function useStockTransactionsQuery() {
       const response = await apiRequest({ endpoint: '/stocks/transactions', method: 'GET' });
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -24,7 +24,7 @@ export function useNseQuoteQuery(symbols: string[]) {
       });
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
     enabled: symbols.length > 0,
   });
 }
@@ -37,11 +37,21 @@ export function useSearchStockByNameQuery(symbol: string) {
         endpoint: `/stocks/search?query=${symbol}`,
         method: 'GET',
       });
-      console.log(1, response);
-      console.log(Array.isArray(response?.data) ? response.data : []);
       return Array.isArray(response?.data) ? response.data : [];
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
     enabled: symbol.length > 3,
+  });
+}
+
+export function useStockFullProfile(symbol: string, range?: '1y', interval?: '1d') {
+  return useQuery({
+    queryKey: ['stock-full-profile', symbol, range, interval],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: `/stocks/stock-profile?symbol=${symbol}&range=${range}&interval=${interval}`,
+      });
+      return response.data;
+    },
   });
 }

@@ -7,11 +7,22 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
+import { Skeleton } from '@/components/ui/skeleton';
 import xirr, { XirrTransaction } from '@/utils/xirr';
 import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
 import { formatCurrency } from '@/utils/numbers';
 
 export default function GoldPortfolioPage() {
+  type TooltipPoint = {
+    y?: number;
+    series: { name: string };
+  };
+
+  type TooltipContext = {
+    x?: number;
+    points?: TooltipPoint[];
+  };
+
   const { theme } = useAppStore();
   const TIMEFRAMES = getTimeframes();
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[1].label); // default '1m'
@@ -19,8 +30,10 @@ export default function GoldPortfolioPage() {
   const selectedTimeframe = TIMEFRAMES.find((tf) => tf.label === timeframe) || TIMEFRAMES[1];
   const startDate = getPastDate(selectedTimeframe.days, 'ymd');
 
-  const { data, isLoading, error } = useSafeGoldRatesQuery({ startDate, endDate });
-  const { data: transactions } = useGoldTransactionsQuery();
+  const { data, isLoading: ratesLoading, error } = useSafeGoldRatesQuery({ startDate, endDate });
+  const { data: transactions, isLoading: transactionsLoading } = useGoldTransactionsQuery();
+
+  const isLoading = ratesLoading || transactionsLoading;
 
   // Gold portfolio calculations
   const goldStats = useMemo(() => {
@@ -117,28 +130,32 @@ export default function GoldPortfolioPage() {
     };
   }, [data, theme]);
 
-  // Investment events and cumulative invested chart options
   const investmentChartOptions = useMemo(() => {
     if (!transactions || transactions.length === 0) return {};
-    // Sort transactions by date ascending
+
+    const currentGoldPrice =
+      data?.data && data.data.length > 0 ? parseFloat(data.data[data.data.length - 1].rate) : null;
+
     const sortedTx = [...transactions].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-    // Only consider credits for investment events
     const investmentEvents = sortedTx.filter((tx) => tx.type === 'credit');
-    // Prepare data for columns (investment events)
+
     const eventData = investmentEvents.map((tx) => [Date.parse(tx.date), tx.amount]);
-    // Prepare data for cumulative invested (line)
-    let cumulative = 0;
-    const cumulativeData = sortedTx.map((tx) => {
-      if (tx.type === 'credit') cumulative += tx.amount;
-      else if (tx.type === 'debit') cumulative -= tx.amount;
-      return [Date.parse(tx.date), cumulative];
-    });
+    const valuationData =
+      currentGoldPrice !== null
+        ? investmentEvents.map((tx) => [Date.parse(tx.date), tx.quantity * currentGoldPrice])
+        : [];
+
+    // Map date → invested amount for quick lookup in tooltip
+    const investedMap = Object.fromEntries(
+      investmentEvents.map((tx) => [Date.parse(tx.date), tx.amount])
+    );
+
     return {
-      chart: { type: 'line', backgroundColor: 'transparent', height: 320 },
+      chart: { type: 'column', backgroundColor: 'transparent', height: 420 },
       title: {
-        text: 'Gold Investment Timeline',
+        text: 'Gold Invested vs Current Valuation',
         style: {
           fontWeight: 600,
           fontSize: '1.1rem',
@@ -148,15 +165,15 @@ export default function GoldPortfolioPage() {
       xAxis: {
         type: 'datetime',
         labels: {
-          format: '{value:%d %b %Y}',
+          format: '{value:%b %Y}',
           style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
         },
-        title: { text: 'Date', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
+        title: { text: 'Month', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
       },
       yAxis: [
         {
           title: {
-            text: 'Investment (₹)',
+            text: 'Amount (₹)',
             style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
           },
           labels: {
@@ -172,66 +189,182 @@ export default function GoldPortfolioPage() {
       ],
       tooltip: {
         shared: true,
-        useHTML: true,
-        formatter: function (this: unknown) {
-          // Highcharts context is not typed, so we use unknown and cast as needed
-          const self = this as { points?: { series: { name: string }; y: number }[]; x: number };
-          const points = self.points || [];
-          const date = Highcharts.dateFormat('%d %b %Y', self.x);
-          let invested: number | null = null;
-          let total: number | null = null;
-          points.forEach((pt: unknown) => {
-            const point = pt as { series: { name: string }; y: number };
-            if (point.series.name === 'Investment Event' && typeof point.y === 'number')
-              invested = point.y;
-            if (point.series.name === 'Cumulative Invested' && typeof point.y === 'number')
-              total = point.y;
+        xDateFormat: '<b>%b %Y</b>',
+        formatter: function (this: TooltipContext): string {
+          const x = this.x ?? 0;
+          let html = `<b>${Highcharts.dateFormat('%b %Y', x)}</b><br/>`;
+
+          (this.points ?? []).forEach((point: TooltipPoint) => {
+            const val = point.y ?? 0;
+            html += `${point.series.name}: ₹${val.toLocaleString()}<br/>`;
+
+            if (point.series.name === 'Current Valuation') {
+              const invested = investedMap[x] || 0;
+              const change = val - invested;
+              html += `Change: ${change >= 0 ? '+' : ''}${change.toLocaleString()}<br/>`;
+            }
           });
-          return `
-            <div style="min-width:160px; color: ${theme === 'dark' ? '#fff' : '#18181b'};">
-              <div style="font-weight:600; margin-bottom:4px;">${date}</div>
-              ${invested !== null ? `<div>Invested this day: <b>₹${Number(invested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>` : ''}
-              ${total !== null ? `<div>Total invested: <b>₹${Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>` : ''}
-            </div>
-          `;
+
+          return html;
+        },
+      },
+      plotOptions: {
+        column: {
+          grouping: true,
+          pointPadding: 0.1,
+          groupPadding: 0.15,
+          borderWidth: 0,
         },
       },
       series: [
         {
           type: 'column',
-          name: 'Investment Event',
+          name: 'Amount Invested',
           data: eventData,
           color: '#60a5fa',
           yAxis: 0,
-          tooltip: { valuePrefix: '₹' },
         },
-        {
-          type: 'line',
-          name: 'Cumulative Invested',
-          data: cumulativeData,
-          color: '#fbbf24',
-          lineWidth: 2,
-          marker: { enabled: false },
-          yAxis: 0,
-          tooltip: { valuePrefix: '₹' },
-        },
+        ...(currentGoldPrice !== null
+          ? [
+              {
+                type: 'column',
+                name: 'Current Valuation',
+                data: valuationData,
+                color: '#22c55e',
+                yAxis: 0,
+              },
+            ]
+          : []),
       ],
       credits: { enabled: false },
+      legend: { enabled: true },
     };
-  }, [transactions, theme]);
+  }, [transactions, theme, data]);
+
+  const StatsSkeleton = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="bg-card rounded-lg p-4 border border-border">
+          <Skeleton className="h-4 w-24 mb-2" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+
+  // Skeleton for chart
+  const ChartSkeleton = () => (
+    <div className="bg-card rounded-lg p-4 relative">
+      {/* Chart Title Skeleton */}
+      <div className="text-center mb-4">
+        <Skeleton className="h-6 w-48 mx-auto" />
+      </div>
+
+      {/* Tabs Skeleton */}
+      <div className="absolute right-6 top-6 z-10">
+        <div className="flex gap-1">
+          {TIMEFRAMES.map((_, i) => (
+            <Skeleton key={i} className="h-7 w-8 rounded-md" />
+          ))}
+        </div>
+      </div>
+
+      {/* Chart Area Skeleton */}
+      <div className="h-[320px] flex flex-col space-y-4">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full h-full relative">
+            {/* Y-axis labels skeleton */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between py-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-4 w-12" />
+              ))}
+            </div>
+
+            {/* Main chart area skeleton */}
+            <div className="ml-16 mr-4 h-full flex flex-col">
+              <div className="flex-1 bg-gradient-to-b from-yellow-400/20 to-yellow-400/5 rounded animate-pulse"></div>
+
+              {/* X-axis labels skeleton */}
+              <div className="flex justify-between mt-2 px-4">
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <Skeleton key={i} className="h-4 w-12" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Investment Timeline Chart Skeleton
+  const InvestmentChartSkeleton = () => (
+    <div className="bg-card rounded-lg p-4 mt-6">
+      {/* Chart Title Skeleton */}
+      <div className="text-center mb-4">
+        <Skeleton className="h-6 w-56 mx-auto" />
+      </div>
+
+      {/* Chart Area Skeleton */}
+      <div className="h-[320px] flex flex-col space-y-4">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full h-full relative">
+            {/* Y-axis labels skeleton */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between py-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-4 w-12" />
+              ))}
+            </div>
+
+            {/* Main chart area skeleton with column chart pattern */}
+            <div className="ml-16 mr-4 h-full flex flex-col">
+              <div className="flex-1 flex items-end justify-around px-4 pb-4 space-x-2">
+                {/* Simulated column bars */}
+                {[40, 70, 30, 80, 50, 60].map((height, i) => (
+                  <div
+                    key={i}
+                    className="bg-blue-400/30 animate-pulse rounded-t"
+                    style={{ height: `${height}%`, width: '8%' }}
+                  ></div>
+                ))}
+              </div>
+
+              {/* X-axis labels skeleton */}
+              <div className="flex justify-between mt-2 px-4">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Skeleton key={i} className="h-4 w-16" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div className="p-4 h-full">
+        <div className="text-red-500 text-center">Failed to load gold rates</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 h-full">
       <h2 className="text-2xl font-bold mb-6 text-center">Gold Portfolio</h2>
+
       {/* Portfolio Summary Cards */}
-      {goldStats && (
+      {isLoading ? (
+        <StatsSkeleton />
+      ) : goldStats ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           <SummaryStatCard label="Total Gold (gms)" value={goldStats.totalGold.toFixed(4)} />
           <SummaryStatCard label="Total Invested" value={formatCurrency(goldStats.totalInvested)} />
           <SummaryStatCard
             label={
               <>
-                {goldStats.profitLoss >= 0 ? 'Current Profit' : 'Current Loss'}{' '}
+                Current Valuation{' '}
                 <span className={goldStats.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
                   ({formatCurrency(goldStats.profitLoss)})
                 </span>
@@ -255,44 +388,49 @@ export default function GoldPortfolioPage() {
             }
           />
         </div>
-      )}
-      <div className="bg-card rounded-lg p-4 relative">
-        {/* Tabs as overlay in top right of chart */}
-        <div className="absolute right-6 top-6 z-10">
-          <Tabs value={timeframe} onValueChange={setTimeframe} className="min-w-0">
-            <TabsList className="bg-transparent p-0 h-auto gap-1">
-              {TIMEFRAMES.map((tf) => (
-                <TabsTrigger
-                  key={tf.label}
-                  value={tf.label}
-                  className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors duration-150 data-[state=active]:bg-yellow-400 data-[state=active]:text-black data-[state=active]:border-yellow-400 data-[state=active]:shadow-none focus:outline-none focus:ring-2 focus:ring-yellow-400 border-[1px] font-normal"
-                >
-                  {tf.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-        {isLoading ? (
-          <div className="text-center">Loading chart...</div>
-        ) : error ? (
-          <div className="text-center text-red-500">Failed to load gold rates</div>
-        ) : (
+      ) : null}
+
+      {/* Gold Price Chart */}
+      {isLoading ? (
+        <ChartSkeleton />
+      ) : (
+        <div className="bg-card rounded-lg p-4 relative">
+          {/* Tabs as overlay in top right of chart */}
+          <div className="absolute right-6 top-6 z-10">
+            <Tabs value={timeframe} onValueChange={setTimeframe} className="min-w-0">
+              <TabsList className="bg-transparent p-0 h-auto gap-1">
+                {TIMEFRAMES.map((tf) => (
+                  <TabsTrigger
+                    key={tf.label}
+                    value={tf.label}
+                    className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors duration-150 data-[state=active]:bg-yellow-400 data-[state=active]:text-black data-[state=active]:border-yellow-400 data-[state=active]:shadow-none focus:outline-none focus:ring-2 focus:ring-yellow-400 border-[1px] font-normal"
+                  >
+                    {tf.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
           <HighchartsReact
             highcharts={Highcharts}
             options={chartOptions}
             containerProps={{ style: { height: '100%' } }}
           />
-        )}
-      </div>
+        </div>
+      )}
+
       {/* Investment Timeline Chart */}
-      <div className="bg-card rounded-lg p-4 mt-6">
-        <HighchartsReact
-          highcharts={Highcharts}
-          options={investmentChartOptions}
-          containerProps={{ style: { height: 320 } }}
-        />
-      </div>
+      {isLoading ? (
+        <InvestmentChartSkeleton />
+      ) : (
+        <div className="bg-card rounded-lg p-4 mt-6">
+          <HighchartsReact
+            highcharts={Highcharts}
+            options={investmentChartOptions}
+            containerProps={{ style: { height: 420 } }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   getStockTransactions,
   getNSEQuote,
   searchStocksByName,
+  getFullStockProfile,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -20,5 +21,8 @@ router.get('/search', authenticateToken, searchStocksByName);
 
 // GET /stocks/nse-quote?symbol=SYMBOL - Fetch NSE quote for a stock symbol
 router.get('/nse-quote', authenticateToken, getNSEQuote);
+
+// GET /stocks/stock-profile?symbol=SYMBOL&range=time period&interval=time interval
+router.get('/stock-profile', authenticateToken, getFullStockProfile);
 
 export default router;

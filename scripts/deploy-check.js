@@ -1,12 +1,12 @@
 const { execSync } = require('child_process');
 
 const steps = [
-  { label: '📦 Building Frontend', cmd: 'cd frontend && npm run build' },
-  { label: '📦 Building Backend', cmd: 'cd backend && npm run build' },
-  { label: '🔍 Linting Frontend', cmd: 'cd frontend && npm run lint' },
-  { label: '🔍 Linting Backend', cmd: 'cd backend && npm run lint' },
   { label: '🧹 Prettier Check Frontend', cmd: 'cd frontend && npm run prettier:check' },
   { label: '🧹 Prettier Check Backend', cmd: 'cd backend && npm run prettier:check' },
+  { label: '🔍 Linting Frontend', cmd: 'cd frontend && npm run lint' },
+  { label: '🔍 Linting Backend', cmd: 'cd backend && npm run lint' },
+  { label: '📦 Building Frontend', cmd: 'cd frontend && npm run build' },
+  { label: '📦 Building Backend', cmd: 'cd backend && npm run build' },
 ];
 
 (async () => {
