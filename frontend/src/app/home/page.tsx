@@ -781,7 +781,7 @@ export default function Home() {
         />
         <SummaryStatCard
           label="Total P&L %"
-          value={formatToPercentage(portfolioSummary.total.profitLossPercentage)}
+          value={`${formatToPercentage(portfolioSummary.total.profitLossPercentage)}%`}
           valueClassName={getProfitLossColor(portfolioSummary.total.profitLoss)}
         />
         <SummaryStatCard

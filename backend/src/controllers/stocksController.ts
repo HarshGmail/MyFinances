@@ -3,85 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { stocksSchema } from '../schemas/stocks';
 import { getUserFromRequest } from '../utils/jwtHelpers';
-import axios from 'axios';
-
-export interface TradingPeriod {
-  timezone: string;
-  start: number;
-  end: number;
-  gmtoffset: number;
-}
-
-export interface CurrentTradingPeriod {
-  pre: TradingPeriod;
-  regular: TradingPeriod;
-  post: TradingPeriod;
-}
-
-export interface StockMeta {
-  currency: string;
-  symbol: string;
-  exchangeName: string;
-  fullExchangeName: string;
-  instrumentType: string;
-  firstTradeDate: number;
-  regularMarketTime: number;
-  hasPrePostMarketData: boolean;
-  gmtoffset: number;
-  timezone: string;
-  exchangeTimezoneName: string;
-  regularMarketPrice: number;
-  fiftyTwoWeekHigh: number;
-  fiftyTwoWeekLow: number;
-  regularMarketDayHigh: number;
-  regularMarketDayLow: number;
-  regularMarketVolume: number;
-  longName: string;
-  shortName: string;
-  chartPreviousClose: number;
-  priceHint: number;
-  currentTradingPeriod: CurrentTradingPeriod;
-  dataGranularity: string;
-  range: string;
-  validRanges: string[];
-}
-
-export interface Quote {
-  open: number[];
-  volume: number[];
-  close: number[];
-  low: number[];
-  high: number[];
-}
-
-export interface AdjClose {
-  adjclose: number[];
-}
-
-export interface Indicators {
-  quote: Quote[];
-  adjclose: AdjClose[];
-}
-
-export interface ChartResult {
-  meta: StockMeta;
-  timestamp: number[];
-  indicators: Indicators;
-}
-
-export interface ChartError {
-  code: string;
-  description: string;
-}
-
-export interface Chart {
-  result: ChartResult[];
-  error: ChartError | null;
-}
-
-export interface StockData {
-  chart: Chart;
-}
+import { StocksService } from '../services/stocksService';
 
 export async function addStockTransaction(req: Request, res: Response) {
   try {
@@ -130,6 +52,7 @@ export async function getNSEQuote(req: Request, res: Response) {
       res.status(400).json({ success: false, message: 'Symbols are required' });
       return;
     }
+
     const symbols = symbolsParam
       .split(',')
       .map((s) => s.trim())
@@ -139,85 +62,47 @@ export async function getNSEQuote(req: Request, res: Response) {
       return;
     }
 
-    // Throttle: Only one Yahoo Finance API call per second
-    const results: [string, StockData | null][] = [];
-    for (const symbol of symbols) {
-      try {
-        const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1y`;
-        const response = await axios.get(url);
-        console.log('Symbol', symbol, ' yfSymbol', yfSymbol, ' status', response.status);
-        results.push([symbol, response.data]);
-      } catch (err: unknown) {
-        const error = err as Error;
-        console.log('error fetching api data from yahoo', error.message);
-        results.push([symbol, null]);
-      }
-      // Wait 1 second before next call, unless it's the last symbol
-      if (symbol !== symbols[symbols.length - 1]) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    }
-    const dataMap = Object.fromEntries(results);
+    const dataMap = await StocksService.fetchNSEQuotes(symbols);
     res.status(200).json({ success: true, data: dataMap });
   } catch (error) {
-    console.error('Fetch Yahoo Finance quote error:', error);
+    console.error('Fetch NSE quote error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
-}
-
-export interface StockSearchResponse {
-  exchange: string;
-  shortname: string;
-  quoteType: string;
-  symbol: string;
-  index: string;
-  score: string;
-  typeDisp: string;
-  longname: string;
-  exchDisp: string;
-  sector: string;
-  sectorDisp: string;
-  industry: string;
-  industryDisp: string;
-  isYahooFinance: boolean;
 }
 
 export async function searchStocksByName(req: Request, res: Response) {
   try {
     const { query } = req.query;
     if (!query || typeof query !== 'string' || query.length < 2) {
-      res.status(400).json({
-        message: 'Query string is required and should be at least 2 characters.',
-      });
+      res
+        .status(400)
+        .json({ message: 'Query string is required and should be at least 2 characters.' });
       return;
     }
 
-    const url =
-      `https://query2.finance.yahoo.com/v1/finance/search` +
-      `?q=${encodeURIComponent(query)}` +
-      `&lang=en-US&region=US&quotesCount=6&newsCount=3&listsCount=2` +
-      `&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query` +
-      `&multiQuoteQueryId=multi_quote_single_token_query` +
-      `&newsQueryId=news_cie_vespa&enableCb=false&enableNavLinks=true` +
-      `&enableEnhancedTrivialQuery=true&enableResearchReports=true` +
-      `&enableCulturalAssets=true&enableLogoUrl=true&enableLists=false` +
-      `&recommendCount=5&enablePrivateCompany=true`;
-
-    const response = await axios.get(url);
-    const quotes: StockSearchResponse[] = response.data.quotes || [];
-
-    const filtered = quotes
-      .filter((q) => q.exchange === 'NSI')
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      .map(({ isYahooFinance, ...rest }) => rest); // Remove `isYahooFinance`
-
-    res.status(200).json({
-      success: true,
-      data: filtered,
-    });
+    const results = await StocksService.searchStocks(query);
+    res.status(200).json({ success: true, data: results });
   } catch (err) {
     console.error('Error searching stocks by name:', err);
     res.status(500).json({ message: 'Failed to search stocks' });
+  }
+}
+
+export async function getFullStockProfile(req: Request, res: Response) {
+  try {
+    const { symbol } = req.query;
+    if (!symbol || typeof symbol !== 'string') {
+      res.status(400).json({ success: false, message: 'symbol is required' });
+      return;
+    }
+
+    const range = (req.query.range as string) || '1y';
+    const interval = (req.query.interval as string) || '1d';
+
+    const data = await StocksService.getFullStockProfile(symbol, range, interval);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching full stock profile:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
