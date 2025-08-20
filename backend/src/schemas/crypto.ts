@@ -14,5 +14,5 @@ export const cryptoSchema = z.object({
   coinSymbol: z.string(),
 });
 
-// TypeScript type for digitalGold
+// TypeScript type for crypto
 export type crypto = z.infer<typeof cryptoSchema>;

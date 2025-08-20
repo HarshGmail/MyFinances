@@ -1,16 +1,31 @@
 'use client';
 
-import { useEpfQuery, useEpfTimelineQuery } from '@/api/query';
+import {
+  useEpfQuery,
+  useEpfTimelineQuery,
+  useInflationQuery,
+  useUserProfileQuery,
+} from '@/api/query';
 import { useAddEpfAccountMutation } from '@/api/mutations';
 import { EpfAccountPayload } from '@/api/dataInterface';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, CalendarIcon } from 'lucide-react';
+import {
+  Plus,
+  CalendarIcon,
+  TrendingUp,
+  DollarSign,
+  Target,
+  Clock,
+  PiggyBank,
+  Calculator,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, differenceInYears } from 'date-fns';
 
+import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -38,6 +53,7 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 
 export default function EPFPage() {
+  const { theme } = useAppStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -60,6 +76,9 @@ export default function EPFPage() {
 
   const { mutateAsync: addAccount, isPending } = useAddEpfAccountMutation();
   const { data, refetch, isLoading: epfLoading, error: epfError } = useEpfQuery();
+  const { data: user } = useUserProfileQuery();
+  const { data: inflationData } = useInflationQuery(5);
+
   const {
     data: timelineData,
     refetch: refetchTimeline,
@@ -71,6 +90,11 @@ export default function EPFPage() {
   const isLoading = epfLoading || timelineLoading;
   const error = epfError || timelineError;
 
+  const inflationAnnualPct = Number.isFinite(inflationData?.average)
+    ? (inflationData!.average as number)
+    : 5;
+  const INF = inflationAnnualPct / 100;
+
   // EPF calculation logic (CORRECTED FOR MONTHLY CONTRIBUTIONS)
   const calculateEPFGrowth = () => {
     if (!data || data.length === 0) return { yearlyData: [], summary: null };
@@ -80,23 +104,33 @@ export default function EPFPage() {
       (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     );
 
-    const EPF_RATE = 8.25 / 100; // 8.25% annual interest
+    const EPF_RATE = 8.25 / 100; // nominal annual interest
     const RETIREMENT_AGE = 58;
     const currentYear = new Date().getFullYear();
 
-    // Assuming user is currently 25 (you can make this dynamic)
-    const assumedCurrentAge = 25;
-    const retirementYear = currentYear + (RETIREMENT_AGE - assumedCurrentAge);
+    const currentAge = user?.dob ? differenceInYears(new Date(), new Date(user.dob)) : 25;
+    const safeAge = Math.max(0, Math.min(RETIREMENT_AGE, currentAge));
+    const retirementYear = currentYear + (RETIREMENT_AGE - safeAge);
 
-    let totalBalance = 0;
-    const yearlyData = [];
-    let totalContributed = 0;
+    let totalBalanceNominal = 0; // future nominal ₹
+    let totalContributedNominal = 0; // sum of nominal contributions
+    let totalContributedRealPV = 0; // PV (today ₹) of contributions
+
+    const yearlyData: Array<{
+      year: number;
+      balance: number; // nominal
+      realBalance: number; // inflation-adjusted (today ₹)
+      contribution: number; // nominal annual contribution
+      monthlyContribution: number;
+      interestEarned: number; // nominal interest (approx)
+      interestEarnedReal: number; // real interest (today ₹)
+    }> = [];
 
     // Calculate growth year by year
     for (let year = currentYear; year <= Math.min(retirementYear, 2060); year++) {
       let monthlyContribution = 0;
 
-      // Find which account is active in this year
+      // Which account is active this year?
       for (let i = 0; i < sortedAccounts.length; i++) {
         const account = sortedAccounts[i];
         const accountStartYear = new Date(account.startDate).getFullYear();
@@ -106,45 +140,64 @@ export default function EPFPage() {
             : retirementYear + 1;
 
         if (year >= accountStartYear && year < nextAccountStartYear) {
-          monthlyContribution = account.epfAmount; // This is monthly amount
+          monthlyContribution = account.epfAmount; // monthly amount
           break;
         }
       }
 
-      // Calculate annual contribution (monthly * 12)
+      // Annual contribution
       const yearlyContribution = monthlyContribution * 12;
 
-      // Add yearly contribution
-      totalBalance += yearlyContribution;
-      totalContributed += yearlyContribution;
+      // Nominal track
+      totalBalanceNominal += yearlyContribution;
+      totalContributedNominal += yearlyContribution;
+      totalBalanceNominal = totalBalanceNominal * (1 + EPF_RATE);
 
-      // Apply compound interest
-      totalBalance = totalBalance * (1 + EPF_RATE);
+      // Inflation adjustment (deflate to today's ₹)
+      // +1 because we just compounded this year's interest
+      const yearsFromNow = year - currentYear + 1;
+      const realBalance = totalBalanceNominal / Math.pow(1 + INF, yearsFromNow);
+
+      // Present value of this year's contribution (rough, end-of-year timing)
+      const pvContribution = yearlyContribution / Math.pow(1 + INF, yearsFromNow);
+      totalContributedRealPV += pvContribution;
+
+      const interestNominal = totalBalanceNominal - totalContributedNominal;
+      const interestReal = realBalance - totalContributedRealPV;
 
       yearlyData.push({
         year,
-        balance: Math.round(totalBalance),
+        balance: Math.round(totalBalanceNominal),
+        realBalance: Math.round(realBalance),
         contribution: yearlyContribution,
         monthlyContribution,
-        interestEarned: Math.round(totalBalance - totalContributed),
+        interestEarned: Math.round(interestNominal),
+        interestEarnedReal: Math.round(interestReal),
       });
     }
 
-    const finalBalance = yearlyData[yearlyData.length - 1]?.balance || 0;
-    const totalInterest = finalBalance - totalContributed;
+    const finalNominal = yearlyData.at(-1)?.balance ?? 0;
+    const finalReal = yearlyData.at(-1)?.realBalance ?? 0;
 
     return {
       yearlyData,
       summary: {
-        finalBalance,
-        totalContributed,
-        totalInterest,
+        finalBalance: finalNominal, // nominal
+        finalBalanceReal: finalReal, // real, today ₹
+        totalContributed: totalContributedNominal, // nominal
+        totalContributedReal: Math.round(totalContributedRealPV), // PV (today ₹)
+        totalInterest: finalNominal - totalContributedNominal, // nominal
+        totalInterestReal: Math.round(finalReal - totalContributedRealPV), // real
         yearsToRetirement: retirementYear - currentYear,
+        inflationAnnualPct, // surfaced for UI
       },
     };
   };
 
   const { yearlyData, summary } = calculateEPFGrowth();
+
+  const BLUE = '#3B82F6';
+  const ORANGE = '#F97316';
 
   // Highcharts configuration
   const chartOptions = {
@@ -155,22 +208,26 @@ export default function EPFPage() {
     },
     title: {
       text: 'EPF Investment Growth Projection',
-      style: { fontSize: '18px', fontWeight: 'bold' },
+      style: { fontSize: '18px', fontWeight: 'bold', color: theme === 'dark' ? '#fff' : '#18181b' },
     },
     subtitle: {
-      text: 'Based on 8.25% annual interest rate',
+      text: `8.25% nominal, deflated by ${inflationAnnualPct.toFixed(2)}% inflation`,
       style: { fontSize: '14px', color: '#666' },
     },
     xAxis: {
       categories: yearlyData.map((d) => d.year.toString()),
-      title: { text: 'Year' },
+      title: { text: 'Year', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
+      labels: {
+        style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
+      },
     },
     yAxis: {
-      title: { text: 'Amount (₹)' },
+      title: { text: 'Amount (₹)', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
       labels: {
         formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
           return '₹' + ((this.value as number) / 100000).toFixed(1) + 'L';
         },
+        style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
       },
     },
     tooltip: {
@@ -180,22 +237,16 @@ export default function EPFPage() {
         const data = yearlyData[this.point.index];
         // @ts-expect-error highcharts formatter
         return `<b>Year ${this.x}</b><br/>
-                Total Balance: ₹${data.balance.toLocaleString('en-IN')}<br/>
+                Total Balance (Nominal): ₹${data.balance.toLocaleString('en-IN')}<br/>
+                Total Balance (Real): ₹${data.realBalance.toLocaleString('en-IN')}<br/>
                 Annual Contribution: ₹${data.contribution.toLocaleString('en-IN')}<br/>
                 Monthly Contribution: ₹${data.monthlyContribution.toLocaleString('en-IN')}<br/>
-                Interest Earned: ₹${data.interestEarned.toLocaleString('en-IN')}`;
+                Interest Earned (Nominal): ₹${data.interestEarned.toLocaleString('en-IN')}<br/>
+                Interest Earned (Real): ₹${data.interestEarnedReal.toLocaleString('en-IN')}`;
       },
     },
     plotOptions: {
       area: {
-        fillColor: {
-          linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-          stops: [
-            [0, 'rgba(59, 130, 246, 0.3)'],
-            [1, 'rgba(59, 130, 246, 0.1)'],
-          ],
-        },
-        lineColor: '#3B82F6',
         lineWidth: 2,
         marker: {
           enabled: false,
@@ -207,12 +258,35 @@ export default function EPFPage() {
     },
     series: [
       {
-        name: 'EPF Balance',
+        name: 'EPF Balance (Nominal)',
         data: yearlyData.map((d) => d.balance),
-        color: '#3B82F6',
+        color: BLUE,
+        lineColor: BLUE,
+        zIndex: 1,
+        fillColor: {
+          linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+          stops: [
+            [0, Highcharts.color(BLUE).setOpacity(0.35).get('rgba')],
+            [1, Highcharts.color(BLUE).setOpacity(0.1).get('rgba')],
+          ],
+        },
+      },
+      {
+        name: 'EPF Balance (Real, ₹ today)',
+        data: yearlyData.map((d) => d.realBalance),
+        color: ORANGE,
+        lineColor: ORANGE,
+        zIndex: 2, // ensure orange area sits on top of blue
+        fillColor: {
+          linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+          stops: [
+            [0, Highcharts.color(ORANGE).setOpacity(0.35).get('rgba')],
+            [1, Highcharts.color(ORANGE).setOpacity(0.1).get('rgba')],
+          ],
+        },
       },
     ],
-    legend: { enabled: false },
+    legend: { enabled: true },
     credits: { enabled: false },
   };
 
@@ -251,47 +325,18 @@ export default function EPFPage() {
         </div>
 
         {/* Summary Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-24" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-36" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-28" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-40" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-28" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-24" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-20" />
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-3 w-20 mt-1" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Growth Chart Skeleton */}
@@ -526,70 +571,170 @@ export default function EPFPage() {
       {/* Investment Growth Chart and Summary */}
       {data && data.length > 0 && (
         <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Enhanced Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {/* Current Balance */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <PiggyBank className="h-4 w-4 text-green-600" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Invested Amount
+                  Current Balance
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
                   ₹{timelineData?.totalCurrentBalance.toLocaleString('en-IN')}
                 </div>
+                <div className="text-xs text-muted-foreground mt-1">Total invested till date</div>
               </CardContent>
             </Card>
 
+            {/* Maturity Value - Nominal */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <Target className="h-4 w-4 text-blue-600" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Projected Balance at 58
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  ₹{summary?.finalBalance.toLocaleString('en-IN')}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Contributed by 58
+                  Maturity Value (Nominal)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  ₹{summary?.totalContributed.toLocaleString('en-IN')}
+                  ₹{summary?.finalBalance.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Future rupee value at 58</div>
+              </CardContent>
+            </Card>
+
+            {/* Maturity Value - Real (Inflation Adjusted) */}
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <TrendingUp className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Maturity Value (Real)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">
+                  ₹{summary?.finalBalanceReal.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Today&apos;s purchasing power
                 </div>
               </CardContent>
             </Card>
 
+            {/* Total Investment - Nominal */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <DollarSign className="h-4 w-4 text-purple-600" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Interest Earned
+                  Total Investment (Nominal)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
-                  ₹{summary?.totalInterest.toLocaleString('en-IN')}
+                  ₹{summary?.totalContributed.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Future rupee contributions</div>
+              </CardContent>
+            </Card>
+
+            {/* Total Investment - Real (Present Value) */}
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <Calculator className="h-4 w-4 text-cyan-600" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Investment (Real)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-cyan-600">
+                  ₹{summary?.totalContributedReal.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Present value of contributions
                 </div>
               </CardContent>
             </Card>
 
+            {/* Years to Retirement */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center space-y-0 space-x-2">
+                <Clock className="h-4 w-4 text-amber-600" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Years to Retirement
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="text-2xl font-bold text-amber-600">
                   {summary?.yearsToRetirement} years
                 </div>
+                <div className="text-xs text-muted-foreground mt-1">Until age 58</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Additional Summary Insights */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Interest Earned - Nominal */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Interest (Nominal)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-emerald-600">
+                  ₹{summary?.totalInterest.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Future rupee interest earnings
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Interest Earned - Real */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Interest (Real)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-teal-600">
+                  ₹{summary?.totalInterestReal.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Today&apos;s purchasing power
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Interest Rate */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  EPF Interest Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-indigo-600">8.25%</div>
+                <div className="text-xs text-muted-foreground mt-1">Current annual rate</div>
+              </CardContent>
+            </Card>
+
+            {/* Inflation Rate */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Inflation Assumption
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-red-600">
+                  {summary?.inflationAnnualPct?.toFixed(2)}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Annual inflation rate</div>
               </CardContent>
             </Card>
           </div>
@@ -597,7 +742,7 @@ export default function EPFPage() {
           {/* Growth Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>EPF Growth Projection</CardTitle>
+              <CardTitle>EPF Growth Projection (Nominal vs Real)</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Investment timeline based on your monthly EPF contributions and job changes
               </p>

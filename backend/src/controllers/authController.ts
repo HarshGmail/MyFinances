@@ -227,7 +227,9 @@ export async function updateUserProfile(req: Request, res: Response) {
 
     // Step 2: Filter out undefined values (critical!)
     const mappedUpdates = Object.fromEntries(
-      Object.entries(rawUpdates).filter(([v]) => v !== undefined)
+      Object.entries(rawUpdates).filter(
+        ([, v]) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')
+      )
     ) as Partial<User>;
 
     // Step 3: Validate with schema

@@ -285,16 +285,29 @@ export default function Home() {
 
   // ===== EPF DATA =====
   const epfPortfolioData = useMemo(() => {
-    if (!epfTimelineData)
-      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
+    // fallbacks so type stays consistent
+    const base = {
+      invested: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0,
+      monthlyContribution: 0,
+      annualContribution: 0,
+    };
+
+    if (!epfTimelineData) return base;
 
     const invested = epfTimelineData.totalCurrentBalance || 0;
-    const currentValue = invested; // For EPF, current value is the balance
-    const profitLoss = 0; // EPF doesn't show profit/loss in the same way
-    const profitLossPercentage = 0;
+    const monthlyContribution = epfData?.length ? (epfData.at(-1)?.epfAmount ?? 0) : 0;
 
-    return { invested, currentValue, profitLoss, profitLossPercentage };
-  }, [epfTimelineData]);
+    return {
+      ...base,
+      invested,
+      currentValue: invested, // EPF current value is the balance
+      monthlyContribution,
+      annualContribution: monthlyContribution * 12,
+    };
+  }, [epfTimelineData, epfData]);
 
   // ===== NEW FD DATA PROCESSING =====
   const fdPortfolioData = useMemo(() => {
@@ -985,18 +998,12 @@ export default function Home() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Active Accounts:</span>
-                <span>{epfData.length}</span>
-              </div>
-              <div className="flex justify-between">
                 <span>Monthly Contribution:</span>
-                <span>{formatCurrency(epfData.reduce((sum, epf) => sum + epf.epfAmount, 0))}</span>
+                <span>{formatCurrency(portfolioSummary.epf.monthlyContribution)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Annual Contribution:</span>
-                <span>
-                  {formatCurrency(epfData.reduce((sum, epf) => sum + epf.epfAmount * 12, 0))}
-                </span>
+                <span>{formatCurrency(portfolioSummary.epf.annualContribution)}</span>
               </div>
             </div>
           ) : (

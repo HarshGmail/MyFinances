@@ -107,21 +107,31 @@ export default function MutualFundsPortfolioPage() {
   useEffect(() => {
     if (!addActive) return;
     const cached = localStorage.getItem(MF_INFO_CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        Object.entries(parsed).forEach(([key, value]) => {
-          if (key in mfForm.getValues()) {
-            let v = value;
-            if (key === 'date' && typeof value === 'string') {
-              v = new Date(value);
-            } else if (key === 'sipAmount' && typeof value === 'string') {
-              v = Number(value);
-            }
-            mfForm.setValue(key as keyof MutualFundFormValues, v as string);
-          }
-        });
-      } catch {}
+    if (!cached) return;
+
+    try {
+      const parsed = JSON.parse(cached) as Partial<MutualFundFormValues>;
+
+      if (parsed.fundName !== undefined) mfForm.setValue('fundName', String(parsed.fundName));
+
+      if (parsed.schemeNumber !== undefined)
+        mfForm.setValue('schemeNumber', Number(parsed.schemeNumber));
+
+      if (parsed.sipAmount !== undefined) mfForm.setValue('sipAmount', Number(parsed.sipAmount));
+
+      if (parsed.goal !== undefined)
+        mfForm.setValue('goal', parsed.goal ? String(parsed.goal) : '');
+
+      if (parsed.platform !== undefined)
+        mfForm.setValue('platform', parsed.platform ? String(parsed.platform) : '');
+
+      if (parsed.date !== undefined) {
+        // keep DDMMYYYY as a string; strip any non-digits just in case
+        const ddmmyyyy = String(parsed.date).replace(/\D/g, '').slice(0, 8);
+        mfForm.setValue('date', ddmmyyyy);
+      }
+    } catch {
+      // ignore invalid cache
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addActive]);
@@ -389,12 +399,14 @@ export default function MutualFundsPortfolioPage() {
                                   <CommandList>
                                     {fundSuggestions?.length ? (
                                       <CommandGroup heading="Suggestions">
-                                        {/* @ts-expect-error this is expected*/}
                                         {fundSuggestions.map((fund) => (
                                           <CommandItem
                                             key={fund.schemeCode}
                                             onSelect={() => {
-                                              mfForm.setValue('fundName', fund.schemeName);
+                                              mfForm.setValue(
+                                                'fundName',
+                                                fund.schemeName as string
+                                              );
                                               mfForm.setValue('schemeNumber', fund.schemeCode);
                                               setShowSuggestions(false);
                                             }}

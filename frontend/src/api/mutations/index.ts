@@ -1,5 +1,6 @@
 export * from './crypto';
 export * from './epf';
+export * from './expenses';
 export * from './fixed-deposits';
 export * from './gold';
 export * from './login';

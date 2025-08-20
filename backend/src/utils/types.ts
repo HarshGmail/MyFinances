@@ -181,3 +181,36 @@ export interface QuoteSummaryResponse {
     error: string | number | null;
   };
 }
+
+export interface WorldBankMeta {
+  page: number;
+  pages: number;
+  per_page: number; // World Bank returns a number in your sample
+  total: number;
+  sourceid: string;
+  lastupdated: string; // ISO date string
+}
+
+export interface WorldBankIndicatorRef {
+  id: string; // e.g., "FP.CPI.TOTL.ZG"
+  value: string; // indicator title
+}
+
+export interface WorldBankCountryRef {
+  id: string; // e.g., "IN"
+  value: string; // e.g., "India"
+}
+
+export interface WorldBankDataPoint {
+  indicator: WorldBankIndicatorRef;
+  country: WorldBankCountryRef;
+  countryiso3code: string; // "IND"
+  date: string; // year as string, e.g., "2024"
+  value: number | null; // inflation % (may be null for some years)
+  unit: string;
+  obs_status: string;
+  decimal: number;
+}
+
+// The v2 API returns a 2-element array: [meta, data[]]
+export type WorldBankApiResponse = [WorldBankMeta, WorldBankDataPoint[]];

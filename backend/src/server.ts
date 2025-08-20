@@ -18,6 +18,8 @@ import {
   epfRouter,
   fixedDepositsRouter,
   recurringDepositsRouter,
+  inflationRouter,
+  expenseRouter,
 } from './routes';
 import { requestLogger } from './middleware';
 
@@ -64,6 +66,8 @@ app.use('/api/goals', userGoalsRouter);
 app.use('/api/epf', epfRouter);
 app.use('/api/fixed-deposit', fixedDepositsRouter);
 app.use('/api/recurring-deposit', recurringDepositsRouter);
+app.use('/api/inflation', inflationRouter);
+app.use('/api/expenses', expenseRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/health', (req, res) => {

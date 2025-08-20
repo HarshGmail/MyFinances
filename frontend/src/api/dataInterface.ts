@@ -4,6 +4,10 @@ export interface AdjClose {
   adjclose: number[];
 }
 
+export interface BulkExpensePayload {
+  expenses: ExpensePayload[];
+}
+
 export interface Chart {
   result: ChartResult[];
   error: ChartError | null;
@@ -126,6 +130,35 @@ export interface EpfTimelineSummary {
   timeline: TimelineRow[];
 }
 
+export interface Expense {
+  _id: string;
+  userId: string;
+  tag: string;
+  expenseAmount: number;
+  expenseName: string;
+  expenseFrequency: string;
+}
+
+export interface ExpensePayload {
+  tag: string;
+  expenseAmount: number;
+  expenseName: string;
+  expenseFrequency: string;
+}
+
+export interface ExpenseResponse {
+  success: boolean;
+  data: Expense[];
+}
+
+export interface ExpenseSummary {
+  totalExpenses: number;
+  expensesByTag: Record<string, number>;
+  expensesByFrequency: Record<string, number>;
+  monthlyRecurring: number;
+  yearlyRecurring: number;
+}
+
 export interface FixedDeposit {
   _id: string;
   userId: string;
@@ -165,6 +198,13 @@ export interface Indicators {
   adjclose: AdjClose[];
 }
 
+export interface InflationResult {
+  meta: WorldBankMeta;
+  data: WorldBankDataPoint[];
+  tidy: Array<{ year: number; value: number | null }>;
+  average?: number;
+}
+
 export interface MutualFundInfo {
   _id: string;
   userId?: string;
@@ -199,6 +239,13 @@ export interface MutualFundNavHistoryItem {
   meta: MutualFundMeta;
   data: MutualFundNavHistoryData[];
   status: string;
+}
+
+export interface MutualFundSearchResponse {
+  schemeCode: number;
+  schemeName: string | null;
+  isinGrowth: string | null;
+  isinDivReinvestment: string | null;
 }
 
 export interface MutualFundTransaction {
@@ -255,6 +302,11 @@ export interface SafeGoldRatesResponse {
     end_date: string;
     frequency: string;
   };
+}
+
+export interface SingleExpenseResponse {
+  success: boolean;
+  data: Expense;
 }
 
 export interface StockData {
@@ -336,6 +388,11 @@ export interface TradingPeriod {
   gmtoffset: number;
 }
 
+export interface UpdateExpensePayload {
+  id: string;
+  data: Partial<ExpensePayload>;
+}
+
 export interface User {
   name: string | null;
   email: string | null;
@@ -363,4 +420,36 @@ export interface UserProfile {
     loginTime: Date | null;
     expiry: Date | null;
   };
+}
+
+export type WorldBankApiResponse = [WorldBankMeta, WorldBankDataPoint[]];
+
+export interface WorldBankCountryRef {
+  id: string; // e.g., "IN"
+  value: string; // e.g., "India"
+}
+
+export interface WorldBankDataPoint {
+  indicator: WorldBankIndicatorRef;
+  country: WorldBankCountryRef;
+  countryiso3code: string; // "IND"
+  date: string; // "YYYY"
+  value: number | null; // may be null for some years
+  unit: string;
+  obs_status: string;
+  decimal: number;
+}
+
+export interface WorldBankIndicatorRef {
+  id: string; // e.g., "FP.CPI.TOTL.ZG"
+  value: string; // e.g., "Inflation, consumer prices (annual %)"
+}
+
+export interface WorldBankMeta {
+  page: number;
+  pages: number;
+  per_page: number;
+  total: number;
+  sourceid: string;
+  lastupdated: string; // ISO date
 }

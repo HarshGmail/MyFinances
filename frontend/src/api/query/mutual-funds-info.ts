@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { MutualFundInfo, MutualFundNavHistory } from '@/api/dataInterface';
+import {
+  MutualFundInfo,
+  MutualFundNavHistory,
+  MutualFundSearchResponse,
+} from '@/api/dataInterface';
 
 export function useMutualFundInfoFetchQuery() {
   return useQuery<MutualFundInfo[]>({
@@ -14,7 +18,7 @@ export function useMutualFundInfoFetchQuery() {
 }
 
 export function useSearchMutualFundsQuery(query: string) {
-  return useQuery({
+  return useQuery<MutualFundSearchResponse[]>({
     queryKey: ['search-mutual-funds', query],
     queryFn: async () => {
       if (!query || query.length < 2) return [];

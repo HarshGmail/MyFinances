@@ -9,3 +9,5 @@ export { default as userGoalsRouter } from './userGoals';
 export { default as epfRouter } from './epf';
 export { default as fixedDepositsRouter } from './fixedDeposits';
 export { default as recurringDepositsRouter } from './recurringDeposits';
+export { default as inflationRouter } from './inflation';
+export { default as expenseRouter } from './expense';
