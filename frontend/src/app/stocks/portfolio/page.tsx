@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Toggle } from '@/components/ui/toggle';
 
 export default function StocksPortfolioPage() {
   const { theme } = useAppStore();
@@ -39,6 +40,7 @@ export default function StocksPortfolioPage() {
 
   const chartRef = useRef<HTMLDivElement>(null);
   const [selectedStock, setSelectedStock] = useState('All');
+  const [showTxPlotLines, setShowTxPlotLines] = useState(false);
 
   // Fetch stock transactions
   const {
@@ -163,6 +165,50 @@ export default function StocksPortfolioPage() {
     };
   }, [processedPortfolioData]);
 
+  const txPlotLines = useMemo<Highcharts.XAxisPlotLinesOptions[]>(() => {
+    if (!stockTransactions?.length || selectedStock === 'All') return [];
+
+    const inr = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    });
+
+    return stockTransactions
+      .filter((tx) => tx.stockName === selectedStock)
+      .map((tx) => {
+        const tMs = Date.parse(tx.date);
+        if (Number.isNaN(tMs) || tMs < timeframeStart) return null;
+
+        const isCredit = tx.type === 'credit';
+        const color = isCredit ? '#16a34a' /* green-600 */ : '#dc2626'; /* red-600 */
+        const shares =
+          typeof tx.numOfShares === 'number' ? ` • ${tx.numOfShares.toFixed(2)} sh` : '';
+
+        return {
+          value: tMs,
+          color,
+          width: 1,
+          dashStyle: 'ShortDash',
+          zIndex: 5,
+          label: {
+            text: `${isCredit ? '+' : '-'} ${inr.format(tx.amount)}${shares}`,
+            align: 'left',
+            verticalAlign: 'top',
+            x: 2,
+            y: 12,
+            style: {
+              color: isDark ? '#d1d5db' : '#374151',
+              fontSize: '10px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+            },
+          },
+        } as Highcharts.XAxisPlotLinesOptions;
+      })
+      .filter(Boolean) as Highcharts.XAxisPlotLinesOptions[];
+  }, [stockTransactions, selectedStock, timeframeStart, isDark]);
+
   // Process historical data for charts
   const chartData = useMemo(() => {
     if (!processedPortfolioData.length || !nseQuoteData) return null;
@@ -252,6 +298,7 @@ export default function StocksPortfolioPage() {
       },
       xAxis: {
         type: 'datetime',
+        plotLines: showTxPlotLines && selectedStock !== 'All' ? txPlotLines : [],
         title: {
           text: 'Date',
           style: {
@@ -377,7 +424,7 @@ export default function StocksPortfolioPage() {
         ],
       },
     };
-  }, [chartData, isDark, selectedStock]);
+  }, [chartData, isDark, selectedStock, showTxPlotLines, txPlotLines]);
   // Calculate overall portfolio XIRR
   const allStockTxs = useMemo(() => {
     if (!stockTransactions) return [];
@@ -398,6 +445,18 @@ export default function StocksPortfolioPage() {
       return null;
     }
   }, [allStockTxs, portfolioTotals.totalCurrentValue]);
+
+  const chartKey = useMemo(
+    () =>
+      [
+        selectedStock,
+        timeframe,
+        showTxPlotLines ? 'on' : 'off',
+        txPlotLines.length,
+        timeframeStart, // changes when timeframe changes
+      ].join('|'),
+    [selectedStock, timeframe, showTxPlotLines, txPlotLines.length, timeframeStart]
+  );
 
   // Loading and error states
   const isLoading = transactionsLoading || nseQuoteLoading;
@@ -539,14 +598,28 @@ export default function StocksPortfolioPage() {
       {chartData && chartOptions && (
         <div className="relative mb-6" ref={chartRef}>
           {/* Timeframe Tabs in top-right */}
-          <div className="absolute right-6 top-3 z-10">
+          <div className="absolute right-6 top-3 z-10 flex items-center gap-2">
+            {selectedStock !== 'All' && (
+              <Toggle
+                pressed={showTxPlotLines}
+                onPressedChange={setShowTxPlotLines}
+                className="h-7 px-2 rounded-md border border-gray-400 text-gray-400
+               data-[state=on]:bg-gray-400 data-[state=on]:text-black
+               data-[state=on]:border-gray-400"
+              >
+                Transactions
+              </Toggle>
+            )}
+
             <Tabs value={timeframe} onValueChange={setTimeframe}>
               <TabsList className="bg-transparent p-0 h-auto gap-1">
                 {TIMEFRAMES.map((tf) => (
                   <TabsTrigger
                     key={tf.label}
                     value={tf.label}
-                    className="border border-gray-400 text-gray-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors duration-150 data-[state=active]:bg-gray-400 data-[state=active]:text-black data-[state=active]:border-gray-400 data-[state=active]:shadow-none focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    className="border border-gray-400 text-gray-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors 
+                     duration-150 data-[state=active]:bg-gray-400 data-[state=active]:text-black data-[state=active]:border-gray-400 data-[state=active]:shadow-none 
+                     focus:outline-none focus:ring-2 focus:ring-gray-400"
                   >
                     {tf.label}
                   </TabsTrigger>
@@ -572,7 +645,7 @@ export default function StocksPortfolioPage() {
           </div>
 
           <div className="bg-transparent rounded-lg border border-border p-4">
-            <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+            <HighchartsReact highcharts={Highcharts} options={chartOptions} key={chartKey} />
           </div>
         </div>
       )}

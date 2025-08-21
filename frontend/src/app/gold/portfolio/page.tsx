@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import xirr, { XirrTransaction } from '@/utils/xirr';
 import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
 import { formatCurrency } from '@/utils/numbers';
+import { Toggle } from '@/components/ui/toggle';
 
 export default function GoldPortfolioPage() {
   type TooltipPoint = {
@@ -34,6 +35,8 @@ export default function GoldPortfolioPage() {
   const { data: transactions, isLoading: transactionsLoading } = useGoldTransactionsQuery();
 
   const isLoading = ratesLoading || transactionsLoading;
+
+  const [showInvestmentPlotLines, setShowInvestmentPlotLines] = useState(false);
 
   // Gold portfolio calculations
   const goldStats = useMemo(() => {
@@ -75,6 +78,53 @@ export default function GoldPortfolioPage() {
     };
   }, [transactions, data]);
 
+  const transactionPlotLines = useMemo(() => {
+    if (!transactions?.length) return [];
+
+    const startMs = Date.parse(startDate);
+    const inr = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    });
+
+    // Keep it readable: show only transactions within timeframe; cap to latest 30 lines
+    return transactions
+      .map((tx) => {
+        const tMs = Date.parse(tx.date);
+        if (Number.isNaN(tMs) || tMs < startMs) return null;
+
+        const isCredit = tx.type === 'credit';
+        const color = isCredit ? '#16a34a' /* green-600 */ : '#dc2626'; /* red-600 */
+        const qty = typeof tx.quantity === 'number' ? ` • ${Number(tx.quantity).toFixed(2)}g` : '';
+        const labelText = `${isCredit ? '+' : '-'} ${inr.format(tx.amount)}${qty}`;
+
+        const opt: Highcharts.XAxisPlotLinesOptions = {
+          value: tMs,
+          color,
+          width: 1,
+          dashStyle: 'ShortDash',
+          zIndex: 5,
+          label: {
+            text: labelText,
+            align: 'left',
+            verticalAlign: 'top',
+            x: 2,
+            y: 12,
+            style: {
+              color: theme === 'dark' ? '#d1d5db' : '#374151',
+              fontSize: '10px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+            },
+          },
+        };
+        return opt;
+      })
+      .filter((opt): opt is Highcharts.XAxisPlotLinesOptions => Boolean(opt))
+      .slice(-30);
+  }, [transactions, startDate, theme]);
+
   const chartOptions = useMemo(() => {
     if (!data?.data) return {};
     const prices = data.data.map((d) => parseFloat(d.rate));
@@ -94,6 +144,7 @@ export default function GoldPortfolioPage() {
       },
       xAxis: {
         type: 'datetime',
+        plotLines: showInvestmentPlotLines && transactionPlotLines,
         labels: {
           format: '{value:%d %b}',
           style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
@@ -128,10 +179,10 @@ export default function GoldPortfolioPage() {
       ],
       credits: { enabled: false },
     };
-  }, [data, theme]);
+  }, [data?.data, theme, transactionPlotLines, showInvestmentPlotLines]);
 
   const investmentChartOptions = useMemo(() => {
-    if (!transactions || transactions.length === 0) return {};
+    if (!transactions?.length) return {};
 
     const currentGoldPrice =
       data?.data && data.data.length > 0 ? parseFloat(data.data[data.data.length - 1].rate) : null;
@@ -395,15 +446,28 @@ export default function GoldPortfolioPage() {
         <ChartSkeleton />
       ) : (
         <div className="bg-card rounded-lg p-4 relative">
-          {/* Tabs as overlay in top right of chart */}
-          <div className="absolute right-6 top-6 z-10">
+          {/* MOBILE: controls above chart, no overlap */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 sm:hidden">
+            <Toggle
+              pressed={showInvestmentPlotLines}
+              onPressedChange={setShowInvestmentPlotLines}
+              className="h-7 px-2 rounded-md border border-yellow-400 text-yellow-400
+                 data-[state=on]:bg-yellow-400 data-[state=on]:text-black"
+            >
+              Transactions
+            </Toggle>
+
             <Tabs value={timeframe} onValueChange={setTimeframe} className="min-w-0">
-              <TabsList className="bg-transparent p-0 h-auto gap-1">
+              <TabsList className="bg-transparent p-0 h-auto gap-1 flex flex-wrap">
                 {TIMEFRAMES.map((tf) => (
                   <TabsTrigger
                     key={tf.label}
                     value={tf.label}
-                    className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5 text-xs font-normal min-w-[28px] h-7 transition-colors duration-150 data-[state=active]:bg-yellow-400 data-[state=active]:text-black data-[state=active]:border-yellow-400 data-[state=active]:shadow-none focus:outline-none focus:ring-2 focus:ring-yellow-400 border-[1px] font-normal"
+                    className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5
+                       text-[11px] font-normal min-w-[28px] h-7 transition-colors duration-150
+                       data-[state=active]:bg-yellow-400 data-[state=active]:text-black
+                       data-[state=active]:border-yellow-400 data-[state=active]:shadow-none
+                       focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   >
                     {tf.label}
                   </TabsTrigger>
@@ -411,6 +475,37 @@ export default function GoldPortfolioPage() {
               </TabsList>
             </Tabs>
           </div>
+
+          {/* DESKTOP: overlay top-right */}
+          <div className="hidden sm:flex absolute right-6 top-6 z-10 items-center gap-2">
+            <Toggle
+              pressed={showInvestmentPlotLines}
+              onPressedChange={setShowInvestmentPlotLines}
+              className="h-7 px-2 rounded-md border border-yellow-400 text-yellow-400
+                 data-[state=on]:bg-yellow-400 data-[state=on]:text-black"
+            >
+              Transactions
+            </Toggle>
+
+            <Tabs value={timeframe} onValueChange={setTimeframe} className="min-w-0">
+              <TabsList className="bg-transparent p-0 h-auto gap-1 flex flex-wrap">
+                {TIMEFRAMES.map((tf) => (
+                  <TabsTrigger
+                    key={tf.label}
+                    value={tf.label}
+                    className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5
+                       text-xs font-normal min-w-[28px] h-7 transition-colors duration-150
+                       data-[state=active]:bg-yellow-400 data-[state=active]:text-black
+                       data-[state=active]:border-yellow-400 data-[state=active]:shadow-none
+                       focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  >
+                    {tf.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+
           <HighchartsReact
             highcharts={Highcharts}
             options={chartOptions}

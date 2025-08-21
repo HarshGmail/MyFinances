@@ -11,7 +11,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import groupBy from 'lodash/groupBy';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
@@ -293,6 +293,65 @@ export default function CryptoPortfolioPage() {
     return coinSeries;
   }, [portfolioData, multipleCoinCandles, timeframeStart, coinColorMap]);
 
+  // Find all transactions for a given coin
+  const getCoinTransactions = useCallback(
+    (coin: string) => {
+      if (!transactions) return [];
+      return transactions.filter(
+        (tx: CryptoTransaction) =>
+          (tx.coinSymbol?.toUpperCase() || tx.coinName?.toUpperCase()) === coin
+      );
+    },
+    [transactions] // only re-create when `transactions` changes
+  );
+
+  // Vertical lines for this coin's transactions (within current timeframe)
+  const transactionPlotLines = useMemo(() => {
+    if (selectedCoin === 'All' || !transactions) return [];
+
+    const txs = getCoinTransactions(selectedCoin); // you already have this helper
+    const inr = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    });
+
+    // Limit to current timeframe & cap to last 20 to avoid clutter
+    return txs
+      .map((tx) => {
+        const t = new Date(tx.date).getTime();
+        if (t < timeframeStart) return null;
+
+        const isCredit = tx.type === 'credit';
+        const color = isCredit ? '#16a34a' /* green-600 */ : '#dc2626'; /* red-600 */
+        const labelText = `${isCredit ? 'Buy' : 'Sell'} ${inr.format(tx.amount)}`;
+
+        const opt: Highcharts.XAxisPlotLinesOptions = {
+          value: t, // timestamp in ms
+          color,
+          width: 1,
+          dashStyle: 'ShortDash',
+          zIndex: 5,
+          label: {
+            text: labelText,
+            align: 'left',
+            verticalAlign: 'top',
+            x: 2,
+            y: 14,
+            style: {
+              color: isDark ? '#d1d5db' : '#374151',
+              fontSize: '10px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+            },
+          },
+        };
+        return opt;
+      })
+      .filter(Boolean)
+      .slice(-20);
+  }, [selectedCoin, transactions, getCoinTransactions, timeframeStart, isDark]);
+
   // Chart configuration
   const chartOptions = useMemo(() => {
     if (!chartData) return null;
@@ -322,6 +381,7 @@ export default function CryptoPortfolioPage() {
       },
       xAxis: {
         type: 'datetime',
+        plotLines: selectedCoin === 'All' ? [] : transactionPlotLines,
         title: {
           text: 'Date',
           style: {
@@ -500,7 +560,15 @@ export default function CryptoPortfolioPage() {
         ],
       },
     };
-  }, [chartData, isDark, selectedTimeframe.days, selectedCoin, portfolioData, multipleCoinCandles]);
+  }, [
+    chartData,
+    isDark,
+    selectedCoin,
+    transactionPlotLines,
+    selectedTimeframe.days,
+    portfolioData,
+    multipleCoinCandles,
+  ]);
 
   // Pie chart data for invested amount per coin with synchronized colors
   const pieData = useMemo(
@@ -619,15 +687,6 @@ export default function CryptoPortfolioPage() {
       <div className="p-4 h-full">
         <div className="text-red-500 text-center">Error loading portfolio data</div>
       </div>
-    );
-  }
-
-  // Find all transactions for a given coin
-  function getCoinTransactions(coin: string) {
-    if (!transactions) return [];
-    return transactions.filter(
-      (tx: CryptoTransaction) =>
-        (tx.coinSymbol?.toUpperCase() || tx.coinName?.toUpperCase()) === coin
     );
   }
 
@@ -752,7 +811,11 @@ export default function CryptoPortfolioPage() {
                 </div>
               </div>
             ) : chartData && chartOptions ? (
-              <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+              <HighchartsReact
+                highcharts={Highcharts}
+                options={chartOptions}
+                key={`${selectedCoin}-${selectedTimeframe.label}-${fetchDays}`}
+              />
             ) : (
               <div className="h-[500px] flex items-center justify-center text-muted-foreground">
                 <Skeleton className="h-3 w-16 rounded-full" />
