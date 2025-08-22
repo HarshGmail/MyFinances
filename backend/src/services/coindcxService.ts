@@ -83,61 +83,17 @@ class CoinDCXService {
     }
   }
 
-  // Map coin names to CoinDCX market pairs (INR pairs)
-  // private mapCoinToMarketPair(coinName: string): string | null {
-  //   const coinMappings: { [key: string]: string } = {
-  //     bitcoin: 'BTCINR',
-  //     btc: 'BTCINR',
-  //     ethereum: 'ETHINR',
-  //     eth: 'ETHINR',
-  //     'binance coin': 'BNBINR',
-  //     bnb: 'BNBINR',
-  //     cardano: 'ADAINR',
-  //     ada: 'ADAINR',
-  //     solana: 'SOLINR',
-  //     sol: 'SOLINR',
-  //     polkadot: 'DOTINR',
-  //     dot: 'DOTINR',
-  //     ripple: 'XRPINR',
-  //     xrp: 'XRPINR',
-  //     dogecoin: 'DOGEINR',
-  //     doge: 'DOGEINR',
-  //     litecoin: 'LTCINR',
-  //     ltc: 'LTCINR',
-  //     chainlink: 'LINKINR',
-  //     link: 'LINKINR',
-  //     uniswap: 'UNIINR',
-  //     uni: 'UNIINR',
-  //     avalanche: 'AVAXINR',
-  //     avax: 'AVAXINR',
-  //     pol: 'POLINR',
-  //     matic: 'MATICINR',
-  //   };
-
-  //   const normalizedCoinName = coinName.toLowerCase().trim();
-  //   const marketPair = coinMappings[normalizedCoinName];
-
-  //   if (!marketPair) {
-  //     console.warn(
-  //       `No market pair mapping found for coin: ${coinName} (normalized: ${normalizedCoinName})`
-  //     );
-  //   }
-
-  //   return marketPair || null;
-  // }
-
   private mapCoinToMarketPair(coinName: string): string {
     // Since coinName is already in uppercase symbol format (BTC, ETH, etc.)
     // Just append INR to create the market pair
     const marketPair = `${coinName.toUpperCase().trim()}INR`;
-    console.log(`Mapped ${coinName} to ${marketPair}`);
+    // console.log(`Mapped ${coinName} to ${marketPair}`);
     return marketPair;
   }
 
   // Get multiple current prices at once
   async getCurrentPrices(coinNames: string[]): Promise<{ [coinName: string]: number | null }> {
     try {
-      console.log(`Fetching current prices for ${coinNames.length} coins:`, coinNames);
       const tickers = await this.getTickers();
       const prices: { [coinName: string]: number | null } = {};
 
@@ -150,8 +106,6 @@ class CoinDCXService {
           console.warn(`No ticker found for market pair: ${marketPair}`);
         }
       }
-
-      console.log('Fetched prices:', prices);
       return prices;
     } catch (error) {
       console.error('Error getting current prices:', error);
@@ -163,7 +117,6 @@ class CoinDCXService {
   async getUserBalances(): Promise<CoinDCXUserData | null> {
     try {
       const timeStamp = Math.floor(Date.now());
-      console.log('Timestamp:', timeStamp);
 
       if (!this.apiKey || !this.secretKey) {
         console.error('CoinDCX API credentials not configured');

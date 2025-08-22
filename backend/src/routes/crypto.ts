@@ -7,24 +7,31 @@ import {
   getCoinCandles,
   searchCryptoCoinsByName,
   getMultipleCoinCandles,
+  updateCryptoTransaction,
+  deleteCryptoTransaction,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 // POST /crypto/transaction - Add a new crypto transaction
-router.post('/transaction', authenticateToken, addCryptoTransaction);
+router.post('/transaction', addCryptoTransaction);
 
+router.put('/transaction/:id', updateCryptoTransaction);
 // GET /crypto/transactions - Fetch all crypto transactions for the authenticated user
-router.get('/transactions', authenticateToken, getCryptoTransactions);
+router.get('/transactions', getCryptoTransactions);
 
-router.get('/getUserCryptoBalance', authenticateToken, fetchUserBalance);
+router.get('/getUserCryptoBalance', fetchUserBalance);
 
-router.post('/getCoinPrices', authenticateToken, fetchMultipleCoinBalances);
+router.post('/getCoinPrices', fetchMultipleCoinBalances);
 
 // GET /crypto/candles - Public endpoint for coin candles
-router.get('/candles', authenticateToken, getCoinCandles);
-router.get('/multipleCoinCandles', authenticateToken, getMultipleCoinCandles);
+router.get('/candles', getCoinCandles);
+router.get('/multipleCoinCandles', getMultipleCoinCandles);
 
-router.get('/search', authenticateToken, searchCryptoCoinsByName);
+router.get('/search', searchCryptoCoinsByName);
+
+router.delete('/transaction/:id', deleteCryptoTransaction);
+
 export default router;

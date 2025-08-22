@@ -8,6 +8,7 @@ export interface CryptoTransactionPayload {
   quantity: number;
   amount: number;
   coinName: string;
+  coinSymbol: string;
 }
 
 async function addCryptoTransaction(data: CryptoTransactionPayload) {
@@ -38,4 +39,58 @@ export function useAddCryptoTransactionMutation() {
     isSuccess: mutation.isSuccess,
     isError: mutation.isError,
   };
+}
+
+export interface CryptoTransactionUpdatePayload extends CryptoTransactionPayload {
+  id: string;
+}
+
+async function updateCryptoTransaction(data: CryptoTransactionUpdatePayload) {
+  return apiRequest({
+    endpoint: `/crypto/transaction/${data.id}`,
+    method: 'PUT',
+    body: {
+      type: data.type,
+      date: data.date,
+      coinPrice: data.coinPrice,
+      quantity: data.quantity,
+      amount: data.amount,
+      coinName: data.coinName,
+      coinSymbol: data.coinSymbol,
+    },
+  });
+}
+
+export function useUpdateCryptoTransactionMutation() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: updateCryptoTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crypto-transactions'] });
+    },
+  });
+
+  return {
+    ...mutation,
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+  };
+}
+
+export async function deleteCryptoTransaction(id: string) {
+  return apiRequest({
+    endpoint: `/crypto/transaction/${id}`,
+    method: 'DELETE',
+  });
+}
+
+export function useDeleteCryptoTransactionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCryptoTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crypto-transactions'] });
+    },
+  });
 }

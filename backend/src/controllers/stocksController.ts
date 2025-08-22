@@ -45,6 +45,76 @@ export async function getStockTransactions(req: Request, res: Response) {
   }
 }
 
+export async function updateStockTransaction(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Transaction ID is required' });
+      return;
+    }
+
+    // Validate payload (ignore _id, userId)
+    const parsed = stocksSchema.omit({ _id: true, userId: true }).parse(req.body);
+
+    const db = database.getDb();
+    const collection = db.collection('stocks');
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id), userId: new ObjectId(user.userId) },
+      { $set: { ...parsed, date: new Date(parsed.date) } }
+    );
+
+    if (result.matchedCount === 0) {
+      res.status(404).json({ success: false, message: 'Transaction not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, message: 'Transaction updated successfully' });
+  } catch (error) {
+    console.error('Update stock transaction error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function deleteStockTransaction(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Transaction ID is required' });
+      return;
+    }
+
+    const db = database.getDb();
+    const collection = db.collection('stocks');
+    const result = await collection.deleteOne({
+      _id: new ObjectId(id),
+      userId: new ObjectId(user.userId),
+    });
+
+    if (result.deletedCount === 0) {
+      res.status(404).json({ success: false, message: 'Transaction not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, message: 'Transaction deleted' });
+  } catch (error) {
+    console.error('Delete stock transaction error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getNSEQuote(req: Request, res: Response) {
   try {
     const symbolsParam = req.query.symbols;

@@ -20,8 +20,8 @@ export interface Column {
   showTotal?: boolean;
   allowFilter?: boolean;
   className?: string;
-  units?: string; // 'rupee', 'gms', 'none', or any custom unit
-  customTotal?: (rows: Row[], columns: Column[]) => React.ReactNode; // Optional custom total function
+  units?: string;
+  customTotal?: (rows: Row[], columns: Column[]) => React.ReactNode;
 }
 
 export interface Row {
@@ -36,7 +36,8 @@ interface TransactionsTableProps {
   error?: string | null;
   title?: string;
   titleIcon?: React.ReactNode;
-  actions?: React.ReactNode;
+  actions?: React.ReactNode; // top-right actions (e.g., Add)
+  actionsRenderer?: (row: Row, index: number) => React.ReactNode; // per-row actions
 }
 
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({
@@ -47,11 +48,11 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   title,
   titleIcon,
   actions,
+  actionsRenderer,
 }) => {
   const { filters, tempFilters, setFilters, setTempFilters, clearFilters } = useAppStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Generate filter columns based on table columns
   const filterColumns = useMemo(() => {
     return columns
       .filter((column) => column.allowFilter)
@@ -66,7 +67,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
             ],
           };
         }
-        // For string/number columns, get unique values
         const uniqueValues = [
           ...new Set(
             rows
@@ -82,18 +82,13 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       });
   }, [columns, rows]);
 
-  // Filter and sort data
   const filteredRows = useMemo(() => {
     let filtered = [...rows];
-
-    // Dynamically apply filters for all columns with allowFilter
     columns.forEach((column) => {
       if (column.allowFilter && filters[column.id]?.length > 0) {
         filtered = filtered.filter((row) => filters[column.id].includes(row[column.id]));
       }
     });
-
-    // Apply date sorting for any date column
     columns.forEach((column) => {
       if (column.type === 'date' && filters[column.id + 'Sort']?.length > 0) {
         const sortType = filters[column.id + 'Sort'][0];
@@ -104,24 +99,20 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         });
       }
     });
-
     return filtered;
   }, [rows, filters, columns]);
 
-  // Get selected filters count
   const filterCount = useMemo(() => {
     return Object.values(filters).reduce((sum, values) => sum + (values?.length || 0), 0);
   }, [filters]);
 
-  // Calculate totals for all columns with showTotal: true
   const columnTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     columns.forEach((column) => {
       if (column.showTotal) {
         totals[column.id] = filteredRows.reduce((sum: number, row: Row) => {
-          // Only sum numbers and only for 'credit' transactions if type column exists
           if (typeof row[column.id] === 'number') {
-            if (!columns.some((col) => col.id === 'type') || row.type === 'credit') {
+            if (!columns.some((c) => c.id === 'type') || row.type === 'credit') {
               return sum + row[column.id];
             }
           }
@@ -132,26 +123,19 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     return totals;
   }, [columns, filteredRows]);
 
-  // Drawer handlers
   const openDrawer = () => {
     setTempFilters({ ...filters });
     setIsDrawerOpen(true);
   };
-
-  const closeDrawer = () => {
-    setIsDrawerOpen(false);
-  };
-
+  const closeDrawer = () => setIsDrawerOpen(false);
   const applyFilters = () => {
     setFilters({ ...tempFilters });
     closeDrawer();
   };
-
   const cancelFilters = () => {
     setTempFilters({ ...filters });
     closeDrawer();
   };
-
   const removeAllFilters = () => {
     clearFilters();
     closeDrawer();
@@ -166,13 +150,9 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         return new Date(value).toLocaleDateString();
       case 'number':
       default:
-        if (units === 'rupee') {
-          return `₹${Number(value).toFixed(2)}`;
-        } else if (units && units !== 'none') {
-          return `${value} ${units}`;
-        } else {
-          return value;
-        }
+        if (units === 'rupee') return `₹${Number(value).toFixed(2)}`;
+        if (units && units !== 'none') return `${value} ${units}`;
+        return value;
     }
   };
 
@@ -196,17 +176,11 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     return formatValue(value, column.type, column.units);
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error loading transactions</div>;
-  }
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div className="text-red-500">Error loading transactions</div>;
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header */}
       {(title || actions) && (
         <div className="flex items-center w-full mb-4">
           {title && (
@@ -245,8 +219,10 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                 {column.label}
               </TableHead>
             ))}
+            {actionsRenderer && <TableHead>Actions</TableHead>}
           </TableRow>
         </TableHeader>
+
         <TableBody>
           {filteredRows.map((row, idx) => (
             <TableRow key={row._id || idx}>
@@ -256,14 +232,15 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   {renderCell(row, column)}
                 </TableCell>
               ))}
+              {actionsRenderer && <TableCell>{actionsRenderer(row, idx)}</TableCell>}
             </TableRow>
           ))}
         </TableBody>
+
         {Object.keys(columnTotals).length > 0 && (
           <TableFooter>
             <TableRow>
               <TableCell>
-                {' '}
                 {/* S.No column */}
                 Total
               </TableCell>
@@ -279,9 +256,10 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                           : columnTotals[column.id].toFixed(2)}
                   </TableCell>
                 ) : (
-                  <TableCell key={column.id} className={column.className}></TableCell>
+                  <TableCell key={column.id} className={column.className} />
                 )
               )}
+              {actionsRenderer && <TableCell />}
             </TableRow>
           </TableFooter>
         )}

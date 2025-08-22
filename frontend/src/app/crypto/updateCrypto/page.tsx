@@ -18,12 +18,15 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { useAddCryptoTransactionMutation } from '@/api/mutations';
-import { useSearchCryptoQuery } from '@/api/query';
+import {
+  useAddCryptoTransactionMutation,
+  useUpdateCryptoTransactionMutation,
+} from '@/api/mutations';
+import { useSearchCryptoQuery, useCryptoTransactionsQuery } from '@/api/query';
 import { debounce } from 'lodash';
 import {
   Command,
@@ -51,6 +54,20 @@ type FormValues = z.infer<typeof formSchema>;
 const CACHE_KEY = 'cryptoTransactionFormCache';
 
 export default function CryptoUpdateCryptoPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading…</div>}>
+      <CryptoUpdateCryptoPageInner />
+    </Suspense>
+  );
+}
+
+function CryptoUpdateCryptoPageInner() {
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('id');
+  const isEditing = Boolean(editId);
+
+  const { data: cryptoTransactions } = useCryptoTransactionsQuery();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -64,46 +81,70 @@ export default function CryptoUpdateCryptoPage() {
     },
   });
 
+  // Keep a copy of the original tx values for Reset (edit mode)
+  const [originalTx, setOriginalTx] = useState<FormValues | null>(null);
+
+  // Prefill from transaction when editing (takes priority over localStorage)
+  useEffect(() => {
+    if (!isEditing || !cryptoTransactions) return;
+    const tx = cryptoTransactions.find((t) => t._id === editId);
+    if (tx) {
+      const values: FormValues = {
+        type: tx.type,
+        date: new Date(tx.date),
+        coinPrice: tx.coinPrice,
+        quantity: tx.quantity,
+        amount: tx.amount,
+        coinName: tx.coinName,
+        coinSymbol: tx.coinSymbol,
+      };
+      form.reset(values);
+      setOriginalTx(values);
+      // Also set the coin search input to current coin so suggestions line up
+      setCoinNameInput(values.coinName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, editId, cryptoTransactions]);
+
   const [dateOpen, setDateOpen] = useState(false);
   const [coinNameInput, setCoinNameInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const router = useRouter();
-  const { mutate, isPending } = useAddCryptoTransactionMutation();
+  const { mutate: addTx, isPending: adding } = useAddCryptoTransactionMutation();
+  const { mutate: updateTx, isPending: updating } = useUpdateCryptoTransactionMutation();
+  const isPending = adding || updating;
 
-  // Search crypto query with debounced input
+  // Search crypto query with debounced input (this keeps coinSymbol in sync when user changes coin)
   const { data: coinSuggestions } = useSearchCryptoQuery(coinNameInput);
+  const debouncedSetCoinNameInput = useMemo(
+    () => debounce((val: string) => setCoinNameInput(val), 1000),
+    []
+  );
 
-  // Debounced handler for coin search
-  const debouncedSetCoinNameInput = debounce((val: string) => {
-    setCoinNameInput(val);
-  }, 1000);
-
-  // Load cached values if present
+  // Load cached values only when NOT editing (searchParams must win)
   useEffect(() => {
+    if (isEditing) return; // <-- prefer searchParams/tx prefill over cache
     const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        Object.entries(parsed).forEach(([key, value]) => {
-          if (key in form.getValues()) {
-            let v = value;
-            if (key === 'date' && typeof value === 'string') {
-              v = new Date(value);
-            } else if (
-              ['coinPrice', 'quantity', 'amount'].includes(key) &&
-              typeof value === 'string'
-            ) {
-              v = Number(value);
-            }
-            form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
-          }
-        });
-      } catch {}
-    }
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached);
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (key in form.getValues()) {
+          let v = value;
+          if (key === 'date' && typeof value === 'string') v = new Date(value);
+          else if (['coinPrice', 'quantity', 'amount'].includes(key) && typeof value === 'string')
+            v = Number(value);
+          form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
+        }
+      });
+      // Also set search box to cached coin name so suggestions make sense
+      const cachedCoinName = (parsed as Partial<FormValues>).coinName;
+      if (cachedCoinName) setCoinNameInput(cachedCoinName);
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isEditing]);
 
-  // Save form values to cache on change
+  // Save form values to cache on change (both modes; harmless in edit mode)
   useEffect(() => {
     const subscription = form.watch((values) => {
       localStorage.setItem(CACHE_KEY, JSON.stringify(values));
@@ -111,83 +152,92 @@ export default function CryptoUpdateCryptoPage() {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  // Helper function to handle number input changes with proper decimal support
+  // Number input helpers (unchanged)
   const handleNumberInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldOnChange: (value: unknown) => void
   ) => {
     const val = e.target.value;
-
-    // Allow empty string
     if (val === '') {
       fieldOnChange('');
       return;
     }
-
-    // Allow valid decimal patterns (including trailing decimal point)
     const decimalPattern = /^\d*\.?\d*$/;
     if (decimalPattern.test(val)) {
-      // If it's a valid number, convert to number, otherwise keep as string for intermediate states
       const numVal = parseFloat(val);
-      if (!isNaN(numVal)) {
-        fieldOnChange(numVal);
-      } else if (val.endsWith('.') || val === '0.') {
-        // Keep as string for intermediate decimal states like "1." or "0."
-        fieldOnChange(val);
-      }
+      if (!isNaN(numVal)) fieldOnChange(numVal);
+      else if (val.endsWith('.') || val === '0.') fieldOnChange(val);
     }
   };
 
-  // Helper function to get display value for number inputs
   const getNumberDisplayValue = (value: unknown): string => {
-    if (value === '' || value === undefined || value === null) {
-      return '';
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (value === 0) {
-      return '';
-    }
+    if (value === '' || value === undefined || value === null) return '';
+    if (typeof value === 'string') return value;
+    if (value === 0) return '';
     return value.toString();
   };
 
   function onSubmit(values: FormValues) {
-    mutate(
-      {
-        ...values,
-        date: values.date.toISOString(),
-      },
-      {
-        onSuccess: () => {
-          toast.success('Transaction added successfully');
-          router.push('/crypto/transactions');
-          localStorage.removeItem(CACHE_KEY);
-        },
-        onError: (error: unknown) => {
-          let description = 'An error occurred';
-          if (
-            error &&
-            typeof error === 'object' &&
-            'message' in error &&
-            typeof (error as Error).message === 'string'
-          ) {
-            description = (error as Error).message;
-          }
-          toast.error('Transaction Addition failed!', {
-            description,
-          });
-        },
-      }
-    );
+    if (isEditing) {
+      updateTx(
+        { id: editId as string, ...values, date: values.date.toISOString() },
+        {
+          onSuccess: () => {
+            toast.success('Transaction updated successfully');
+            router.push('/crypto/transactions');
+            localStorage.removeItem(CACHE_KEY);
+          },
+          onError: (error) => {
+            toast.error('Transaction update failed', { description: (error as Error).message });
+          },
+        }
+      );
+    } else {
+      addTx(
+        { ...values, date: values.date.toISOString() },
+        {
+          onSuccess: () => {
+            toast.success('Transaction added successfully');
+            router.push('/crypto/transactions');
+            localStorage.removeItem(CACHE_KEY);
+          },
+          onError: (error) => {
+            toast.error('Transaction addition failed', { description: (error as Error).message });
+          },
+        }
+      );
+    }
   }
+
+  // Reset handler
+  const onReset = () => {
+    if (isEditing && originalTx) {
+      form.reset(originalTx);
+      setCoinNameInput(originalTx.coinName || '');
+      localStorage.setItem(CACHE_KEY, JSON.stringify(originalTx));
+    } else {
+      const defaults: FormValues = {
+        type: 'credit',
+        date: undefined as unknown as Date,
+        coinPrice: 0,
+        quantity: 0,
+        amount: 0,
+        coinName: '',
+        coinSymbol: '',
+      };
+      form.reset(defaults);
+      setCoinNameInput('');
+      localStorage.removeItem(CACHE_KEY);
+    }
+  };
 
   return (
     <div className="flex mt-[5%] items-center justify-center bg-background overflow-hidden">
       <div className="w-full max-w-xl p-10 rounded-lg shadow-lg bg-card">
         <h2 className="text-2xl font-bold mb-6 text-center">
-          Add Crypto Transaction/ Update Crypto Portfolio
+          {isEditing ? 'Update Crypto Transaction' : 'Add Crypto Transaction / Update Portfolio'}
         </h2>
+
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
@@ -214,7 +264,7 @@ export default function CryptoUpdateCryptoPage() {
               )}
             />
 
-            {/* Date Picker */}
+            {/* Date */}
             <FormLabel className="self-center">Date</FormLabel>
             <FormField
               control={form.control}
@@ -225,7 +275,7 @@ export default function CryptoUpdateCryptoPage() {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
-                          variant={'outline'}
+                          variant="outline"
                           className={cn(
                             'w-full pl-3 text-left font-normal',
                             !field.value && 'text-muted-foreground'
@@ -244,7 +294,7 @@ export default function CryptoUpdateCryptoPage() {
                           field.onChange(date);
                           setDateOpen(false);
                         }}
-                        disabled={(date: Date) => date > new Date()}
+                        disabled={(d: Date) => d > new Date()}
                         captionLayout="dropdown"
                       />
                     </PopoverContent>
@@ -272,9 +322,8 @@ export default function CryptoUpdateCryptoPage() {
                         if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) {
-                          field.onChange(0);
-                        } else if (typeof field.value === 'string') {
+                        if (field.value === undefined) field.onChange(0);
+                        else if (typeof field.value === 'string') {
                           const numVal = parseFloat(field.value);
                           field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
@@ -305,9 +354,8 @@ export default function CryptoUpdateCryptoPage() {
                         if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) {
-                          field.onChange(0);
-                        } else if (typeof field.value === 'string') {
+                        if (field.value === undefined) field.onChange(0);
+                        else if (typeof field.value === 'string') {
                           const numVal = parseFloat(field.value);
                           field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
@@ -338,9 +386,8 @@ export default function CryptoUpdateCryptoPage() {
                         if (field.value === 0) field.onChange('');
                       }}
                       onBlur={() => {
-                        if (field.value === undefined) {
-                          field.onChange(0);
-                        } else if (typeof field.value === 'string') {
+                        if (field.value === undefined) field.onChange(0);
+                        else if (typeof field.value === 'string') {
                           const numVal = parseFloat(field.value);
                           field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
@@ -353,7 +400,7 @@ export default function CryptoUpdateCryptoPage() {
               )}
             />
 
-            {/* Coin Name (with search suggestions) */}
+            {/* Coin Name + Suggestions (keeps coinSymbol synced) */}
             <FormLabel className="self-center">Coin Name</FormLabel>
             <FormField
               control={form.control}
@@ -369,7 +416,7 @@ export default function CryptoUpdateCryptoPage() {
                           field.onChange(e);
                           debouncedSetCoinNameInput(e.target.value);
                           setShowSuggestions(true);
-                          // Reset coin symbol when user types manually
+                          // reset symbol until a suggestion is chosen
                           form.setValue('coinSymbol', '');
                         }}
                         onFocus={() => setShowSuggestions(true)}
@@ -399,6 +446,7 @@ export default function CryptoUpdateCryptoPage() {
                                         onSelect={() => {
                                           form.setValue('coinName', coin.name);
                                           form.setValue('coinSymbol', coin.symbol);
+                                          setCoinNameInput(coin.name);
                                           setShowSuggestions(false);
                                         }}
                                         className="flex justify-between items-center"
@@ -432,20 +480,43 @@ export default function CryptoUpdateCryptoPage() {
               )}
             />
 
-            {/* Hidden field for coinSymbol */}
+            {/* Hidden coinSymbol field */}
             <input type="hidden" {...form.register('coinSymbol')} />
 
-            {/* Submit button, spans both columns */}
+            {/* Submit + Reset row */}
             <div className="md:col-span-2 col-span-1">
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? (
-                  <>
-                    <Loader2 className="animate-spin mr-2 h-4 w-4" /> Updating...
-                  </>
-                ) : (
-                  'Submit'
-                )}
-              </Button>
+              {isEditing ? (
+                <div className="flex gap-3">
+                  <Button type="submit" className="w-full md:w-1/2" disabled={isPending}>
+                    {isPending ? (
+                      <>
+                        <Loader2 className="animate-spin mr-2 h-4 w-4" /> Updating...
+                      </>
+                    ) : (
+                      'Update'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full md:w-1/2"
+                    onClick={onReset}
+                    disabled={isPending}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              ) : (
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" /> Saving...
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         </Form>

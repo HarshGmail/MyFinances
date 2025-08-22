@@ -18,7 +18,6 @@ import { useLoginMutation } from '@/api/mutations';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { setItemToLocalStorage } from '@/utils/localStorageHelpers';
 import { User } from '@/api/dataInterface';
 
 const formSchema = z.object({
@@ -42,7 +41,7 @@ export function LoginForm() {
     mutate(values, {
       onSuccess: (user: User) => {
         setUser(user);
-        setItemToLocalStorage('user', user);
+        localStorage.setItem('user', JSON.stringify(user));
         toast.success('Login successful!');
         router.push('/home');
       },

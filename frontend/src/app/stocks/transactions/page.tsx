@@ -4,8 +4,10 @@ import { useStockTransactionsQuery } from '@/api/query';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
-import { TrendingUp } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { TrendingUp, Edit3, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { toast } from 'sonner';
+import { useDeleteStockTransactionMutation } from '@/api/mutations';
 
 interface StockTransaction {
   _id?: string;
@@ -20,11 +22,8 @@ interface StockTransaction {
 export default function StocksTransactionsPage() {
   const { data: stockTransactions, isLoading, error } = useStockTransactionsQuery();
   const router = useRouter();
+  const { mutate: deleteStockTx } = useDeleteStockTransactionMutation();
 
-  // Table data state
-  const [tableRows, setTableRows] = useState<Row[]>([]);
-
-  // Define table columns
   const columns: Column[] = [
     { id: 'stockName', label: 'Stock Name', type: 'string', allowFilter: true },
     { id: 'date', label: 'Date', type: 'date', allowFilter: true },
@@ -34,11 +33,10 @@ export default function StocksTransactionsPage() {
     { id: 'amount', label: 'Amount', type: 'number', showTotal: true, units: 'rupee' },
   ];
 
-  // Transform data for table
-  const rawTableRows: Row[] = useMemo(() => {
+  const rows: Row[] = useMemo(() => {
     if (!stockTransactions) return [];
-
     return stockTransactions.map((tx: StockTransaction) => ({
+      _id: tx._id, // keep id for actions
       stockName: tx.stockName || '-',
       date: tx.date || '-',
       type: tx.type || '-',
@@ -48,16 +46,21 @@ export default function StocksTransactionsPage() {
     }));
   }, [stockTransactions]);
 
-  // Update table rows when raw data changes
-  useMemo(() => {
-    setTableRows(rawTableRows);
-  }, [rawTableRows]);
+  const handleDelete = (id?: string) => {
+    if (!id) return;
+    if (!confirm('Delete this transaction? This cannot be undone.')) return;
+    deleteStockTx(id, {
+      onSuccess: () => toast.success('Stock transaction deleted'),
+      onError: (e: unknown) =>
+        toast.error('Delete failed', { description: (e as Error)?.message || 'Unknown error' }),
+    });
+  };
 
   return (
     <div className="h-full p-4">
       <TransactionsTable
         columns={columns}
-        rows={tableRows}
+        rows={rows}
         isLoading={isLoading}
         error={error?.message || null}
         title="Stock Transactions"
@@ -71,6 +74,28 @@ export default function StocksTransactionsPage() {
             Add Transaction
           </Button>
         }
+        actionsRenderer={(row) => (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Edit transaction"
+              onClick={() => router.push(`/stocks/updateStock?id=${row._id}`)}
+              className="hover:bg-accent"
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Delete transaction"
+              onClick={() => handleDelete(row._id)}
+              className="hover:bg-accent"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       />
     </div>
   );

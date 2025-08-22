@@ -86,7 +86,7 @@ export interface CryptoPortfolioSummary {
 }
 
 export interface CryptoTransaction {
-  id: string;
+  _id: string;
   type: 'credit' | 'debit';
   date: string;
   coinPrice: number;

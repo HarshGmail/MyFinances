@@ -51,6 +51,76 @@ export async function getCryptoTransactions(req: Request, res: Response) {
   }
 }
 
+export async function updateCryptoTransaction(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Transaction ID is required' });
+      return;
+    }
+
+    // Validate body against schema (ignore _id and userId)
+    const parsed = cryptoSchema.omit({ _id: true, userId: true }).parse(req.body);
+
+    const db = database.getDb();
+    const collection = db.collection('crypto');
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id), userId: new ObjectId(user.userId) },
+      { $set: { ...parsed, date: new Date(parsed.date) } }
+    );
+
+    if (result.matchedCount === 0) {
+      res.status(404).json({ success: false, message: 'Transaction not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, message: 'Transaction updated successfully' });
+  } catch (error) {
+    console.error('Update crypto transaction error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function deleteCryptoTransaction(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Transaction ID is required' });
+      return;
+    }
+
+    const db = database.getDb();
+    const collection = db.collection('crypto');
+    const result = await collection.deleteOne({
+      _id: new ObjectId(id),
+      userId: new ObjectId(user.userId),
+    });
+
+    if (result.deletedCount === 0) {
+      res.status(404).json({ success: false, message: 'Transaction not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, message: 'Transaction deleted' });
+  } catch (error) {
+    console.error('Delete crypto transaction error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function fetchUserBalance(req: Request, res: Response) {
   try {
     const userData = await coindcxService.getUserBalances();

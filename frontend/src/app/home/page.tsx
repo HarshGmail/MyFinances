@@ -1,7 +1,7 @@
 'use client';
 
 import { useAppStore } from '@/store/useAppStore';
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   useMutualFundTransactionsQuery,
   useSafeGoldRatesQuery,
@@ -26,6 +26,9 @@ import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils
 import dynamic from 'next/dynamic';
 import { getProfitLossColor } from '@/utils/text';
 import { differenceInDays, differenceInMonths } from 'date-fns';
+import { Copy, CopyCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { buildAIInsightPrompt } from './aiCopy';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -55,6 +58,7 @@ const calculateCompoundInterest = (principal: number, rate: number, timeInMonths
 
 export default function Home() {
   const user = useAppStore((state) => state.user);
+  const [copied, setCopied] = useState(false);
 
   // ===== STOCKS DATA =====
   const { data: stockTransactions, isLoading: stockTransactionsLoading } =
@@ -732,10 +736,136 @@ export default function Home() {
     fdLoading ||
     rdLoading;
 
+  const aiPrompt = useMemo(() => {
+    return buildAIInsightPrompt({
+      userName: user?.name ?? 'Investor',
+      asOf: new Date(),
+
+      // totals
+      total: {
+        invested: portfolioSummary.total.invested,
+        currentValue: portfolioSummary.total.currentValue,
+        pnl: portfolioSummary.total.profitLoss,
+        pnlPct: portfolioSummary.total.profitLossPercentage,
+        xirr: overallXirr,
+      },
+
+      // sections
+      stocks: {
+        ...portfolioSummary.stocks,
+        xirr: stockXirr,
+        holdings: stockPortfolioData.map((s) => ({
+          name: s.stockName,
+          shares: s.numOfShares,
+          avgCost: Number(s.avgPrice),
+          currentPrice: s.currentPrice,
+          currentValue: s.currentValuation,
+          invested: s.investedAmount,
+          pnl: s.profitLoss,
+          pnlPct: s.profitLossPercentage,
+          dataOk: s.isDataAvailable,
+        })),
+      },
+
+      mutualFunds: {
+        ...portfolioSummary.mutualFunds,
+        xirr: mfXirr,
+        holdings: mfPortfolioData.map((f) => ({
+          name: f.fundName,
+          units: f.totalUnits,
+          invested: f.totalInvested,
+          currentNav: f.currentNav ?? null,
+          currentValue: f.currentValue ?? null,
+          pnl: f.profitLoss ?? null,
+          pnlPct: f.profitLossPercentage ?? null,
+        })),
+      },
+
+      gold: {
+        ...portfolioSummary.gold,
+        xirr: goldXirr,
+        // If you want to expose the latest market rate you computed:
+        currentRatePerGram: (goldPortfolioData && goldPortfolioData[0]?.currentGoldRate) || null,
+      },
+
+      crypto: {
+        ...portfolioSummary.crypto,
+        xirr: cryptoXirr,
+        coins: cryptoPortfolioData.map((c) => ({
+          name: c.coinName,
+          symbol: c.currency,
+          units: c.balance,
+          invested: c.investedAmount,
+          currentPrice: c.currentPrice,
+          currentValue: c.currentValue,
+          pnl: c.profitLoss,
+          pnlPct: c.profitLossPercentage,
+        })),
+      },
+
+      epf: {
+        invested: portfolioSummary.epf.invested,
+        currentValue: portfolioSummary.epf.currentValue,
+        monthlyContribution: portfolioSummary.epf.monthlyContribution,
+        annualContribution: portfolioSummary.epf.annualContribution,
+      },
+
+      fd: {
+        invested: portfolioSummary.fd.invested,
+        currentValue: portfolioSummary.fd.currentValue,
+        pnl: portfolioSummary.fd.profitLoss,
+        pnlPct: portfolioSummary.fd.profitLossPercentage,
+        list: fdData ?? [],
+      },
+
+      rd: {
+        invested: portfolioSummary.rd.invested,
+        currentValue: portfolioSummary.rd.currentValue,
+        pnl: portfolioSummary.rd.profitLoss,
+        pnlPct: portfolioSummary.rd.profitLossPercentage,
+        list: rdData ?? [],
+      },
+    });
+  }, [
+    user?.name,
+    portfolioSummary,
+    stockPortfolioData,
+    mfPortfolioData,
+    goldPortfolioData,
+    cryptoPortfolioData,
+    fdData,
+    rdData,
+    stockXirr,
+    mfXirr,
+    goldXirr,
+    cryptoXirr,
+    overallXirr,
+  ]);
+
+  // --- Copy to clipboard handler ---
+  const handleCopyPrompt = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(aiPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = aiPrompt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [aiPrompt]);
+
   if (isLoading) {
     return (
       <div className="p-4">
-        <h2 className="text-2xl font-bold mb-6 text-center">Portfolio Dashboard</h2>
+        <h2 className="text-2xl font-bold text-center w-full md:w-auto">Portfolio Dashboard</h2>
+
         {/* Top: Summary Cards Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           <Skeleton className="w-full h-[120px]" />
@@ -769,7 +899,27 @@ export default function Home() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6 text-center">Portfolio Dashboard</h2>
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold mb-6 text-center">Portfolio Dashboard</h2>
+        {/* Right actions: Copy prompt */}
+        <div className="ml-3 flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={copied ? 'Copied Portfolio Prompt' : 'Copy Portfolio Prompt'}
+            title={copied ? 'Copied!' : 'Copy AI-ready portfolio prompt'}
+            onClick={handleCopyPrompt}
+            className="rounded-full"
+            disabled={isLoading}
+          >
+            {copied ? (
+              <CopyCheck className="h-5 w-5 text-green-500" />
+            ) : (
+              <Copy className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
+      </div>
       {/* Top: Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
         <SummaryStatCard

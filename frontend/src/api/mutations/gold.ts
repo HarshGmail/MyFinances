@@ -11,6 +11,10 @@ export interface GoldTransactionPayload {
   platform?: string;
 }
 
+export interface GoldUpdatePayload extends GoldTransactionPayload {
+  id: string;
+}
+
 async function addGoldTransaction(data: GoldTransactionPayload) {
   return apiRequest({
     endpoint: '/gold/transaction',
@@ -39,4 +43,26 @@ export function useAddGoldTransactionMutation() {
     isSuccess: mutation.isSuccess,
     isError: mutation.isError,
   };
+}
+
+async function updateGoldTransaction({ id, ...data }: GoldUpdatePayload) {
+  return apiRequest({ endpoint: `/gold/transaction/${id}`, method: 'PUT', body: data });
+}
+export function useUpdateGoldTransactionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateGoldTransaction,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['goldTransactions'] }),
+  });
+}
+
+async function deleteGoldTransaction(id: string) {
+  return apiRequest({ endpoint: `/gold/transaction/${id}`, method: 'DELETE' });
+}
+export function useDeleteGoldTransactionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteGoldTransaction,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['goldTransactions'] }),
+  });
 }

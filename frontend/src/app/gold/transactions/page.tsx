@@ -4,8 +4,10 @@ import { useGoldTransactionsQuery } from '@/api/query';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
-import { Receipt } from 'lucide-react';
+import { Receipt, Edit3, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { useDeleteGoldTransactionMutation } from '@/api/mutations/gold'; // adjust path if needed
 
 interface GoldTransaction {
   _id?: string;
@@ -21,11 +23,10 @@ interface GoldTransaction {
 export default function GoldTransactionsPage() {
   const { data: goldTransactions, isLoading, error } = useGoldTransactionsQuery();
   const router = useRouter();
+  const { mutate: deleteGoldTx } = useDeleteGoldTransactionMutation();
 
-  // Table data state
   const [tableRows, setTableRows] = useState<Row[]>([]);
 
-  // Define table columns
   const columns: Column[] = [
     { id: 'platform', label: 'Platform', type: 'string', allowFilter: true },
     { id: 'date', label: 'Date', type: 'date', allowFilter: true },
@@ -49,11 +50,10 @@ export default function GoldTransactionsPage() {
     { id: 'amount', label: 'Invest Amount', type: 'number', showTotal: true, units: 'rupee' },
   ];
 
-  // Transform data for table
   const rawTableRows: Row[] = useMemo(() => {
     if (!goldTransactions) return [];
-
     return goldTransactions.map((tx: GoldTransaction) => ({
+      _id: tx._id, // keep _id for actions
       platform: tx.platform || '-',
       amount: tx.amount || 0,
       date: tx.date || '-',
@@ -64,10 +64,17 @@ export default function GoldTransactionsPage() {
     }));
   }, [goldTransactions]);
 
-  // Update table rows when raw data changes
-  useMemo(() => {
-    setTableRows(rawTableRows);
-  }, [rawTableRows]);
+  useMemo(() => setTableRows(rawTableRows), [rawTableRows]);
+
+  const handleDelete = (id?: string) => {
+    if (!id) return;
+    if (!confirm('Delete this transaction? This cannot be undone.')) return;
+    deleteGoldTx(id, {
+      onSuccess: () => toast.success('Gold transaction deleted'),
+      onError: (e: unknown) =>
+        toast.error('Delete failed', { description: (e as Error)?.message || 'Unknown error' }),
+    });
+  };
 
   return (
     <div className="p-4 h-full">
@@ -87,6 +94,28 @@ export default function GoldTransactionsPage() {
             Add Transaction
           </Button>
         }
+        actionsRenderer={(row) => (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Edit transaction"
+              onClick={() => router.push(`/gold/updateGold?id=${row._id}`)}
+              className="hover:bg-accent"
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Delete transaction"
+              onClick={() => handleDelete(row._id)}
+              className="hover:bg-accent"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       />
     </div>
   );

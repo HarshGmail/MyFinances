@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { User } from '@/api/dataInterface';
-import { getItemFromLocalStorage } from '@/utils/localStorageHelpers';
 
 interface AuthContextType {
   user: User | null;
@@ -18,9 +17,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // On mount, sync Zustand user state with localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const storedUser = getItemFromLocalStorage<User>('user');
-      if (storedUser && typeof storedUser === 'object' && !Array.isArray(storedUser) && !user) {
-        setUser(storedUser);
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
       }
     }
     // Only run on mount

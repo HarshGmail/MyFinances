@@ -3,14 +3,15 @@ import { addMutualFundInfo, getMutualFundInfo, getMfapiNavHistory } from '../con
 import { authenticateToken } from '../middleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 // POST /mutual-funds/Info - Add a new mutual fund Info
-router.post('/infoAddition', authenticateToken, addMutualFundInfo);
+router.post('/infoAddition', addMutualFundInfo);
 
 // GET /mutual-funds/Infos - Fetch all mutual fund Infos for the authenticated user
-router.get('/infoFetch', authenticateToken, getMutualFundInfo);
+router.get('/infoFetch', getMutualFundInfo);
 
 // POST /mutual-funds-info/nav-history - Fetch NAV history for multiple scheme numbers
-router.post('/nav-history', authenticateToken, getMfapiNavHistory);
+router.post('/nav-history', getMfapiNavHistory);
 
 export default router;

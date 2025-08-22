@@ -3,9 +3,10 @@ import { addEpfAccount, getEpfAccounts, getEpfTimeline } from '../controllers';
 import { authenticateToken } from '../middleware';
 
 const router = Router();
+router.use(authenticateToken);
 
-router.post('/addInfo', authenticateToken, addEpfAccount);
-router.get('/timeline', authenticateToken, getEpfTimeline);
-router.get('/getInfo', authenticateToken, getEpfAccounts);
+router.post('/addInfo', addEpfAccount);
+router.get('/timeline', getEpfTimeline);
+router.get('/getInfo', getEpfAccounts);
 
 export default router;

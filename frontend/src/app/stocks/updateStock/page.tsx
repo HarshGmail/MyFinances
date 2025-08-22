@@ -26,12 +26,12 @@ import {
   Search,
   ChevronDown,
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { useAddStockTransactionMutation } from '@/api/mutations';
-import { useSearchStockByNameQuery } from '@/api/query';
+import { useAddStockTransactionMutation, useUpdateStockTransactionMutation } from '@/api/mutations';
+import { useSearchStockByNameQuery, useStockTransactionsQuery } from '@/api/query';
 import { debounce } from 'lodash';
 
 const formSchema = z.object({
@@ -49,6 +49,20 @@ type FormValues = z.infer<typeof formSchema>;
 const CACHE_KEY = 'stockTransactionFormCache';
 
 export default function StocksUpdateStockPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading…</div>}>
+      <StocksUpdateStockPageInner />
+    </Suspense>
+  );
+}
+
+function StocksUpdateStockPageInner() {
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('id');
+  const isEditing = Boolean(editId);
+
+  const { data: stockTransactions } = useStockTransactionsQuery();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -60,59 +74,77 @@ export default function StocksUpdateStockPage() {
     },
   });
 
+  const [originalTx, setOriginalTx] = useState<FormValues | null>(null);
+
+  // Prefill when editing (wins over cache)
+  useEffect(() => {
+    if (!isEditing || !stockTransactions) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tx = stockTransactions.find((t: any) => t._id === editId);
+    if (tx) {
+      const values: FormValues = {
+        type: tx.type,
+        date: new Date(tx.date),
+        marketPrice: tx.marketPrice,
+        numOfShares: tx.numOfShares,
+        stockName: tx.stockName, // You store the chosen display (symbol/longname)
+      };
+      form.reset(values);
+      setOriginalTx(values);
+      setStockNameInput(values.stockName);
+      setSelectedStock({ longname: values.stockName, symbol: values.stockName }); // best-effort seed
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, editId, stockTransactions]);
+
   const [dateOpen, setDateOpen] = useState(false);
   const [stockNameInput, setStockNameInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedStock, setSelectedStock] = useState<{ longname: string; symbol: string } | null>(
     null
   );
-  const router = useRouter();
-  const { mutate, isPending } = useAddStockTransactionMutation();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Search stock query with debounced input
+  const router = useRouter();
+  const { mutate: addTx, isPending: adding } = useAddStockTransactionMutation();
+  const { mutate: updateTx, isPending: updating } = useUpdateStockTransactionMutation();
+  const isPending = adding || updating;
+
+  // Search
   const { data: stockSuggestions, error: stockSearchError } =
     useSearchStockByNameQuery(stockNameInput);
-
-  // Handle search errors
   useEffect(() => {
-    if (stockSearchError) {
-      console.error('Stock search error:', stockSearchError);
-    }
+    if (stockSearchError) console.error('Stock search error:', stockSearchError);
   }, [stockSearchError]);
 
-  // Debounced handler for stock search
-  const debouncedSetStockNameInput = debounce((val: string) => {
-    setStockNameInput(val);
-  }, 1000);
+  const debouncedSetStockNameInput = useMemo(
+    () => debounce((val: string) => setStockNameInput(val), 1000),
+    []
+  );
 
-  // Load cached values if present
+  // Load cache only when NOT editing
   useEffect(() => {
+    if (isEditing) return;
     const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        Object.entries(parsed).forEach(([key, value]) => {
-          if (key in form.getValues()) {
-            let v = value;
-            if (key === 'date' && typeof value === 'string') {
-              v = new Date(value);
-            } else if (['marketPrice', 'numOfShares'].includes(key) && typeof value === 'string') {
-              v = Number(value);
-            }
-            form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
-          }
-        });
-        // Also restore selected stock if present
-        if (parsed.selectedStock) {
-          setSelectedStock(parsed.selectedStock);
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached);
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (key in form.getValues()) {
+          let v = value;
+          if (key === 'date' && typeof value === 'string') v = new Date(value);
+          else if (['marketPrice', 'numOfShares'].includes(key) && typeof value === 'string')
+            v = Number(value);
+          form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
         }
-      } catch {}
-    }
+      });
+      if (parsed.selectedStock) setSelectedStock(parsed.selectedStock);
+      if (parsed.stockName) setStockNameInput(parsed.stockName);
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isEditing]);
 
-  // Save form values to cache on change
+  // Persist cache
   useEffect(() => {
     const subscription = form.watch((values) => {
       const cacheData = { ...values, selectedStock };
@@ -121,57 +153,88 @@ export default function StocksUpdateStockPage() {
     return () => subscription.unsubscribe();
   }, [form, selectedStock]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown if click outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    const handle = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
     };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
   }, []);
-  const [showLoader, setShowLoader] = useState(false);
-  function onSubmit(values: FormValues) {
-    const amount = values.numOfShares * values.marketPrice;
-    // Use the symbol from selectedStock if available, otherwise use the form value
-    const stockNameToSubmit = selectedStock?.symbol || values.stockName;
-
-    mutate(
-      {
-        ...values,
-        stockName: stockNameToSubmit,
-        date: values.date.toISOString(),
-        amount,
-      },
-      {
-        onSuccess: () => {
-          setShowLoader(true);
-          toast.success('Stock transaction added successfully');
-          router.push('/stocks/transactions');
-          localStorage.removeItem(CACHE_KEY);
-        },
-        onError: (error: unknown) => {
-          let description = 'An error occurred';
-          if (
-            error &&
-            typeof error === 'object' &&
-            'message' in error &&
-            typeof (error as Error).message === 'string'
-          ) {
-            description = (error as Error).message;
-          }
-          toast.error('Transaction Addition failed!', {
-            description,
-          });
-        },
-      }
-    );
-  }
 
   const watchedValues = form.watch();
   const totalAmount = (watchedValues.marketPrice || 0) * (watchedValues.numOfShares || 0);
+
+  function onSubmit(values: FormValues) {
+    const amount = values.numOfShares * values.marketPrice;
+    const stockNameToSubmit = selectedStock?.symbol || values.stockName;
+
+    if (isEditing) {
+      updateTx(
+        {
+          id: editId as string,
+          ...values,
+          stockName: stockNameToSubmit,
+          date: values.date.toISOString(),
+          amount,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Stock transaction updated successfully');
+            router.push('/stocks/transactions');
+            localStorage.removeItem(CACHE_KEY);
+          },
+          onError: (error: unknown) => {
+            toast.error('Transaction Update failed!', { description: (error as Error).message });
+          },
+        }
+      );
+    } else {
+      addTx(
+        { ...values, stockName: stockNameToSubmit, date: values.date.toISOString(), amount },
+        {
+          onSuccess: () => {
+            toast.success('Stock transaction added successfully');
+            router.push('/stocks/transactions');
+            localStorage.removeItem(CACHE_KEY);
+          },
+          onError: (error: unknown) => {
+            toast.error('Transaction Addition failed!', { description: (error as Error).message });
+          },
+        }
+      );
+    }
+  }
+
+  // Reset handler (edit: back to original; add: to defaults)
+  const onReset = () => {
+    if (isEditing && originalTx) {
+      form.reset(originalTx);
+      setStockNameInput(originalTx.stockName || '');
+      setSelectedStock({ longname: originalTx.stockName, symbol: originalTx.stockName });
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({
+          ...originalTx,
+          selectedStock: { longname: originalTx.stockName, symbol: originalTx.stockName },
+        })
+      );
+    } else {
+      const defaults: FormValues = {
+        type: 'credit',
+        date: undefined as unknown as Date,
+        marketPrice: 0,
+        numOfShares: 0,
+        stockName: '',
+      };
+      form.reset(defaults);
+      setStockNameInput('');
+      setSelectedStock(null);
+      localStorage.removeItem(CACHE_KEY);
+    }
+  };
 
   return (
     <div className="h-full bg-background overflow-hidden flex items-center justify-center px-4 py-9">
@@ -182,15 +245,17 @@ export default function StocksUpdateStockPage() {
             <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Stock Transaction
+            {isEditing ? 'Update Stock Transaction' : 'Stock Transaction'}
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Add a new transaction to update your portfolio
+            {isEditing
+              ? 'Modify and save your transaction'
+              : 'Add a new transaction to update your portfolio'}
           </p>
         </div>
 
         {/* Form Card */}
-        {isPending || showLoader ? (
+        {isPending ? (
           <Loader2 className="animate-spin mr-2 h-5 w-5" />
         ) : (
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 overflow">
@@ -224,7 +289,7 @@ export default function StocksUpdateStockPage() {
                     )}
                   />
 
-                  {/* Date and Stock Name Row */}
+                  {/* Date & Stock Name */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <FormField
                       control={form.control}
@@ -258,7 +323,7 @@ export default function StocksUpdateStockPage() {
                                   field.onChange(date);
                                   setDateOpen(false);
                                 }}
-                                disabled={(date: Date) => date > new Date()}
+                                disabled={(d: Date) => d > new Date()}
                                 captionLayout="dropdown"
                                 className="rounded-lg"
                               />
@@ -269,7 +334,6 @@ export default function StocksUpdateStockPage() {
                       )}
                     />
 
-                    {/* Stock Name with Search */}
                     <FormField
                       control={form.control}
                       name="stockName"
@@ -295,10 +359,10 @@ export default function StocksUpdateStockPage() {
                                   }}
                                   onFocus={() => setShowSuggestions(true)}
                                   autoComplete="off"
+                                  value={field.value}
                                 />
                               </div>
 
-                              {/* Suggestions Dropdown */}
                               {showSuggestions && stockNameInput.length >= 3 && (
                                 <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl max-h-64 overflow-hidden">
                                   <div className="p-3 border-b border-gray-100 dark:border-slate-700">
@@ -318,6 +382,7 @@ export default function StocksUpdateStockPage() {
                                               longname: displayName,
                                               symbol: stock.symbol.split('.')[0],
                                             });
+                                            setStockNameInput(displayName);
                                             setShowSuggestions(false);
                                           }}
                                           className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-b-0 transition-colors"
@@ -371,7 +436,7 @@ export default function StocksUpdateStockPage() {
                     />
                   </div>
 
-                  {/* Price and Shares Row */}
+                  {/* Price & Shares */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <FormField
                       control={form.control}
@@ -401,11 +466,8 @@ export default function StocksUpdateStockPage() {
                                 }}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val === '') {
-                                    field.onChange('');
-                                  } else {
-                                    field.onChange(Number(val));
-                                  }
+                                  if (val === '') field.onChange('');
+                                  else field.onChange(Number(val));
                                 }}
                               />
                             </div>
@@ -443,11 +505,8 @@ export default function StocksUpdateStockPage() {
                                 }}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val === '') {
-                                    field.onChange('');
-                                  } else {
-                                    field.onChange(Number(val));
-                                  }
+                                  if (val === '') field.onChange('');
+                                  else field.onChange(Number(val));
                                 }}
                               />
                             </div>
@@ -458,7 +517,7 @@ export default function StocksUpdateStockPage() {
                     />
                   </div>
 
-                  {/* Total Amount Display */}
+                  {/* Total Amount */}
                   {totalAmount > 0 && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
                       <div className="flex items-center justify-between">
@@ -476,24 +535,56 @@ export default function StocksUpdateStockPage() {
                     </div>
                   )}
 
-                  {/* Submit Button */}
-                  <Button
-                    type="submit"
-                    disabled={isPending}
-                    className="w-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isPending ? (
-                      <>
-                        <Loader2 className="animate-spin mr-2 h-5 w-5" />
-                        Processing Transaction...
-                      </>
-                    ) : (
-                      <>
-                        <TrendingUp className="mr-2 h-5 w-5" />
-                        Add Transaction
-                      </>
-                    )}
-                  </Button>
+                  {/* Submit / Reset */}
+                  {isEditing ? (
+                    <div className="flex gap-3">
+                      <Button
+                        type="submit"
+                        disabled={isPending}
+                        className="w-full md:w-1/2 h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPending ? (
+                          <>
+                            <Loader2 className="animate-spin mr-2 h-5 w-5" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <TrendingUp className="mr-2 h-5 w-5" />
+                            Update Transaction
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full md:w-1/2 h-10 rounded-xl"
+                        onClick={onReset}
+                        disabled={isPending}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={isPending}
+                      className="w-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="animate-spin mr-2 h-5 w-5" />
+                          Processing Transaction...
+                        </>
+                      ) : (
+                        <>
+                          <TrendingUp className="mr-2 h-5 w-5" />
+                          Add Transaction
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </form>
               </Form>
             </div>

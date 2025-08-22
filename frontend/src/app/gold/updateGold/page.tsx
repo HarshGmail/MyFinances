@@ -17,12 +17,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
 import { cn } from '@/lib/utils';
-import { useAddGoldTransactionMutation } from '@/api/mutations';
-import { useRouter } from 'next/navigation';
+import {
+  useAddGoldTransactionMutation,
+  useUpdateGoldTransactionMutation,
+} from '@/api/mutations/gold'; // adjust path
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { useGoldTransactionsQuery } from '@/api/query';
 
 const formSchema = z.object({
   type: z.enum(['credit', 'debit'], { required_error: 'Type is required' }),
@@ -35,14 +39,26 @@ const formSchema = z.object({
   tax: z.number().min(0, 'Tax must be at least 0'),
   platform: z.string().optional(),
 });
-
 type FormValues = z.infer<typeof formSchema>;
 
 const platformSuggestions = ['Tanishq', 'SafeGold'];
-
 const CACHE_KEY = 'goldTransactionFormCache';
 
 export default function GoldUpdateGoldPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading…</div>}>
+      <GoldUpdateGoldPageInner />
+    </Suspense>
+  );
+}
+
+function GoldUpdateGoldPageInner() {
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('id');
+  const isEditing = Boolean(editId);
+
+  const { data: goldTransactions } = useGoldTransactionsQuery();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -55,37 +71,60 @@ export default function GoldUpdateGoldPage() {
       platform: '',
     },
   });
+
   const [dateOpen, setDateOpen] = useState(false);
   const router = useRouter();
-  const { mutate, isPending } = useAddGoldTransactionMutation();
+  const { mutate: addTx, isPending: adding } = useAddGoldTransactionMutation();
+  const { mutate: updateTx, isPending: updating } = useUpdateGoldTransactionMutation();
+  const isPending = adding || updating;
 
-  // Load cached values if present
+  // keep original for Reset in edit mode
+  const [originalTx, setOriginalTx] = useState<FormValues | null>(null);
+
   useEffect(() => {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        // Only set values for fields that exist in the form
-        Object.entries(parsed).forEach(([key, value]) => {
-          if (key in form.getValues()) {
-            let v = value;
-            if (key === 'date' && typeof value === 'string') {
-              v = new Date(value);
-            } else if (
-              ['goldPrice', 'quantity', 'amount', 'tax'].includes(key) &&
-              typeof value === 'string'
-            ) {
-              v = Number(value);
-            }
-            form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
-          }
-        });
-      } catch {}
+    if (!isEditing || !goldTransactions) return;
+    // @ts-expect-error id error
+    const tx = goldTransactions.find((t) => t._id === editId);
+    if (tx) {
+      const values: FormValues = {
+        type: tx.type as 'credit' | 'debit',
+        date: new Date(tx.date as string),
+        goldPrice: Number(tx.goldPrice ?? 0),
+        quantity: Number(tx.quantity ?? 0),
+        amount: Number(tx.amount ?? 0),
+        tax: Number(tx.tax ?? 0),
+        platform: tx.platform || '',
+      };
+      form.reset(values);
+      setOriginalTx(values);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isEditing, editId, goldTransactions]);
 
-  // Save form values to cache on change
+  // Load cached values only when NOT editing
+  useEffect(() => {
+    if (isEditing) return;
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached);
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (key in form.getValues()) {
+          let v = value;
+          if (key === 'date' && typeof value === 'string') v = new Date(value);
+          else if (
+            ['goldPrice', 'quantity', 'amount', 'tax'].includes(key) &&
+            typeof value === 'string'
+          )
+            v = Number(value);
+          form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
+        }
+      });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
+
+  // Persist cache
   useEffect(() => {
     const subscription = form.watch((values) => {
       localStorage.setItem(CACHE_KEY, JSON.stringify(values));
@@ -94,52 +133,79 @@ export default function GoldUpdateGoldPage() {
   }, [form]);
 
   function onSubmit(values: FormValues) {
-    mutate(
-      {
-        ...values,
-        date: values.date instanceof Date ? values.date : new Date(values.date),
-        goldPrice: Number(values.goldPrice),
-        quantity: Number(values.quantity),
-        amount: Number(values.amount),
-        tax: Number(values.tax),
-        platform: values.platform || undefined,
-      },
-      {
+    const payload = {
+      ...values,
+      date: new Date(
+        values.date instanceof Date
+          ? values.date.toISOString()
+          : new Date(values.date).toISOString()
+      ),
+      goldPrice: Number(values.goldPrice),
+      quantity: Number(values.quantity),
+      amount: Number(values.amount),
+      tax: Number(values.tax),
+      platform: values.platform || undefined,
+    };
+
+    if (isEditing) {
+      updateTx(
+        { id: editId as string, ...payload },
+        {
+          onSuccess: () => {
+            toast.success('Transaction updated successfully');
+            router.push('/gold/transactions');
+            localStorage.removeItem(CACHE_KEY);
+          },
+          onError: (error) => {
+            toast.error('Transaction update failed', { description: (error as Error).message });
+          },
+        }
+      );
+    } else {
+      addTx(payload, {
         onSuccess: () => {
           toast.success('Transaction added successfully');
           router.push('/gold/transactions');
           localStorage.removeItem(CACHE_KEY);
         },
-        onError: (error: unknown) => {
-          let description = 'An error occurred';
-          if (
-            error &&
-            typeof error === 'object' &&
-            'message' in error &&
-            typeof (error as Error).message === 'string'
-          ) {
-            description = (error as Error).message;
-          }
-          toast.error('Transaction Addition failed!', {
-            description,
-          });
+        onError: (error) => {
+          toast.error('Transaction addition failed', { description: (error as Error).message });
         },
-      }
-    );
+      });
+    }
   }
+
+  const onReset = () => {
+    if (isEditing && originalTx) {
+      form.reset(originalTx);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(originalTx));
+    } else {
+      const defaults: FormValues = {
+        type: 'credit',
+        date: undefined as unknown as Date,
+        goldPrice: 0,
+        quantity: 0,
+        amount: 0,
+        tax: 0,
+        platform: '',
+      };
+      form.reset(defaults);
+      localStorage.removeItem(CACHE_KEY);
+    }
+  };
 
   return (
     <div className="flex mt-[5%] items-center justify-center bg-background overflow-hidden">
       <div className="w-full max-w-xl p-10 rounded-lg shadow-lg bg-card">
         <h2 className="text-2xl font-bold mb-6 text-center">
-          Add Gold Transaction/ Update Gold Portfolio
+          {isEditing ? 'Update Gold Transaction' : 'Add Gold Transaction / Update Portfolio'}
         </h2>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            {/* Type of Transaction */}
+            {/* Type */}
             <FormField
               control={form.control}
               name="type"
@@ -160,7 +226,7 @@ export default function GoldUpdateGoldPage() {
               )}
             />
 
-            {/* Date Picker */}
+            {/* Date */}
             <FormField
               control={form.control}
               name="date"
@@ -171,7 +237,7 @@ export default function GoldUpdateGoldPage() {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
-                          variant={'outline'}
+                          variant="outline"
                           className={cn(
                             'w-full pl-3 text-left font-normal',
                             !field.value && 'text-muted-foreground'
@@ -186,11 +252,11 @@ export default function GoldUpdateGoldPage() {
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={(date: Date | undefined) => {
-                          field.onChange(date);
+                        onSelect={(d: Date | undefined) => {
+                          field.onChange(d);
                           setDateOpen(false);
                         }}
-                        disabled={(date: Date) => date > new Date()}
+                        disabled={(d: Date) => d > new Date()}
                         captionLayout="dropdown"
                       />
                     </PopoverContent>
@@ -221,14 +287,9 @@ export default function GoldUpdateGoldPage() {
                       onBlur={() => {
                         if (field.value === undefined) field.onChange(0);
                       }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
-                        }
-                      }}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -257,14 +318,9 @@ export default function GoldUpdateGoldPage() {
                       onBlur={() => {
                         if (field.value === undefined) field.onChange(0);
                       }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
-                        }
-                      }}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -293,14 +349,9 @@ export default function GoldUpdateGoldPage() {
                       onBlur={() => {
                         if (field.value === undefined) field.onChange(0);
                       }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
-                        }
-                      }}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -308,7 +359,7 @@ export default function GoldUpdateGoldPage() {
               )}
             />
 
-            {/* Tax Paid */}
+            {/* Tax */}
             <FormField
               control={form.control}
               name="tax"
@@ -329,14 +380,9 @@ export default function GoldUpdateGoldPage() {
                       onBlur={() => {
                         if (field.value === undefined) field.onChange(0);
                       }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          field.onChange('');
-                        } else {
-                          field.onChange(Number(val));
-                        }
-                      }}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -344,7 +390,7 @@ export default function GoldUpdateGoldPage() {
               )}
             />
 
-            {/* Platform (optional, with suggestions) */}
+            {/* Platform */}
             <FormField
               control={form.control}
               name="platform"
@@ -371,16 +417,40 @@ export default function GoldUpdateGoldPage() {
               )}
             />
 
+            {/* Submit + Reset (edit mode half width) */}
             <div className="md:col-span-2">
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? (
-                  <>
-                    <CalendarIcon className="animate-spin mr-2 h-4 w-4" /> Updating...
-                  </>
-                ) : (
-                  'Submit'
-                )}
-              </Button>
+              {isEditing ? (
+                <div className="flex gap-3">
+                  <Button type="submit" className="w-full md:w-1/2" disabled={isPending}>
+                    {isPending ? (
+                      <>
+                        <Loader2 className="animate-spin mr-2 h-4 w-4" /> Updating...
+                      </>
+                    ) : (
+                      'Update'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full md:w-1/2"
+                    onClick={onReset}
+                    disabled={isPending}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              ) : (
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" /> Saving...
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         </Form>
