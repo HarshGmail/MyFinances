@@ -27,9 +27,14 @@ export default function GoldPortfolioPage() {
   const { theme } = useAppStore();
   const TIMEFRAMES = getTimeframes();
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[1].label); // default '1m'
+
   const endDate = new Date().toISOString().slice(0, 10);
+  const fiveYearsAgo = new Date();
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  const startDate = fiveYearsAgo.toISOString().slice(0, 10);
+
   const selectedTimeframe = TIMEFRAMES.find((tf) => tf.label === timeframe) || TIMEFRAMES[1];
-  const startDate = getPastDate(selectedTimeframe.days, 'ymd');
+  const timeframeStartDate = getPastDate(selectedTimeframe.days, 'ymd');
 
   const { data, isLoading: ratesLoading, error } = useSafeGoldRatesQuery({ startDate, endDate });
   const { data: transactions, isLoading: transactionsLoading } = useGoldTransactionsQuery();
@@ -38,9 +43,15 @@ export default function GoldPortfolioPage() {
 
   const [showInvestmentPlotLines, setShowInvestmentPlotLines] = useState(false);
 
+  const filteredRates = useMemo(() => {
+    if (!data?.data) return [];
+    const cutoff = Date.parse(timeframeStartDate);
+    return data.data.filter((d) => Date.parse(d.date) >= cutoff);
+  }, [data, timeframeStartDate]);
+
   // Gold portfolio calculations
   const goldStats = useMemo(() => {
-    if (!transactions || !data?.data || data.data.length === 0) return null;
+    if (!transactions || !filteredRates || filteredRates.length === 0) return null;
     const totalGold = transactions.reduce(
       (sum, tx) => sum + (tx.type === 'credit' ? tx.quantity : -tx.quantity),
       0
@@ -49,8 +60,8 @@ export default function GoldPortfolioPage() {
       (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
       0
     );
-    // Last available gold rate (string to number)
-    const lastRate = parseFloat(data.data[data.data.length - 1].rate);
+
+    const lastRate = parseFloat(filteredRates[filteredRates.length - 1].rate);
     const sellRate = lastRate * 0.97; // 3% deduction
     const currentValue = totalGold * sellRate;
     const profitLoss = currentValue - totalInvested;
@@ -68,34 +79,26 @@ export default function GoldPortfolioPage() {
     } catch {
       xirrValue = null;
     }
-    return {
-      totalGold,
-      totalInvested,
-      currentValue,
-      profitLoss,
-      profitLossPercentage,
-      xirrValue,
-    };
-  }, [transactions, data]);
+    return { totalGold, totalInvested, currentValue, profitLoss, profitLossPercentage, xirrValue };
+  }, [transactions, filteredRates]);
 
   const transactionPlotLines = useMemo(() => {
     if (!transactions?.length) return [];
+    const cutoff = Date.parse(timeframeStartDate);
 
-    const startMs = Date.parse(startDate);
     const inr = new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
     });
 
-    // Keep it readable: show only transactions within timeframe; cap to latest 30 lines
     return transactions
       .map((tx) => {
         const tMs = Date.parse(tx.date);
-        if (Number.isNaN(tMs) || tMs < startMs) return null;
+        if (Number.isNaN(tMs) || tMs < cutoff) return null;
 
         const isCredit = tx.type === 'credit';
-        const color = isCredit ? '#16a34a' /* green-600 */ : '#dc2626'; /* red-600 */
+        const color = isCredit ? '#16a34a' : '#dc2626';
         const qty = typeof tx.quantity === 'number' ? ` • ${Number(tx.quantity).toFixed(2)}g` : '';
         const labelText = `${isCredit ? '+' : '-'} ${inr.format(tx.amount)}${qty}`;
 
@@ -123,11 +126,11 @@ export default function GoldPortfolioPage() {
       })
       .filter((opt): opt is Highcharts.XAxisPlotLinesOptions => Boolean(opt))
       .slice(-30);
-  }, [transactions, startDate, theme]);
+  }, [transactions, timeframeStartDate, theme]);
 
   const chartOptions = useMemo(() => {
-    if (!data?.data) return {};
-    const prices = data.data.map((d) => parseFloat(d.rate));
+    if (!filteredRates.length) return {};
+    const prices = filteredRates.map((d) => parseFloat(d.rate));
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const yMin = Math.floor(minPrice - (maxPrice - minPrice) * 0.05);
@@ -172,14 +175,14 @@ export default function GoldPortfolioPage() {
       series: [
         {
           name: 'Gold Rate',
-          data: data.data.map((d) => [Date.parse(d.date), parseFloat(d.rate)]),
+          data: filteredRates.map((d) => [Date.parse(d.date), parseFloat(d.rate)]),
           color: '#fbbf24',
           fillOpacity: 0.2,
         },
       ],
       credits: { enabled: false },
     };
-  }, [data?.data, theme, transactionPlotLines, showInvestmentPlotLines]);
+  }, [filteredRates, theme, transactionPlotLines, showInvestmentPlotLines]);
 
   const investmentChartOptions = useMemo(() => {
     if (!transactions?.length) return {};
