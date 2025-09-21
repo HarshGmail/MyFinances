@@ -153,22 +153,6 @@ function CryptoUpdateCryptoPageInner() {
   }, [form]);
 
   // Number input helpers (unchanged)
-  const handleNumberInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    fieldOnChange: (value: unknown) => void
-  ) => {
-    const val = e.target.value;
-    if (val === '') {
-      fieldOnChange('');
-      return;
-    }
-    const decimalPattern = /^\d*\.?\d*$/;
-    if (decimalPattern.test(val)) {
-      const numVal = parseFloat(val);
-      if (!isNaN(numVal)) fieldOnChange(numVal);
-      else if (val.endsWith('.') || val === '0.') fieldOnChange(val);
-    }
-  };
 
   const getNumberDisplayValue = (value: unknown): string => {
     if (value === '' || value === undefined || value === null) return '';
