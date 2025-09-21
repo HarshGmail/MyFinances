@@ -273,6 +273,32 @@ export default function StocksPortfolioPage() {
   const chartOptions = useMemo(() => {
     if (!chartData) return null;
 
+    const yAxisPlotLines: Highcharts.YAxisPlotLinesOptions[] = [];
+
+    if (selectedStock !== 'All') {
+      const stockRow = processedPortfolioData.find((s) => s.stockName === selectedStock);
+      if (stockRow && stockRow.numOfShares > 0) {
+        const avgPrice = stockRow.investedAmount / stockRow.numOfShares;
+
+        yAxisPlotLines.push({
+          value: avgPrice * stockRow.numOfShares, // since yAxis is portfolio value, multiply by shares
+          color: '#3B82F6', // bluish
+          dashStyle: 'Dash',
+          width: 2,
+          zIndex: 5,
+          label: {
+            text: `Avg Price: ₹${avgPrice.toFixed(2)}`,
+            align: 'right',
+            x: -10,
+            style: {
+              color: '#3B82F6',
+              fontWeight: 'bold',
+            },
+          },
+        });
+      }
+    }
+
     return {
       chart: {
         type: 'line',
@@ -331,6 +357,7 @@ export default function StocksPortfolioPage() {
         },
         gridLineWidth: 1,
         gridLineColor: isDark ? '#374151' : '#e5e7eb',
+        plotLines: yAxisPlotLines,
       },
       tooltip: {
         shared: true,
@@ -424,7 +451,7 @@ export default function StocksPortfolioPage() {
         ],
       },
     };
-  }, [chartData, isDark, selectedStock, showTxPlotLines, txPlotLines]);
+  }, [chartData, isDark, processedPortfolioData, selectedStock, showTxPlotLines, txPlotLines]);
   // Calculate overall portfolio XIRR
   const allStockTxs = useMemo(() => {
     if (!stockTransactions) return [];
