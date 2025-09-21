@@ -42,7 +42,6 @@ interface PortfolioItem {
   profitLossPercentage: number;
 }
 
-// Extended timeframes for crypto (can go back further than stocks)
 const CRYPTO_TIMEFRAMES = [
   { label: '1D', days: 1 },
   { label: '3D', days: 3 },
@@ -56,7 +55,6 @@ const CRYPTO_TIMEFRAMES = [
   { label: '5Y', days: 1825 },
 ];
 
-// Define a consistent color palette for coins
 const COIN_COLORS = [
   '#FF6B6B', // Red
   '#4ECDC4', // Teal
@@ -352,7 +350,32 @@ export default function CryptoPortfolioPage() {
       .slice(-20);
   }, [selectedCoin, transactions, getCoinTransactions, timeframeStart, isDark]);
 
-  // Chart configuration
+  const avgPriceLine = useMemo(() => {
+    if (selectedCoin === 'All') return null;
+
+    const coin = portfolioData.find((c) => c.currency === selectedCoin);
+    if (!coin || coin.balance <= 0) return null;
+
+    const avgPrice = coin.investedAmount / coin.balance;
+
+    return {
+      name: `${selectedCoin} Avg Price`,
+      type: 'line' as const,
+      data:
+        chartData
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ?.find((s: any) => s.name === selectedCoin)
+          // @ts-expect-error highcharts type issue
+          ?.data.map(([time]: [number, number]) => [time, avgPrice * coin.balance]) || [],
+      color: isDark ? '#93c5fd' : '#1e3a8a',
+      dashStyle: 'Dash',
+      lineWidth: 2,
+      marker: { enabled: false },
+      enableMouseTracking: false,
+      showInLegend: true,
+    };
+  }, [selectedCoin, portfolioData, chartData, isDark]);
+
   const chartOptions = useMemo(() => {
     if (!chartData) return null;
 
@@ -393,18 +416,13 @@ export default function CryptoPortfolioPage() {
             color: isDark ? '#d1d5db' : '#6b7280',
           },
           formatter: function (this: Highcharts.AxisLabelsFormatterContextObject) {
-            // Format based on timeframe for better readability
             if (selectedTimeframe.days <= 7) {
-              // For 7 days or less, show day and month
               return Highcharts.dateFormat('%e %b', this.value as number);
             } else if (selectedTimeframe.days <= 90) {
-              // For up to 3 months, show day and month
               return Highcharts.dateFormat('%e %b', this.value as number);
             } else if (selectedTimeframe.days <= 365) {
-              // For up to 1 year, show month and year
               return Highcharts.dateFormat('%b %Y', this.value as number);
             } else {
-              // For longer periods, show month and year
               return Highcharts.dateFormat('%b %Y', this.value as number);
             }
           },
@@ -414,14 +432,14 @@ export default function CryptoPortfolioPage() {
         lineColor: isDark ? '#4b5563' : '#d1d5db',
         tickInterval:
           selectedTimeframe.days <= 7
-            ? 24 * 3600 * 1000 // Daily for 7D
+            ? 24 * 3600 * 1000
             : selectedTimeframe.days <= 30
-              ? 7 * 24 * 3600 * 1000 // Weekly for 1M
+              ? 7 * 24 * 3600 * 1000
               : selectedTimeframe.days <= 90
-                ? 15 * 24 * 3600 * 1000 // Bi-weekly for 3M
+                ? 15 * 24 * 3600 * 1000
                 : selectedTimeframe.days <= 365
-                  ? 30 * 24 * 3600 * 1000 // Monthly for 1Y
-                  : 90 * 24 * 3600 * 1000, // Quarterly for longer periods
+                  ? 30 * 24 * 3600 * 1000
+                  : 90 * 24 * 3600 * 1000,
       },
       yAxis: {
         title: {
@@ -440,6 +458,33 @@ export default function CryptoPortfolioPage() {
         },
         gridLineWidth: 1,
         gridLineColor: isDark ? '#374151' : '#e5e7eb',
+        plotLines:
+          selectedCoin === 'All' || !avgPriceLine
+            ? []
+            : [
+                {
+                  value:
+                    (portfolioData.find((c) => c.currency === selectedCoin)?.investedAmount ?? 0) /
+                    (portfolioData.find((c) => c.currency === selectedCoin)?.balance ?? 1), // avg price
+                  color: isDark ? '#93c5fd' : '#1e3a8a',
+                  width: 1.5,
+                  dashStyle: 'Dash',
+                  zIndex: 5,
+                  label: {
+                    text: `Avg Price ₹${(
+                      (portfolioData.find((c) => c.currency === selectedCoin)?.investedAmount ??
+                        0) / (portfolioData.find((c) => c.currency === selectedCoin)?.balance ?? 1)
+                    ).toFixed(2)}`,
+                    align: 'right',
+                    x: -5,
+                    style: {
+                      color: isDark ? '#93c5fd' : '#1e3a8a',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                    },
+                  },
+                },
+              ],
       },
       tooltip: {
         shared: true,
@@ -460,29 +505,24 @@ export default function CryptoPortfolioPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (this.points ?? []).forEach((point: any) => {
             if (selectedCoin === 'All') {
-              // Show portfolio valuation when viewing all coins
               tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
             } else {
-              // Show coin price when viewing a single coin
               const coin = portfolioData.find((c) => c.currency === point.series.name);
               if (coin && multipleCoinCandles && multipleCoinCandles[coin.currency]) {
-                // Find the candle data for this specific timestamp
                 const candles = multipleCoinCandles[coin.currency];
-                const targetTime = (point.x as number) / 1000; // Convert back to seconds
+                const targetTime = (point.x as number) / 1000;
                 const candle = candles.find((c) => {
                   const candleTime = c.time > 1000000000000 ? c.time / 1000 : c.time;
-                  return Math.abs(candleTime - targetTime) < 43200; // Within 12 hours
+                  return Math.abs(candleTime - targetTime) < 43200;
                 });
 
                 if (candle) {
                   tooltip += `<span style="color:${point.color}">●</span> ${point.series.name} Price: <b>₹${Highcharts.numberFormat(candle.close, 2)}</b><br/>`;
                   tooltip += `<span style="color:${point.color}">●</span> Holdings Value: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
                 } else {
-                  // Fallback to portfolio value if we can't find the candle
                   tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
                 }
               } else {
-                // Fallback to portfolio value
                 tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
               }
             }
@@ -533,13 +573,16 @@ export default function CryptoPortfolioPage() {
       series:
         selectedCoin === 'All'
           ? chartData
-          : chartData.filter(
-              (s) =>
-                typeof s === 'object' &&
-                s !== null &&
-                'name' in s &&
-                (s as { name: string }).name === selectedCoin
-            ),
+          : [
+              ...chartData.filter(
+                (s) =>
+                  typeof s === 'object' &&
+                  s !== null &&
+                  'name' in s &&
+                  (s as { name: string }).name === selectedCoin
+              ),
+              ...(avgPriceLine ? [avgPriceLine] : []),
+            ],
       credits: {
         enabled: false,
       },
@@ -566,11 +609,11 @@ export default function CryptoPortfolioPage() {
     selectedCoin,
     transactionPlotLines,
     selectedTimeframe.days,
+    avgPriceLine,
     portfolioData,
     multipleCoinCandles,
   ]);
 
-  // Pie chart data for invested amount per coin with synchronized colors
   const pieData = useMemo(
     () =>
       portfolioData.map((item) => ({
@@ -582,7 +625,6 @@ export default function CryptoPortfolioPage() {
     [portfolioData, coinColorMap]
   );
 
-  // Update your pieOptions useMemo to include the click handler:
   const pieOptions = useMemo(
     () => ({
       chart: {
@@ -666,12 +708,11 @@ export default function CryptoPortfolioPage() {
         },
       },
     }),
-    [theme, pieData, selectedCoin] // Add dependencies
+    [theme, pieData, selectedCoin]
   );
 
   const isLoading = transactionsLoading || pricesLoading;
   const error = transactionsError || pricesError;
-  // Only show chart loading when we're actually fetching new data
   const isChartLoading = candlesLoading && needsNewData;
 
   if (isLoading) {
@@ -694,12 +735,9 @@ export default function CryptoPortfolioPage() {
     <div className="p-4 h-full">
       <h2 className="text-xl font-bold mb-6 text-center">Crypto Portfolio</h2>
 
-      {/* Portfolio Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <SummaryStatCard label="Total Invested" value={formatCurrency(summary.totalInvested)} />
-
-          {/* Merged Current Value + Total P&L Card */}
           <SummaryStatCard
             label={
               <>
@@ -717,7 +755,6 @@ export default function CryptoPortfolioPage() {
             }
             valueClassName={getProfitLossColor(summary.totalProfitLoss)}
           />
-
           <SummaryStatCard
             label="XIRR %"
             value={xirrValue !== null ? `${xirrValue.toFixed(2)}%` : 'N/A'}
@@ -731,7 +768,6 @@ export default function CryptoPortfolioPage() {
       {/* Portfolio Performance Chart */}
       {portfolioData.length > 0 && (
         <div className="relative mb-6" ref={chartRef}>
-          {/* Timeframe Tabs in top-right */}
           <div className="absolute right-6 top-3 z-10">
             <Tabs value={timeframe} onValueChange={setTimeframe}>
               <TabsList className="bg-transparent p-0 h-auto gap-1">
@@ -750,7 +786,6 @@ export default function CryptoPortfolioPage() {
             </Tabs>
           </div>
 
-          {/* Coin Filter in top-left */}
           <div className="absolute left-6 top-3 z-10">
             <Select value={selectedCoin} onValueChange={setSelectedCoin}>
               <SelectTrigger className="w-[160px] border border-black text-black dark:border-white dark:text-white dark:bg-transparent">

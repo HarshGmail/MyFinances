@@ -59,7 +59,7 @@ export function useCryptoCoinPricesQuery(coinNames: string[]) {
       return response;
     },
     staleTime: 60 * 1000 * 2, // Cache for 2 minutes
-    refetchInterval: 60 * 1000 * 5, // Refetch every 5 minutes
+    refetchInterval: 60 * 1000 * 15, // Refetch every 5 minutes
     enabled: coinNames.length > 0, // Only run if coinNames array is not empty
   });
 }

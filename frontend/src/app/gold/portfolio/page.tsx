@@ -52,6 +52,7 @@ export default function GoldPortfolioPage() {
   // Gold portfolio calculations
   const goldStats = useMemo(() => {
     if (!transactions || !filteredRates || filteredRates.length === 0) return null;
+
     const totalGold = transactions.reduce(
       (sum, tx) => sum + (tx.type === 'credit' ? tx.quantity : -tx.quantity),
       0
@@ -62,24 +63,37 @@ export default function GoldPortfolioPage() {
     );
 
     const lastRate = parseFloat(filteredRates[filteredRates.length - 1].rate);
+    const avgPrice = totalGold > 0 ? totalInvested / totalGold : 0;
+
     const sellRate = lastRate * 0.97; // 3% deduction
     const currentValue = totalGold * sellRate;
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
-    // XIRR calculation
+
+    // XIRR calc
     const cashFlows: XirrTransaction[] = transactions.map((tx) => ({
       amount: tx.type === 'credit' ? -tx.amount : tx.amount,
       when: new Date(tx.date),
     }));
-    // Add current value as final positive cash flow
     cashFlows.push({ amount: currentValue, when: new Date() });
+
     let xirrValue: number | null = null;
     try {
       xirrValue = xirr(cashFlows) * 100;
     } catch {
       xirrValue = null;
     }
-    return { totalGold, totalInvested, currentValue, profitLoss, profitLossPercentage, xirrValue };
+
+    return {
+      totalGold,
+      totalInvested,
+      currentValue,
+      profitLoss,
+      profitLossPercentage,
+      xirrValue,
+      avgPrice,
+      currentPrice: lastRate,
+    };
   }, [transactions, filteredRates]);
 
   const transactionPlotLines = useMemo(() => {
@@ -136,7 +150,7 @@ export default function GoldPortfolioPage() {
     const yMin = Math.floor(minPrice - (maxPrice - minPrice) * 0.05);
     const yMax = Math.ceil(maxPrice + (maxPrice - minPrice) * 0.05);
     return {
-      chart: { type: 'area', backgroundColor: 'transparent', height: 320 },
+      chart: { type: 'area', backgroundColor: 'transparent', height: 500 },
       title: {
         text: 'Gold Price Trend',
         style: {
@@ -167,6 +181,27 @@ export default function GoldPortfolioPage() {
         max: yMax,
         gridLineWidth: 0.5,
         gridLineColor: theme === 'dark' ? '#888' : '#cccccc',
+        plotLines: goldStats
+          ? [
+              {
+                value: goldStats.avgPrice,
+                color: '#3b82f6', // blue line
+                width: 1.5,
+                dashStyle: 'Dash',
+                label: {
+                  text: `Avg Price ₹${goldStats.avgPrice.toFixed(2)}`,
+                  align: 'right',
+                  x: -5,
+                  style: {
+                    color: theme === 'dark' ? '#93c5fd' : '#1e3a8a',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                  },
+                },
+                zIndex: 5,
+              },
+            ]
+          : [],
       },
       tooltip: {
         xDateFormat: '%d %b %Y',
@@ -182,7 +217,7 @@ export default function GoldPortfolioPage() {
       ],
       credits: { enabled: false },
     };
-  }, [filteredRates, theme, transactionPlotLines, showInvestmentPlotLines]);
+  }, [filteredRates, theme, showInvestmentPlotLines, transactionPlotLines, goldStats]);
 
   const investmentChartOptions = useMemo(() => {
     if (!transactions?.length) return {};
@@ -207,7 +242,7 @@ export default function GoldPortfolioPage() {
     );
 
     return {
-      chart: { type: 'column', backgroundColor: 'transparent', height: 420 },
+      chart: { type: 'column', backgroundColor: 'transparent', height: 500 },
       title: {
         text: 'Gold Invested vs Current Valuation',
         style: {
@@ -412,7 +447,7 @@ export default function GoldPortfolioPage() {
       {isLoading ? (
         <StatsSkeleton />
       ) : goldStats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           <SummaryStatCard label="Total Gold (gms)" value={goldStats.totalGold.toFixed(4)} />
           <SummaryStatCard label="Total Invested" value={formatCurrency(goldStats.totalInvested)} />
           <SummaryStatCard
@@ -431,6 +466,16 @@ export default function GoldPortfolioPage() {
               </span>
             }
             valueClassName={goldStats.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}
+          />
+          <SummaryStatCard
+            label="Avg vs Current Price"
+            valueClassName="text-xl"
+            value={
+              <>
+                <div>Avg: ₹{goldStats.avgPrice.toFixed(2)}</div>
+                <div>Current: ₹{goldStats.currentPrice.toFixed(2)}</div>
+              </>
+            }
           />
           <SummaryStatCard
             label="XIRR %"
