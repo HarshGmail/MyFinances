@@ -20,12 +20,13 @@ import {
   recurringDepositsRouter,
   inflationRouter,
   expenseRouter,
+  assetTargetRouter,
 } from './routes';
 import { requestLogger } from './middleware';
 
 const app = express();
 const port = config.PORT;
-
+app.set('trust proxy', 1);
 // CORS configuration
 import { CorsOptions } from 'cors';
 
@@ -36,6 +37,7 @@ const corsOptions: CorsOptions = {
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5000',
     'https://my-finances-alpha.vercel.app',
+    'https://my-finances.site',
     // Allow all vercel.app subdomains
     // /^https:\/\/.*\.vercel\.app$/,
   ],
@@ -57,6 +59,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/targets', assetTargetRouter);
 app.use('/api/gold', goldRouter);
 app.use('/api/crypto', cryptoRouter);
 app.use('/api/mutual-funds', mutualFundsRouter);
@@ -84,7 +87,7 @@ async function startServer() {
     await database.connect();
 
     // Start the server
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running at http://localhost:${port}`);
       console.log(`📚 Swagger docs at http://localhost:${port}/api-docs`);
     });

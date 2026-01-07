@@ -1,3 +1,4 @@
+export { default as assetTargetRouter } from './assetTarget';
 export { default as authRoutes } from './auth';
 export { default as verifyRoutes } from './verify';
 export { default as goldRouter } from './gold';

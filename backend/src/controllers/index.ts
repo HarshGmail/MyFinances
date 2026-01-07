@@ -1,3 +1,4 @@
+export * from './assetTargetController';
 export * from './authController';
 export * from './goldController';
 export * from './cryptoController';
@@ -6,5 +7,6 @@ export * from './stocksController';
 export * from './mutualFundsInfoController';
 export * from './userGoalsController';
 export * from './epfController';
+export * from './expenseController';
 export * from './fixedDepositsController';
 export * from './recurringDepositsController';

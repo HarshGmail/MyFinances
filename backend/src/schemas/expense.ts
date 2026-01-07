@@ -12,4 +12,4 @@ export const expenseSchema = z.object({
 });
 
 // TypeScript type for expense
-export type crypto = z.infer<typeof expenseSchema>;
+export type expense = z.infer<typeof expenseSchema>;

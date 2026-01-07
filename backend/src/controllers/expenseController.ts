@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import database from '../database';
-import { expenseSchema } from '../schemas/expense';
+import { expenseSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 
 export async function addExpense(req: Request, res: Response) {
