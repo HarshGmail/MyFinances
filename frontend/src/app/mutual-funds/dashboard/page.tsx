@@ -69,8 +69,15 @@ export default function MutualFundsDashboardPage() {
   const tableData = useMemo(() => {
     if (!mutualFundsTransactionsData || !mfInfoData) return [];
     return Object.entries(grouped).map(([fundName, txs]) => {
-      const totalUnits = txs.reduce((sum, tx) => sum + tx.numOfUnits, 0);
-      const totalInvested = txs.reduce((sum, tx) => sum + tx.amount, 0);
+      const totalUnits = txs.reduce(
+        (sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits : -tx.numOfUnits),
+        0
+      );
+      const totalInvested = txs.reduce(
+        (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
+        0
+      );
+
       // Find schemeNumber for this fundName
       const info = mfInfoData.find((info) => info.fundName === fundName);
       const schemeNumber = info?.schemeNumber;
@@ -249,8 +256,6 @@ export default function MutualFundsDashboardPage() {
     const cumulativeAmountInvested = Object.entries(investmentMap)
       .map(([timestamp, value]) => [Number(timestamp), value as number])
       .sort((a, b) => a[0] - b[0]);
-    // You can use cumulativeAmountInvested elsewhere as needed
-    console.log('cumulativeAmountInvested', cumulativeAmountInvested);
 
     // Fill gaps in cumulativeAmountInvested for all dates in cumulativeSeriesData
     const investedMap = new Map<number, number>(cumulativeAmountInvested as [number, number][]);
@@ -264,73 +269,6 @@ export default function MutualFundsDashboardPage() {
       }
     );
 
-    // Keep the per-fund chartSeries mapping for future use (do not remove)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const perFundChartSeries = mfInfoData
-      ? mfInfoData
-          .map((info) => {
-            const fundName = info.fundName;
-            const schemeNumber = info.schemeNumber;
-            const navData = navHistoryBatch?.[schemeNumber];
-            if (!navData || !navData.data) return null;
-            const navHistory = navData.data;
-            const txs = mutualFundsTransactionsData
-              .filter((tx) => tx.fundName === fundName)
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            if (txs.length === 0) return null;
-            const firstTxDate = new Date(txs[0].date);
-            const dateToUnits: Record<string, number> = {};
-            let cumulativeUnits = 0;
-            let txIdx = 0;
-            const allDates: string[] = [];
-            for (let d = new Date(firstTxDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              const dateStr = `${yyyy}-${mm}-${dd}`;
-              while (
-                txIdx < txs.length &&
-                new Date(txs[txIdx].date).toDateString() === d.toDateString()
-              ) {
-                cumulativeUnits += txs[txIdx].numOfUnits;
-                txIdx++;
-              }
-              dateToUnits[dateStr] = cumulativeUnits;
-              allDates.push(dateStr);
-            }
-            const navMap: Record<string, number> = {};
-            navHistory.forEach((navPoint: { date: string; nav: string }) => {
-              const [dd, mm, yyyy] = navPoint.date.split('-');
-              const dateStr = `${yyyy}-${mm}-${dd}`;
-              navMap[dateStr] = parseFloat(navPoint.nav);
-            });
-            let lastKnownNav = null;
-            const seriesData: [number, number][] = [];
-            for (const dateStr of allDates) {
-              if (navMap[dateStr] !== undefined) {
-                lastKnownNav = navMap[dateStr];
-              }
-              if (lastKnownNav !== null && dateToUnits[dateStr] > 0) {
-                const timestamp = new Date(dateStr + 'T00:00:00').getTime();
-                seriesData.push([
-                  timestamp,
-                  Number((dateToUnits[dateStr] * lastKnownNav).toFixed(2)),
-                ]);
-              }
-            }
-            return {
-              name: fundName,
-              data: [...seriesData],
-              type: 'line',
-              color: undefined,
-              dashStyle: 'Solid',
-              marker: { enabled: true },
-            };
-          })
-          .filter(Boolean)
-      : [];
-
-    // Only show cumulative lines in the chart for now
     const chartSeries = [
       {
         name: 'Total Portfolio Valuation',
@@ -615,7 +553,7 @@ export default function MutualFundsDashboardPage() {
         </div>
       )}
       {tableData.length > 0 ? (
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w mx-auto">
           <Table>
             <TableHeader>
               <TableRow>

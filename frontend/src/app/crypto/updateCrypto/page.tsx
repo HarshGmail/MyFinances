@@ -301,7 +301,7 @@ function CryptoUpdateCryptoPageInner() {
                       step="0.00000001"
                       min="0"
                       placeholder="Enter coin price (e.g., 50000.25)"
-                      value= {(field.value)}
+                      value={field.value}
                       onFocus={() => {
                         if (field.value === 0) field.onChange('');
                       }}
@@ -314,11 +314,11 @@ function CryptoUpdateCryptoPageInner() {
                       }}
                       onChange={(e) => {
                         const value = e.target.value;
-                            const isValid = /^\d*\.?\d*$/.test(value); 
-                            if (isValid) {
-                              field.onChange(value);
-                            }}
-                      }
+                        const isValid = /^\d*\.?\d*$/.test(value);
+                        if (isValid) {
+                          field.onChange(value);
+                        }
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -350,15 +350,13 @@ function CryptoUpdateCryptoPageInner() {
                           field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
                       }}
-                      onChange={(e) => 
-                            {
-                              const value = e.target.value;
-                              const isValid = /^\d*\.?\d*$/.test(value); 
-                              if (isValid) {
-                              field.onChange(value);
-                               }
-                      }
-                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const isValid = /^\d*\.?\d*$/.test(value);
+                        if (isValid) {
+                          field.onChange(value);
+                        }
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -390,17 +388,15 @@ function CryptoUpdateCryptoPageInner() {
                           field.onChange(isNaN(numVal) ? 0 : numVal);
                         }
                       }}
-                      onChange={(e) => 
-                      {
-                             {
-                              const value = e.target.value;
-                              const isValid = /^\d*\.?\d*$/.test(value); 
-                              if (isValid) {
-                              field.onChange(value);
-                               }
-                      }
-                      }
-                      }
+                      onChange={(e) => {
+                        {
+                          const value = e.target.value;
+                          const isValid = /^\d*\.?\d*$/.test(value);
+                          if (isValid) {
+                            field.onChange(value);
+                          }
+                        }
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
