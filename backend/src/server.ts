@@ -1,6 +1,7 @@
 import config from './config';
 import express from 'express';
 import cors from 'cors';
+import { CorsOptions } from 'cors';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import * as fs from 'fs';
@@ -28,7 +29,6 @@ const app = express();
 const port = config.PORT;
 app.set('trust proxy', 1);
 // CORS configuration
-import { CorsOptions } from 'cors';
 
 const corsOptions: CorsOptions = {
   origin: [
@@ -37,9 +37,8 @@ const corsOptions: CorsOptions = {
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5000',
     'https://my-finances-alpha.vercel.app',
+    'https://www.my-finances.site',
     'https://my-finances.site',
-    // Allow all vercel.app subdomains
-    // /^https:\/\/.*\.vercel\.app$/,
   ],
   credentials: true,
   optionsSuccessStatus: 200,
