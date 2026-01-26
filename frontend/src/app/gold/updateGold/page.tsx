@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   useAddGoldTransactionMutation,
   useUpdateGoldTransactionMutation,
-} from '@/api/mutations/gold'; // adjust path
+} from '@/api/mutations/gold';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useGoldTransactionsQuery } from '@/api/query';
@@ -33,10 +33,8 @@ const formSchema = z.object({
   date: z
     .date({ required_error: 'Date is required' })
     .max(new Date(), { message: 'Date cannot be in the future' }),
-  goldPrice: z.number().min(0, 'Gold price must be at least 0'),
   quantity: z.number().min(0, 'Quantity must be at least 0'),
   amount: z.number().min(0, 'Amount must be at least 0'),
-  tax: z.number().min(0, 'Tax must be at least 0'),
   platform: z.string().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
@@ -64,10 +62,8 @@ function GoldUpdateGoldPageInner() {
     defaultValues: {
       type: 'credit',
       date: undefined,
-      goldPrice: 0,
       quantity: 0,
       amount: 0,
-      tax: 0,
       platform: '',
     },
   });
@@ -78,7 +74,6 @@ function GoldUpdateGoldPageInner() {
   const { mutate: updateTx, isPending: updating } = useUpdateGoldTransactionMutation();
   const isPending = adding || updating;
 
-  // keep original for Reset in edit mode
   const [originalTx, setOriginalTx] = useState<FormValues | null>(null);
 
   useEffect(() => {
@@ -89,10 +84,8 @@ function GoldUpdateGoldPageInner() {
       const values: FormValues = {
         type: tx.type as 'credit' | 'debit',
         date: new Date(tx.date as string),
-        goldPrice: Number(tx.goldPrice ?? 0),
         quantity: Number(tx.quantity ?? 0),
         amount: Number(tx.amount ?? 0),
-        tax: Number(tx.tax ?? 0),
         platform: tx.platform || '',
       };
       form.reset(values);
@@ -101,7 +94,6 @@ function GoldUpdateGoldPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, editId, goldTransactions]);
 
-  // Load cached values only when NOT editing
   useEffect(() => {
     if (isEditing) return;
     const cached = localStorage.getItem(CACHE_KEY);
@@ -112,10 +104,7 @@ function GoldUpdateGoldPageInner() {
         if (key in form.getValues()) {
           let v = value;
           if (key === 'date' && typeof value === 'string') v = new Date(value);
-          else if (
-            ['goldPrice', 'quantity', 'amount', 'tax'].includes(key) &&
-            typeof value === 'string'
-          )
+          else if (['quantity', 'amount'].includes(key) && typeof value === 'string')
             v = Number(value);
           form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
         }
@@ -124,7 +113,6 @@ function GoldUpdateGoldPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
-  // Persist cache
   useEffect(() => {
     const subscription = form.watch((values) => {
       localStorage.setItem(CACHE_KEY, JSON.stringify(values));
@@ -133,6 +121,15 @@ function GoldUpdateGoldPageInner() {
   }, [form]);
 
   function onSubmit(values: FormValues) {
+    const quantity = Number(values.quantity);
+    const amount = Number(values.amount);
+
+    // Calculate gold price: amount / quantity
+    const goldPrice = quantity > 0 ? amount / quantity : 0;
+
+    // Calculate tax: 3% of amount
+    const tax = amount * 0.03;
+
     const payload = {
       ...values,
       date: new Date(
@@ -140,10 +137,10 @@ function GoldUpdateGoldPageInner() {
           ? values.date.toISOString()
           : new Date(values.date).toISOString()
       ),
-      goldPrice: Number(values.goldPrice),
-      quantity: Number(values.quantity),
-      amount: Number(values.amount),
-      tax: Number(values.tax),
+      goldPrice: Number(goldPrice.toFixed(2)),
+      quantity: quantity,
+      amount: amount,
+      tax: Number(tax.toFixed(2)),
       platform: values.platform || undefined,
     };
 
@@ -183,10 +180,8 @@ function GoldUpdateGoldPageInner() {
       const defaults: FormValues = {
         type: 'credit',
         date: undefined as unknown as Date,
-        goldPrice: 0,
         quantity: 0,
         amount: 0,
-        tax: 0,
         platform: '',
       };
       form.reset(defaults);
@@ -266,37 +261,6 @@ function GoldUpdateGoldPageInner() {
               )}
             />
 
-            {/* Gold Price */}
-            <FormField
-              control={form.control}
-              name="goldPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gold Price</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="0"
-                      placeholder="Enter gold price"
-                      {...field}
-                      value={field.value?.toString() === '0' ? '' : field.value}
-                      onFocus={() => {
-                        if (field.value?.toString() === '0') field.onChange('');
-                      }}
-                      onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                      }}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Quantity */}
             <FormField
               control={form.control}
@@ -359,43 +323,12 @@ function GoldUpdateGoldPageInner() {
               )}
             />
 
-            {/* Tax */}
-            <FormField
-              control={form.control}
-              name="tax"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tax Paid</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="0"
-                      placeholder="Enter tax paid"
-                      {...field}
-                      value={field.value?.toString() === '0' ? '' : field.value}
-                      onFocus={() => {
-                        if (field.value?.toString() === '0') field.onChange('');
-                      }}
-                      onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                      }}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? '' : Number(e.target.value))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Platform */}
             <FormField
               control={form.control}
               name="platform"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel>Platform</FormLabel>
                   <FormControl>
                     <input
@@ -417,7 +350,7 @@ function GoldUpdateGoldPageInner() {
               )}
             />
 
-            {/* Submit + Reset (edit mode half width) */}
+            {/* Submit + Reset */}
             <div className="md:col-span-2">
               {isEditing ? (
                 <div className="flex gap-3">
