@@ -82,6 +82,7 @@ export default function RecurringDepositPage() {
       z.object({
         recurringDepositName: z.string().min(1, 'RD name is required'),
         amountInvested: z.number().min(1, 'Amount must be greater than 0'),
+        monthlyDeposit: z.number().min(1, 'Monthly deposit amount is required'),
         rateOfInterest: z.number().min(0.1, 'Interest rate is required'),
         platform: z.string().optional(),
         dateOfCreation: z.string().min(1, 'Creation date is required'),
@@ -91,6 +92,7 @@ export default function RecurringDepositPage() {
     defaultValues: {
       recurringDepositName: '',
       amountInvested: 0,
+      monthlyDeposit: 0,
       rateOfInterest: 0,
       platform: '',
       dateOfCreation: '',
@@ -590,6 +592,29 @@ export default function RecurringDepositPage() {
                         onChange={(e) => {
                           const value = e.target.value;
                           // Remove leading zeros and convert to number
+                          const cleanValue = value.replace(/^0+/, '') || '0';
+                          field.onChange(parseFloat(cleanValue) || 0);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="monthlyDeposit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly Deposit Amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="5000"
+                        type="number"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
                           const cleanValue = value.replace(/^0+/, '') || '0';
                           field.onChange(parseFloat(cleanValue) || 0);
                         }}

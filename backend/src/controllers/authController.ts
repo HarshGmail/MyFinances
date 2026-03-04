@@ -2,7 +2,15 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { ObjectId } from 'mongodb';
 import database from '../database';
-import { UserInput, userInputSchema, createUser, User, updateUser } from '../schemas';
+import {
+  UserInput,
+  userInputSchema,
+  createUser,
+  User,
+  updateUser,
+  SalaryRecord,
+  MonthlyPayment,
+} from '../schemas';
 import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
 
 export async function signup(req: Request, res: Response) {
@@ -177,6 +185,21 @@ export async function userProfile(req: Request, res: Response) {
       return;
     }
 
+    // Get current base salary from salary history
+    type SalaryRecord = {
+      effectiveDate: string;
+      baseSalary: number;
+    };
+
+    const currentBaseSalary =
+      Array.isArray(user.salaryHistory) && user.salaryHistory.length > 0
+        ? ((user.salaryHistory as SalaryRecord[])
+            .filter((record) => new Date(record.effectiveDate) <= new Date())
+            .sort(
+              (a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+            )[0]?.baseSalary ?? null)
+        : (user.monthlySalary ?? null);
+
     res.status(200).json({
       success: true,
       data: {
@@ -184,7 +207,10 @@ export async function userProfile(req: Request, res: Response) {
         userEmail: user.email,
         dob: user.dob,
         joined: user.createdAt,
-        monthlySalary: user.monthlySalary ?? null,
+        monthlySalary: user.monthlySalary ?? null, // Keep for backward compatibility
+        currentBaseSalary,
+        salaryHistory: user.salaryHistory ?? [],
+        paymentHistory: user.paymentHistory ?? [],
         session: {
           loginTime: userPayload.iat ? new Date(userPayload.iat * 1000) : null,
           expiry: userPayload.exp ? new Date(userPayload.exp * 1000) : null,
@@ -222,7 +248,6 @@ export async function updateUserProfile(req: Request, res: Response) {
       name: req.body.userName,
       email: req.body.userEmail,
       dob: req.body.dob ? new Date(req.body.dob) : undefined,
-      monthlySalary: req.body.monthlySalary,
     };
 
     // Step 2: Filter out undefined values (critical!)
@@ -246,12 +271,93 @@ export async function updateUserProfile(req: Request, res: Response) {
       return;
     }
 
-    // Step 4: Update and save
-    const updatedUser = updateUser(existingUser as User, updates);
+    // Step 4: Handle salary history updates separately
+    let salaryHistoryUpdate: { salaryHistory?: SalaryRecord[] } = {};
+    if (req.body.salaryHistory && Array.isArray(req.body.salaryHistory)) {
+      try {
+        const parsedSalaryHistory: SalaryRecord[] = req.body.salaryHistory.map(
+          (record: { baseSalary: number; effectiveDate: string | Date; notes?: string }) => ({
+            baseSalary: record.baseSalary,
+            effectiveDate: new Date(record.effectiveDate),
+            notes: record.notes,
+          })
+        );
+
+        // Sort by effectiveDate (newest first)
+        parsedSalaryHistory.sort(
+          (a: SalaryRecord, b: SalaryRecord) =>
+            b.effectiveDate.getTime() - a.effectiveDate.getTime()
+        );
+
+        salaryHistoryUpdate = { salaryHistory: parsedSalaryHistory };
+      } catch {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid salary history format',
+        });
+        return;
+      }
+    }
+
+    // Step 5: Handle payment history updates separately
+    let paymentHistoryUpdate: { paymentHistory?: MonthlyPayment[] } = {};
+    if (req.body.paymentHistory && Array.isArray(req.body.paymentHistory)) {
+      try {
+        const parsedPaymentHistory: MonthlyPayment[] = req.body.paymentHistory.map(
+          (payment: {
+            month: string | Date;
+            baseAmount: number;
+            bonus?: number;
+            arrears?: number;
+            totalPaid: number;
+            notes?: string;
+          }) => ({
+            month: new Date(payment.month),
+            baseAmount: payment.baseAmount,
+            bonus: payment.bonus || 0,
+            arrears: payment.arrears || 0,
+            totalPaid: payment.totalPaid,
+            notes: payment.notes,
+          })
+        );
+
+        // Sort by month (newest first)
+        parsedPaymentHistory.sort(
+          (a: MonthlyPayment, b: MonthlyPayment) => b.month.getTime() - a.month.getTime()
+        );
+
+        paymentHistoryUpdate = { paymentHistory: parsedPaymentHistory };
+      } catch {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid payment history format',
+        });
+        return;
+      }
+    }
+
+    // Step 6: Update and save
+    const updatedUser = {
+      ...updateUser(existingUser as User, updates),
+      ...salaryHistoryUpdate,
+      ...paymentHistoryUpdate,
+    };
+
     await usersCollection.updateOne(
       { _id: new ObjectId(userPayload.userId) },
       { $set: updatedUser }
     );
+
+    // Get current base salary for response
+    const currentBaseSalary =
+      updatedUser.salaryHistory && updatedUser.salaryHistory.length > 0
+        ? (updatedUser.salaryHistory
+            .filter((record: SalaryRecord) => new Date(record.effectiveDate) <= new Date())
+            .sort(
+              (a: SalaryRecord, b: SalaryRecord) =>
+                new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+            )[0]?.baseSalary ?? null)
+        : null;
 
     res.status(200).json({
       success: true,
@@ -261,10 +367,12 @@ export async function updateUserProfile(req: Request, res: Response) {
         userEmail: updatedUser.email,
         dob: updatedUser.dob,
         joined: updatedUser.createdAt,
-        monthlySalary: updatedUser.monthlySalary ?? null,
+        currentBaseSalary,
+        salaryHistory: updatedUser.salaryHistory ?? [],
+        paymentHistory: updatedUser.paymentHistory ?? [],
       },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('User profile update error:', err);
     res.status(500).json({
       success: false,

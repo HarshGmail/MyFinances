@@ -9,10 +9,50 @@ import { Input } from '@/components/ui/input';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
-import { Pencil, Check, X, User, Mail, Calendar, DollarSign, Clock } from 'lucide-react';
+import {
+  Pencil,
+  Check,
+  X,
+  User,
+  Mail,
+  Calendar,
+  DollarSign,
+  Clock,
+  Plus,
+  Trash2,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+
+// Types for salary and payment records
+interface SalaryRecord {
+  baseSalary: number;
+  effectiveDate: string;
+  notes?: string;
+}
+
+interface MonthlyPayment {
+  month: string;
+  baseAmount: number;
+  bonus: number;
+  arrears: number;
+  totalPaid: number;
+  notes?: string;
+}
 
 // Helper function to convert DDMMYYYY to YYYY-MM-DD
 const convertToISODate = (dateStr: string) => {
@@ -92,7 +132,7 @@ function EditableField({
     if (type === 'date') {
       return format(new Date(value as string), 'PPP');
     }
-    if (type === 'number' && field === 'monthlySalary') {
+    if (type === 'number') {
       return `₹${(value as number).toLocaleString('en-IN')}`;
     }
     return value.toString();
@@ -167,9 +207,238 @@ function EditableField({
   );
 }
 
+// Salary History Dialog Component
+function AddSalaryRecordDialog({
+  onAdd,
+  isUpdating,
+}: {
+  onAdd: (record: SalaryRecord) => void;
+  isUpdating: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [baseSalary, setBaseSalary] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = () => {
+    if (!baseSalary || !effectiveDate) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    onAdd({
+      baseSalary: parseFloat(baseSalary),
+      effectiveDate,
+      notes: notes || undefined,
+    });
+
+    // Reset form
+    setBaseSalary('');
+    setEffectiveDate('');
+    setNotes('');
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Add Salary Record
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Salary Record</DialogTitle>
+          <DialogDescription>Record a salary change or hike</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="baseSalary">Base Salary *</Label>
+            <Input
+              id="baseSalary"
+              type="number"
+              placeholder="98988"
+              value={baseSalary}
+              onChange={(e) => setBaseSalary(e.target.value)}
+              step="0.01"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="effectiveDate">Effective Date *</Label>
+            <Input
+              id="effectiveDate"
+              type="date"
+              value={effectiveDate}
+              onChange={(e) => setEffectiveDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="e.g., 36% hike, Promotion"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isUpdating}>
+            Add Record
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Payment History Dialog Component
+function AddPaymentRecordDialog({
+  onAdd,
+  isUpdating,
+}: {
+  onAdd: (payment: MonthlyPayment) => void;
+  isUpdating: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState('');
+  const [baseAmount, setBaseAmount] = useState('');
+  const [bonus, setBonus] = useState('0');
+  const [arrears, setArrears] = useState('0');
+  const [notes, setNotes] = useState('');
+
+  const totalPaid =
+    (parseFloat(baseAmount) || 0) + (parseFloat(bonus) || 0) + (parseFloat(arrears) || 0);
+
+  const handleSubmit = () => {
+    if (!month || !baseAmount) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    onAdd({
+      month,
+      baseAmount: parseFloat(baseAmount),
+      bonus: parseFloat(bonus) || 0,
+      arrears: parseFloat(arrears) || 0,
+      totalPaid,
+      notes: notes || undefined,
+    });
+
+    // Reset form
+    setMonth('');
+    setBaseAmount('');
+    setBonus('0');
+    setArrears('0');
+    setNotes('');
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Add Payment Record
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Payment Record</DialogTitle>
+          <DialogDescription>Record a monthly salary payment</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="month">Month *</Label>
+            <Input
+              id="month"
+              type="month"
+              value={month ? month.substring(0, 7) : ''} // Show YYYY-MM format
+              onChange={(e) => setMonth(e.target.value + '-01')} // Store as YYYY-MM-01
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="baseAmount">Base Amount *</Label>
+            <Input
+              id="baseAmount"
+              type="number"
+              placeholder="98988"
+              value={baseAmount}
+              onChange={(e) => setBaseAmount(e.target.value)}
+              step="0.01"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bonus">Bonus</Label>
+              <Input
+                id="bonus"
+                type="number"
+                placeholder="0"
+                value={bonus}
+                onChange={(e) => setBonus(e.target.value)}
+                onFocus={(e) => e.target.value === '0' && setBonus('')} // Clear 0 on focus
+                onBlur={(e) => e.target.value === '' && setBonus('0')} // Set back to 0 if empty
+                step="0.01"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="arrears">Arrears</Label>
+              <Input
+                id="arrears"
+                type="number"
+                placeholder="0"
+                value={arrears}
+                onChange={(e) => setArrears(e.target.value)}
+                onFocus={(e) => e.target.value === '0' && setArrears('')} // Clear 0 on focus
+                onBlur={(e) => e.target.value === '' && setArrears('0')} // Set back to 0 if empty
+                step="0.01"
+              />
+            </div>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">Total Paid</div>
+            <div className="text-xl font-bold">₹{totalPaid.toLocaleString('en-IN')}</div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="paymentNotes">Notes</Label>
+            <Textarea
+              id="paymentNotes"
+              placeholder="e.g., Includes Oct arrears, Performance bonus"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isUpdating}>
+            Add Payment
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ProfilePage() {
   const { data: user, isLoading, isError, refetch } = useUserProfileQuery();
   const { mutateAsync: updateProfile, isPending: isUpdating } = useUpdateUserProfileMutation();
+
+  const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<MonthlyPayment[]>([]);
+
+  // Initialize histories from user data
+  useState(() => {
+    if (user?.salaryHistory) setSalaryHistory(user.salaryHistory);
+    if (user?.paymentHistory) setPaymentHistory(user.paymentHistory);
+  });
 
   const handleUpdate = async (field: keyof UpdateUserProfile, value: string | number) => {
     try {
@@ -182,9 +451,69 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAddSalaryRecord = async (record: SalaryRecord) => {
+    const updatedHistory = [...salaryHistory, record].sort(
+      (a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+    );
+    setSalaryHistory(updatedHistory);
+
+    try {
+      await updateProfile({ data: { salaryHistory: updatedHistory } });
+      toast.success('Salary record added successfully');
+      await refetch();
+    } catch (error) {
+      toast.error('Failed to add salary record');
+      console.error('Update error:', error);
+    }
+  };
+
+  const handleDeleteSalaryRecord = async (index: number) => {
+    const updatedHistory = salaryHistory.filter((_, i) => i !== index);
+    setSalaryHistory(updatedHistory);
+
+    try {
+      await updateProfile({ data: { salaryHistory: updatedHistory } });
+      toast.success('Salary record deleted successfully');
+      await refetch();
+    } catch (error) {
+      toast.error('Failed to delete salary record');
+      console.error('Update error:', error);
+    }
+  };
+
+  const handleAddPaymentRecord = async (payment: MonthlyPayment) => {
+    const updatedHistory = [...paymentHistory, payment].sort(
+      (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
+    );
+    setPaymentHistory(updatedHistory);
+
+    try {
+      await updateProfile({ data: { paymentHistory: updatedHistory } });
+      toast.success('Payment record added successfully');
+      await refetch();
+    } catch (error) {
+      toast.error('Failed to add payment record');
+      console.error('Update error:', error);
+    }
+  };
+
+  const handleDeletePaymentRecord = async (index: number) => {
+    const updatedHistory = paymentHistory.filter((_, i) => i !== index);
+    setPaymentHistory(updatedHistory);
+
+    try {
+      await updateProfile({ data: { paymentHistory: updatedHistory } });
+      toast.success('Payment record deleted successfully');
+      await refetch();
+    } catch (error) {
+      toast.error('Failed to delete payment record');
+      console.error('Update error:', error);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <Card>
           <CardHeader className="text-center pb-6">
             <div className="flex flex-col items-center gap-4">
@@ -216,7 +545,7 @@ export default function ProfilePage() {
 
   if (isError || !user) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <Card>
           <CardContent className="text-center py-12">
             <div className="text-red-500 text-lg font-medium">Error loading profile data</div>
@@ -233,7 +562,7 @@ export default function ProfilePage() {
   const isSessionActive = user.session?.expiry ? new Date() < new Date(user.session.expiry) : false;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Profile Header */}
       <Card>
         <CardHeader className="text-center pb-6">
@@ -259,115 +588,256 @@ export default function ProfilePage() {
         </CardHeader>
       </Card>
 
-      {/* Editable Profile Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Personal Information
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Click the pencil icon to edit any field below
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <EditableField
-            label="Username"
-            value={user.userName}
-            field="userName"
-            type="text"
-            icon={<User className="h-4 w-4" />}
-            onUpdate={handleUpdate}
-            isUpdating={isUpdating}
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div className="space-y-6">
+          {/* Editable Profile Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Personal Information
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Click the pencil icon to edit any field below
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <EditableField
+                label="Username"
+                value={user.userName}
+                field="userName"
+                type="text"
+                icon={<User className="h-4 w-4" />}
+                onUpdate={handleUpdate}
+                isUpdating={isUpdating}
+              />
 
-          <EditableField
-            label="Email Address"
-            value={user.userEmail}
-            field="userEmail"
-            type="email"
-            icon={<Mail className="h-4 w-4" />}
-            onUpdate={handleUpdate}
-            isUpdating={isUpdating}
-          />
+              <EditableField
+                label="Email Address"
+                value={user.userEmail}
+                field="userEmail"
+                type="email"
+                icon={<Mail className="h-4 w-4" />}
+                onUpdate={handleUpdate}
+                isUpdating={isUpdating}
+              />
 
-          <EditableField
-            label="Monthly Salary"
-            value={user.monthlySalary}
-            field="monthlySalary"
-            type="number"
-            icon={<DollarSign className="h-4 w-4" />}
-            onUpdate={handleUpdate}
-            isUpdating={isUpdating}
-          />
+              <EditableField
+                label="Date of Birth"
+                value={user.dob ?? ''}
+                field="dob"
+                type="date"
+                icon={<Calendar className="h-4 w-4" />}
+                onUpdate={handleUpdate}
+                isUpdating={isUpdating}
+              />
+            </CardContent>
+          </Card>
 
-          <EditableField
-            label="Date of Birth"
-            value={user.dob}
-            field="dob"
-            type="date"
-            icon={<Calendar className="h-4 w-4" />}
-            onUpdate={handleUpdate}
-            isUpdating={isUpdating}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Session Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Session Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-blue-100 text-blue-600">
-                <Clock className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Login Time</div>
-                <div className="text-base font-medium">
-                  {user.session?.loginTime ? format(new Date(user.session.loginTime), 'PPPp') : '—'}
+          {/* Session Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Session Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Login Time</div>
+                    <div className="text-base font-medium">
+                      {user.session?.loginTime
+                        ? format(new Date(user.session.loginTime), 'PPPp')
+                        : '—'}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-orange-100 text-orange-600">
-                <Calendar className="h-4 w-4" />
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-orange-100 text-orange-600">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Session Expiry</div>
+                    <div className="text-base font-medium">
+                      {user.session?.expiry ? format(new Date(user.session.expiry), 'PPPp') : '—'}
+                    </div>
+                  </div>
+                </div>
+                <Badge variant={isSessionActive ? 'default' : 'destructive'}>
+                  {isSessionActive ? 'Valid' : 'Expired'}
+                </Badge>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Session Expiry</div>
-                <div className="text-base font-medium">
-                  {user.session?.expiry ? format(new Date(user.session.expiry), 'PPPp') : '—'}
+
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-green-100 text-green-600">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Member Since</div>
+                    <div className="text-base font-medium">
+                      {user.joined ? format(new Date(user.joined), 'PPP') : '—'}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <Badge variant={isSessionActive ? 'default' : 'destructive'}>
-              {isSessionActive ? 'Valid' : 'Expired'}
-            </Badge>
-          </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-green-100 text-green-600">
-                <User className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Member Since</div>
-                <div className="text-base font-medium">
-                  {user.joined ? format(new Date(user.joined), 'PPP') : '—'}
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Salary History */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Salary History
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Track your salary changes over time
+                  </p>
                 </div>
+                <AddSalaryRecordDialog onAdd={handleAddSalaryRecord} isUpdating={isUpdating} />
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {salaryHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No salary records yet. Add one to get started!
+                </div>
+              ) : (
+                salaryHistory.map((record, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="text-lg font-bold">
+                          ₹{record.baseSalary.toLocaleString('en-IN')}
+                        </div>
+                        {index === 0 && (
+                          <Badge variant="default" className="text-xs">
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Effective: {format(new Date(record.effectiveDate), 'PPP')}
+                      </div>
+                      {record.notes && (
+                        <div className="text-xs text-muted-foreground mt-1">{record.notes}</div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteSalaryRecord(index)}
+                      disabled={isUpdating}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payment History */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5" />
+                    Payment History
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Track your actual monthly payments
+                  </p>
+                </div>
+                <AddPaymentRecordDialog onAdd={handleAddPaymentRecord} isUpdating={isUpdating} />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
+              {paymentHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No payment records yet. Add one to get started!
+                </div>
+              ) : (
+                paymentHistory.map((payment, index) => (
+                  <div
+                    key={index}
+                    className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <div className="font-semibold">
+                          {format(new Date(payment.month), 'MMMM yyyy')}
+                        </div>
+                        <div className="text-2xl font-bold text-primary">
+                          ₹{payment.totalPaid.toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeletePaymentRecord(index)}
+                        disabled={isUpdating}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <div className="text-muted-foreground">Base</div>
+                        <div className="font-medium">
+                          ₹{payment.baseAmount.toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      {payment.bonus > 0 && (
+                        <div>
+                          <div className="text-muted-foreground">Bonus</div>
+                          <div className="font-medium text-green-600">
+                            +₹{payment.bonus.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      )}
+                      {payment.arrears > 0 && (
+                        <div>
+                          <div className="text-muted-foreground">Arrears</div>
+                          <div className="font-medium text-blue-600">
+                            +₹{payment.arrears.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {payment.notes && (
+                      <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                        {payment.notes}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

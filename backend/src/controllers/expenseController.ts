@@ -14,9 +14,12 @@ export async function addExpense(req: Request, res: Response) {
 
     const parsed = expenseSchema.omit({ userId: true, _id: true }).parse(req.body);
 
+    const now = new Date();
     const newExpense = {
       ...parsed,
       userId: new ObjectId(user.userId),
+      createdAt: now,
+      updatedAt: now,
     };
 
     const db = database.getDb();
@@ -111,7 +114,7 @@ export async function updateExpense(req: Request, res: Response) {
 
     const result = await collection.updateOne(
       { _id: new ObjectId(id), userId: new ObjectId(user.userId) },
-      { $set: parsed }
+      { $set: { ...parsed, updatedAt: new Date() } }
     );
 
     if (result.matchedCount === 0) {

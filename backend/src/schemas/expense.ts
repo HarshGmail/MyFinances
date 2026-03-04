@@ -9,6 +9,9 @@ export const expenseSchema = z.object({
   expenseAmount: z.number().positive(),
   expenseName: z.string(),
   expenseFrequency: z.string(),
+  isFixed: z.boolean().optional().default(false),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 });
 
 // TypeScript type for expense

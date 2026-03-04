@@ -1,3 +1,17 @@
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
+// Salary and Payment History types
+// Updated UserProfile interface
 export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
 export interface AdjClose {
@@ -137,6 +151,9 @@ export interface Expense {
   expenseAmount: number;
   expenseName: string;
   expenseFrequency: string;
+  isFixed?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ExpensePayload {
@@ -144,6 +161,7 @@ export interface ExpensePayload {
   expenseAmount: number;
   expenseName: string;
   expenseFrequency: string;
+  isFixed?: boolean;
 }
 
 export interface ExpenseResponse {
@@ -203,6 +221,15 @@ export interface InflationResult {
   data: WorldBankDataPoint[];
   tidy: Array<{ year: number; value: number | null }>;
   average?: number;
+}
+
+export interface MonthlyPayment {
+  month: string;
+  baseAmount: number;
+  bonus: number;
+  arrears: number;
+  totalPaid: number;
+  notes?: string;
 }
 
 export interface MutualFundInfo {
@@ -276,6 +303,7 @@ export interface RecurringDeposit {
   dateOfCreation: Date;
   dateOfMaturity: Date;
   amountInvested: number;
+  monthlyDeposit: number;
   platform?: string;
   recurringDepositName: string;
   rateOfInterest: number;
@@ -285,6 +313,7 @@ export interface RecurringDepositPayload {
   dateOfCreation: string;
   dateOfMaturity: string;
   amountInvested: number;
+  monthlyDeposit: number;
   platform?: string;
   recurringDepositName: string;
   rateOfInterest: number;
@@ -302,6 +331,13 @@ export interface SafeGoldRatesResponse {
     end_date: string;
     frequency: string;
   };
+}
+
+// Salary and Payment History types
+export interface SalaryRecord {
+  baseSalary: number;
+  effectiveDate: string;
+  notes?: string;
 }
 
 export interface SingleExpenseResponse {
@@ -410,15 +446,19 @@ export interface UserGoal {
   targetAmount?: number;
 }
 
+// Updated UserProfile interface
 export interface UserProfile {
   userName: string;
   userEmail: string;
-  dob: string;
-  joined: string;
-  monthlySalary: number;
-  session: {
-    loginTime: Date | null;
-    expiry: Date | null;
+  dob?: string;
+  joined?: string;
+  monthlySalary?: number;
+  currentBaseSalary?: number | null;
+  salaryHistory?: SalaryRecord[];
+  paymentHistory?: MonthlyPayment[];
+  session?: {
+    loginTime: string | null;
+    expiry: string | null;
   };
 }
 
