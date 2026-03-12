@@ -29,6 +29,7 @@ import { differenceInDays, differenceInMonths } from 'date-fns';
 import { Copy, CopyCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildAIInsightPrompt } from './aiCopy';
+import { calcMFPortfolio, calcEPFPortfolio } from '@/utils/portfolioCalculations';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -150,36 +151,10 @@ export default function Home() {
     return map;
   }, [schemeNumbers, navHistoryBatch]);
 
-  const mfGrouped = useMemo(() => {
-    if (!mutualFundsTransactionsData) return {};
-    return _.groupBy(mutualFundsTransactionsData, 'fundName');
-  }, [mutualFundsTransactionsData]);
-
   const mfPortfolioData = useMemo(() => {
     if (!mutualFundsTransactionsData || !mfInfoData) return [];
-    return Object.entries(mfGrouped).map(([fundName, txs]) => {
-      const totalUnits = txs.reduce((sum, tx) => sum + tx.numOfUnits, 0);
-      const totalInvested = txs.reduce((sum, tx) => sum + tx.amount, 0);
-      const info = mfInfoData.find((info) => info.fundName === fundName);
-      const schemeNumber = info?.schemeNumber;
-      const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
-      const currentNav = navInfo ? navInfo.nav : null;
-      const currentValue = currentNav !== null ? totalUnits * currentNav : null;
-      const profitLoss = currentValue !== null ? currentValue - totalInvested : null;
-      const profitLossPercentage =
-        profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;
-
-      return {
-        fundName,
-        totalUnits,
-        totalInvested,
-        currentNav,
-        currentValue,
-        profitLoss,
-        profitLossPercentage,
-      };
-    });
-  }, [mfGrouped, mfInfoData, mutualFundsTransactionsData, navDataMap]);
+    return calcMFPortfolio(mutualFundsTransactionsData, mfInfoData, navDataMap).fundData;
+  }, [mfInfoData, mutualFundsTransactionsData, navDataMap]);
 
   // ===== GOLD DATA =====
   const endDate = new Date().toISOString().slice(0, 10);
@@ -289,25 +264,20 @@ export default function Home() {
 
   // ===== EPF DATA =====
   const epfPortfolioData = useMemo(() => {
-    // fallbacks so type stays consistent
+    const monthlyContribution = epfData?.length ? (epfData.at(-1)?.epfAmount ?? 0) : 0;
     const base = {
       invested: 0,
       currentValue: 0,
       profitLoss: 0,
       profitLossPercentage: 0,
-      monthlyContribution: 0,
-      annualContribution: 0,
+      monthlyContribution,
+      annualContribution: monthlyContribution * 12,
     };
 
     if (!epfTimelineData) return base;
 
-    const invested = epfTimelineData.totalCurrentBalance || 0;
-    const monthlyContribution = epfData?.length ? (epfData.at(-1)?.epfAmount ?? 0) : 0;
-
     return {
-      ...base,
-      invested,
-      currentValue: invested, // EPF current value is the balance
+      ...calcEPFPortfolio(epfTimelineData),
       monthlyContribution,
       annualContribution: monthlyContribution * 12,
     };

@@ -3,25 +3,44 @@ import { QuoteSummaryResult, StockData, StockSearchResponse } from '../utils/typ
 import { defaultStockInfoOptions } from './stockServiceHelper';
 import puppeteer from 'puppeteer-core';
 import chromium from 'chrome-aws-lambda';
+import YahooFinance from 'yahoo-finance2';
+import { ChartResult } from '../utils/types';
+
+const yahooFinance = new YahooFinance();
 
 export class StocksService {
   static async fetchNSEQuotes(symbols: string[]): Promise<Record<string, StockData | null>> {
     const results: [string, StockData | null][] = [];
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
     for (const symbol of symbols) {
       try {
         const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1y`;
-        const response = await axios.get(url);
-        results.push([symbol, response.data]);
+
+        // return:'object' gives { meta, timestamp, indicators } — matching our ChartResult shape
+        const chartData = await yahooFinance.chart(yfSymbol, {
+          period1: oneYearAgo,
+          interval: '1d',
+          return: 'object',
+        });
+
+        const transformed: StockData = {
+          chart: {
+            result: [chartData as unknown as ChartResult],
+            error: null,
+          },
+        };
+
+        results.push([symbol, transformed]);
       } catch (err: unknown) {
         const error = err as Error;
         console.error('Yahoo API error:', error.message);
         results.push([symbol, null]);
       }
 
+      // Small delay between requests to be polite to Yahoo's servers
       if (symbol !== symbols[symbols.length - 1]) {
-        await new Promise((res) => setTimeout(res, 1000));
+        await new Promise((res) => setTimeout(res, 300));
       }
     }
 
