@@ -33,6 +33,7 @@ export function useSafeGoldRatesQuery({
       });
       return response.data;
     },
-    refetchInterval: 1 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: true,
   });
 }

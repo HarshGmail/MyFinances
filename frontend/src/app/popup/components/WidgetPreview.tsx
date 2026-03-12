@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bitcoin, PieChart, Coins, TrendingUp } from 'lucide-react';
+import { Bitcoin, PieChart, Coins, TrendingUp, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -23,6 +23,8 @@ interface WidgetPreviewProps {
   selectedStockDetails: StockDetails[];
   isPricesLoading: boolean;
   compact?: boolean;
+  onRefresh?: () => void;
+  lastRefreshed?: Date;
 }
 
 export const WidgetPreview: React.FC<WidgetPreviewProps> = ({
@@ -35,6 +37,8 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({
   mfPortfolioData,
   isPricesLoading,
   compact = false,
+  onRefresh,
+  lastRefreshed,
 }) => {
   const selectedMfDetails = useMemo(() => {
     return preferences.selectedMutualFunds
@@ -83,6 +87,25 @@ export const WidgetPreview: React.FC<WidgetPreviewProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Refresh bar — shown only in PiP popup */}
+      {onRefresh && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {lastRefreshed
+              ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              : 'Not yet refreshed'}
+          </span>
+          <button
+            onClick={onRefresh}
+            disabled={isPricesLoading}
+            className="flex items-center gap-1 hover:text-foreground disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-3 h-3 ${isPricesLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      )}
+
       {/* Portfolio Summary */}
       {preferences.showPortfolioSummary && (
         <PortfolioSummary

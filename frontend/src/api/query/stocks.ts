@@ -25,6 +25,8 @@ export function useNseQuoteQuery(symbols: string[]) {
       return response.data;
     },
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: true,
     enabled: symbols.length > 0,
   });
 }

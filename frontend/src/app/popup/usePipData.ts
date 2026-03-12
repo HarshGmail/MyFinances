@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import _ from 'lodash';
 import {
   useCryptoTransactionsQuery,
@@ -30,7 +30,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
   // Get current gold rates (last 24 hours)
   const endDate = new Date().toISOString().slice(0, 10);
   const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const { data: goldRatesData, isLoading: goldRatesLoading } = useSafeGoldRatesQuery({
+  const { data: goldRatesData, isLoading: goldRatesLoading, refetch: refetchGoldRates } = useSafeGoldRatesQuery({
     startDate,
     endDate,
   });
@@ -110,7 +110,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
     return [...new Set(ownedSchemes)];
   }, [ownedMutualFunds]);
 
-  const { data: navHistoryBatch, isLoading: navHistoryLoading } =
+  const { data: navHistoryBatch, isLoading: navHistoryLoading, refetch: refetchNavHistory } =
     // @ts-expect-error to be fixed
     useMfapiNavHistoryBatchQuery(schemeNumbers);
 
@@ -162,7 +162,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
   }, [ownedStocks, selectedStocks]);
 
   // Current prices map { [symbol]: price }
-  const { data: nseQuoteData, isLoading: stockQuoteLoading } = useNseQuoteQuery(allStockSymbols);
+  const { data: nseQuoteData, isLoading: stockQuoteLoading, refetch: refetchStockQuotes } = useNseQuoteQuery(allStockSymbols);
 
   const stockPrices: Record<string, number | null> = useMemo(() => {
     const map: Record<string, number | null> = {};
@@ -214,7 +214,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
     return [...new Set([...ownedSymbols, ...selectedCoins])];
   }, [ownedCoins, selectedCoins]);
 
-  const { data: coinPrices, isLoading: pricesLoading } = useCryptoCoinPricesQuery(allCoinsToFetch);
+  const { data: coinPrices, isLoading: pricesLoading, refetch: refetchCoinPrices } = useCryptoCoinPricesQuery(allCoinsToFetch);
 
   // Calculate crypto portfolio metrics
   const cryptoPortfolioMetrics: PortfolioMetrics | null = useMemo(() => {
@@ -267,6 +267,15 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
     };
   }, [mfPortfolioData]);
 
+  const refetchPrices = useCallback(async () => {
+    await Promise.all([
+      refetchCoinPrices(),
+      refetchGoldRates(),
+      refetchNavHistory(),
+      refetchStockQuotes(),
+    ]);
+  }, [refetchCoinPrices, refetchGoldRates, refetchNavHistory, refetchStockQuotes]);
+
   const isLoading =
     transactionsLoading ||
     goldTransactionsLoading ||
@@ -291,5 +300,8 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
     // Loading states
     isLoading,
     isPricesLoading,
+
+    // Actions
+    refetchPrices,
   };
 };

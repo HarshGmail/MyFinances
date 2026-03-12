@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PictureInPicture } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -85,10 +85,7 @@ export const PreviewPiPButton: React.FC<Props> = ({
     };
   }, [pipWin]);
 
-  const portal = useMemo(() => {
-    if (!pipWin || !mountRef.current) return null;
-    return createPortal(children, mountRef.current);
-  }, [pipWin, children]);
+  const portal = pipWin && mountRef.current ? createPortal(children, mountRef.current) : null;
 
   return (
     <>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Settings, Save, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +37,21 @@ const PiPCustomizationPage = () => {
     mfPortfolioMetrics,
     isLoading,
     isPricesLoading,
+    refetchPrices,
   } = usePipData(preferences.selectedCoins, preferences.selectedStocks);
+
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+
+  const handleRefresh = useCallback(async () => {
+    await refetchPrices();
+    setLastRefreshed(new Date());
+  }, [refetchPrices]);
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(handleRefresh, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [handleRefresh]);
 
   // Load preferences from localStorage on mount
   useEffect(() => {
@@ -207,6 +221,8 @@ const PiPCustomizationPage = () => {
                   mfPortfolioData={mfPortfolioData}
                   selectedStockDetails={selectedStockDetails}
                   isPricesLoading={isPricesLoading}
+                  onRefresh={handleRefresh}
+                  lastRefreshed={lastRefreshed}
                 />
               </div>
             </PreviewPiPButton>

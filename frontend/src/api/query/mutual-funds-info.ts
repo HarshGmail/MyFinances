@@ -64,5 +64,7 @@ export function useMfapiNavHistoryBatchQuery(schemeNumbers: (string | number)[])
     },
     enabled: schemeNumbers.length > 0,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: true,
   });
 }
