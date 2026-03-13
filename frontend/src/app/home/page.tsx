@@ -182,7 +182,7 @@ export default function Home() {
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
     }
 
-    const currentValue = totalGold * currentGoldRate;
+    const currentValue = totalGold * currentGoldRate * 0.97; // 3% SafeGold sell deduction
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 

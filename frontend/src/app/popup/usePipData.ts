@@ -30,7 +30,11 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
   // Get current gold rates (last 24 hours)
   const endDate = new Date().toISOString().slice(0, 10);
   const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const { data: goldRatesData, isLoading: goldRatesLoading, refetch: refetchGoldRates } = useSafeGoldRatesQuery({
+  const {
+    data: goldRatesData,
+    isLoading: goldRatesLoading,
+    refetch: refetchGoldRates,
+  } = useSafeGoldRatesQuery({
     startDate,
     endDate,
   });
@@ -162,7 +166,11 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
   }, [ownedStocks, selectedStocks]);
 
   // Current prices map { [symbol]: price }
-  const { data: nseQuoteData, isLoading: stockQuoteLoading, refetch: refetchStockQuotes } = useNseQuoteQuery(allStockSymbols);
+  const {
+    data: nseQuoteData,
+    isLoading: stockQuoteLoading,
+    refetch: refetchStockQuotes,
+  } = useNseQuoteQuery(allStockSymbols);
 
   const stockPrices: Record<string, number | null> = useMemo(() => {
     const map: Record<string, number | null> = {};
@@ -194,7 +202,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
     }
 
-    const currentValue = totalGold * currentGoldRate;
+    const currentValue = totalGold * currentGoldRate * 0.97; // 3% SafeGold sell deduction
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 
@@ -214,7 +222,11 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
     return [...new Set([...ownedSymbols, ...selectedCoins])];
   }, [ownedCoins, selectedCoins]);
 
-  const { data: coinPrices, isLoading: pricesLoading, refetch: refetchCoinPrices } = useCryptoCoinPricesQuery(allCoinsToFetch);
+  const {
+    data: coinPrices,
+    isLoading: pricesLoading,
+    refetch: refetchCoinPrices,
+  } = useCryptoCoinPricesQuery(allCoinsToFetch);
 
   // Calculate crypto portfolio metrics
   const cryptoPortfolioMetrics: PortfolioMetrics | null = useMemo(() => {

@@ -1,17 +1,3 @@
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
-// Salary and Payment History types
-// Updated UserProfile interface
 export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
 export interface AdjClose {
@@ -325,12 +311,8 @@ export interface SafeGoldRate {
 }
 
 export interface SafeGoldRatesResponse {
+  success: boolean;
   data: SafeGoldRate[];
-  params: {
-    start_date: string;
-    end_date: string;
-    frequency: string;
-  };
 }
 
 // Salary and Payment History types

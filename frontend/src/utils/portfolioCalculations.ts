@@ -59,7 +59,15 @@ export function calcMFPortfolio(
     const profitLossPercentage =
       profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;
 
-    return { fundName, totalUnits, totalInvested, currentNav, currentValue, profitLoss, profitLossPercentage };
+    return {
+      fundName,
+      totalUnits,
+      totalInvested,
+      currentNav,
+      currentValue,
+      profitLoss,
+      profitLossPercentage,
+    };
   });
 
   const totalInvested = fundData.reduce((sum, f) => sum + f.totalInvested, 0);

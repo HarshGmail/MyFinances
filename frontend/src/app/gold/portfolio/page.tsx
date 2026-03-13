@@ -14,16 +14,6 @@ import { formatCurrency } from '@/utils/numbers';
 import { Toggle } from '@/components/ui/toggle';
 
 export default function GoldPortfolioPage() {
-  type TooltipPoint = {
-    y?: number;
-    series: { name: string };
-  };
-
-  type TooltipContext = {
-    x?: number;
-    points?: TooltipPoint[];
-  };
-
   const { theme } = useAppStore();
   const TIMEFRAMES = getTimeframes();
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[1].label); // default '1m'
@@ -225,26 +215,62 @@ export default function GoldPortfolioPage() {
     const currentGoldPrice =
       data?.data && data.data.length > 0 ? parseFloat(data.data[data.data.length - 1].rate) : null;
 
-    const sortedTx = [...transactions].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    const investmentEvents = sortedTx.filter((tx) => tx.type === 'credit');
+    const MONTH_NAMES = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
-    const eventData = investmentEvents.map((tx) => [Date.parse(tx.date), tx.amount]);
-    const valuationData =
-      currentGoldPrice !== null
-        ? investmentEvents.map((tx) => [Date.parse(tx.date), tx.quantity * currentGoldPrice])
-        : [];
+    type MonthGroup = {
+      label: string;
+      totalInvested: number;
+      totalValuation: number;
+      transactions: typeof transactions;
+    };
 
-    // Map date → invested amount for quick lookup in tooltip
-    const investedMap = Object.fromEntries(
-      investmentEvents.map((tx) => [Date.parse(tx.date), tx.amount])
-    );
+    // Group credit transactions by month
+    const monthMap = new Map<string, MonthGroup>();
+    [...transactions]
+      .filter((tx) => tx.type === 'credit')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .forEach((tx) => {
+        const d = new Date(tx.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const label = `${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+        if (!monthMap.has(key)) {
+          monthMap.set(key, { label, totalInvested: 0, totalValuation: 0, transactions: [] });
+        }
+        const g = monthMap.get(key)!;
+        g.totalInvested += tx.amount;
+        if (currentGoldPrice !== null) g.totalValuation += tx.quantity * currentGoldPrice;
+        g.transactions.push(tx);
+      });
+
+    const months = Array.from(monthMap.values());
+    if (!months.length) return {};
+
+    const categories = months.map((m) => m.label);
+    const textColor = theme === 'dark' ? '#e5e7eb' : '#18181b';
+    const gridColor = theme === 'dark' ? '#374151' : '#e5e7eb';
 
     return {
-      chart: { type: 'column', backgroundColor: 'transparent', height: 500 },
+      chart: {
+        type: 'column',
+        backgroundColor: 'transparent',
+        height: 440,
+        style: { fontFamily: 'inherit' },
+      },
       title: {
-        text: 'Gold Invested vs Current Valuation',
+        text: 'Monthly Gold Investment',
         style: {
           fontWeight: 600,
           fontSize: '1.1rem',
@@ -252,81 +278,115 @@ export default function GoldPortfolioPage() {
         },
       },
       xAxis: {
-        type: 'datetime',
+        categories,
         labels: {
-          format: '{value:%b %Y}',
-          style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
+          style: { color: textColor, fontSize: '11px' },
+          rotation: 0,
+          align: 'right',
         },
-        title: { text: 'Month', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
+        lineColor: gridColor,
+        tickColor: gridColor,
       },
-      yAxis: [
-        {
-          title: {
-            text: 'Amount (₹)',
-            style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
+      yAxis: {
+        title: { text: 'Amount (₹)', style: { color: textColor } },
+        labels: {
+          formatter: function (this: Highcharts.AxisLabelsFormatterContextObject): string {
+            const v = this.value as number;
+            return v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : `₹${v.toLocaleString('en-IN')}`;
           },
-          labels: {
-            formatter: function (this: Highcharts.AxisLabelsFormatterContextObject): string {
-              return '₹' + this.value;
-            },
-            style: { color: theme === 'dark' ? '#FFF' : '#18181b' },
-          },
-          min: 0,
-          gridLineWidth: 0.5,
-          gridLineColor: theme === 'dark' ? '#888' : '#cccccc',
+          style: { color: textColor },
         },
-      ],
+        min: 0,
+        gridLineWidth: 0.5,
+        gridLineColor: gridColor,
+      },
       tooltip: {
-        shared: true,
-        xDateFormat: '<b>%b %Y</b>',
-        formatter: function (this: TooltipContext): string {
-          const x = this.x ?? 0;
-          let html = `<b>${Highcharts.dateFormat('%b %Y', x)}</b><br/>`;
+        useHTML: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        formatter: function (this: any): string {
+          const month: MonthGroup = months[this.point.index];
+          const gain =
+            currentGoldPrice !== null ? month.totalValuation - month.totalInvested : null;
+          const gainPct =
+            gain !== null && month.totalInvested > 0 ? (gain / month.totalInvested) * 100 : null;
+          const gainColor = gain !== null && gain >= 0 ? '#4ade80' : '#f87171';
 
-          (this.points ?? []).forEach((point: TooltipPoint) => {
-            const val = point.y ?? 0;
-            html += `${point.series.name}: ₹${val.toLocaleString()}<br/>`;
+          let html = `<div style="padding:8px;min-width:210px;font-size:12px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.3);">${month.label}</div>`;
 
-            if (point.series.name === 'Current Valuation') {
-              const invested = investedMap[x] || 0;
-              const change = val - invested;
-              html += `Change: ${change >= 0 ? '+' : ''}${change.toLocaleString()}<br/>`;
+          month.transactions.forEach((tx) => {
+            const txVal = currentGoldPrice !== null ? tx.quantity * currentGoldPrice : null;
+            const txGain = txVal !== null ? txVal - tx.amount : null;
+            const txGainColor = txGain !== null && txGain >= 0 ? '#4ade80' : '#f87171';
+            const d = new Date(tx.date);
+            html += `<div style="margin-bottom:8px;padding:6px;background:rgba(128,128,128,0.1);border-radius:6px;">
+              <div style="color:#94a3b8;font-size:11px;margin-bottom:3px;">${d.getDate()} ${MONTH_NAMES[d.getMonth()]} · ${tx.quantity.toFixed(4)}g</div>
+              <div style="color:#93c5fd;">Invested: <b>₹${tx.amount.toLocaleString('en-IN')}</b></div>`;
+            if (txVal !== null && txGain !== null) {
+              html += `<div style="color:${txGainColor};">Now: <b>₹${Math.round(txVal).toLocaleString('en-IN')}</b> <span style="font-size:11px;">(${txGain >= 0 ? '+' : ''}${((txGain / tx.amount) * 100).toFixed(1)}%)</span></div>`;
             }
+            html += `</div>`;
           });
 
-          return html;
+          if (month.transactions.length > 1) {
+            html += `<div style="padding-top:6px;border-top:1px solid rgba(128,128,128,0.3);font-weight:600;">
+              <div style="color:#93c5fd;">Total invested: ₹${month.totalInvested.toLocaleString('en-IN')}</div>`;
+            if (gain !== null && gainPct !== null) {
+              html += `<div style="color:${gainColor};">Now: ₹${Math.round(month.totalValuation).toLocaleString('en-IN')} (${gain >= 0 ? '+' : ''}${gainPct.toFixed(1)}%)</div>`;
+            }
+            html += `</div>`;
+          } else if (gain !== null && gainPct !== null) {
+            html += `<div style="color:${gainColor};font-weight:600;">${gain >= 0 ? '+' : ''}${gainPct.toFixed(1)}% gain</div>`;
+          }
+
+          return html + `</div>`;
         },
       },
       plotOptions: {
         column: {
           grouping: true,
-          pointPadding: 0.1,
+          pointPadding: 0.05,
           groupPadding: 0.15,
           borderWidth: 0,
+          borderRadius: 4,
         },
       },
       series: [
         {
           type: 'column',
           name: 'Amount Invested',
-          data: eventData,
-          color: '#60a5fa',
-          yAxis: 0,
+          data: months.map((m) => m.totalInvested),
+          color: {
+            linearGradient: { x1: 0, x2: 0, y1: 0, y2: 1 },
+            stops: [
+              [0, '#60a5fa'],
+              [1, '#2563eb'],
+            ],
+          },
         },
         ...(currentGoldPrice !== null
           ? [
               {
                 type: 'column',
                 name: 'Current Valuation',
-                data: valuationData,
-                color: '#22c55e',
-                yAxis: 0,
+                data: months.map((m) => m.totalValuation),
+                color: {
+                  linearGradient: { x1: 0, x2: 0, y1: 0, y2: 1 },
+                  stops: [
+                    [0, '#4ade80'],
+                    [1, '#16a34a'],
+                  ],
+                },
               },
             ]
           : []),
       ],
       credits: { enabled: false },
-      legend: { enabled: true },
+      legend: {
+        enabled: true,
+        itemStyle: { color: textColor, fontWeight: 'normal', fontSize: '12px' },
+        itemHoverStyle: { color: theme === 'dark' ? '#fff' : '#000' },
+      },
     };
   }, [transactions, theme, data]);
 
@@ -492,6 +552,46 @@ export default function GoldPortfolioPage() {
       {/* Gold Price Chart */}
       {isLoading ? (
         <ChartSkeleton />
+      ) : filteredRates.length === 0 ? (
+        <div className="bg-card rounded-lg p-4 relative">
+          <div className="flex flex-wrap items-center gap-2 justify-end mb-3">
+            <Tabs value={timeframe} onValueChange={setTimeframe} className="min-w-0">
+              <TabsList className="bg-transparent p-0 h-auto gap-1 flex flex-wrap">
+                {TIMEFRAMES.map((tf) => (
+                  <TabsTrigger
+                    key={tf.label}
+                    value={tf.label}
+                    className="border border-yellow-400 text-yellow-400 rounded-md px-2 py-0.5
+                       text-xs font-normal min-w-[28px] h-7 transition-colors duration-150
+                       data-[state=active]:bg-yellow-400 data-[state=active]:text-black
+                       data-[state=active]:border-yellow-400 data-[state=active]:shadow-none
+                       focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  >
+                    {tf.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="h-[500px] flex flex-col items-center justify-center gap-3 text-muted-foreground">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-12 h-12 opacity-30"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+            <p className="text-sm">No gold rate data for this timeframe</p>
+            <p className="text-xs opacity-60">Try selecting a longer period or check back later</p>
+          </div>
+        </div>
       ) : (
         <div className="bg-card rounded-lg p-4 relative">
           {/* MOBILE: controls above chart, no overlap */}

@@ -27,11 +27,10 @@ export function useSafeGoldRatesQuery({
         startDate,
         endDate,
       });
-      const response = await apiRequest({
+      return await apiRequest({
         endpoint: `/gold/safe-gold-rates?${params.toString()}`,
         method: 'GET',
       });
-      return response.data;
     },
     refetchInterval: 5 * 60 * 1000,
     refetchIntervalInBackground: true,

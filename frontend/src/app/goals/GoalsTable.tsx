@@ -211,7 +211,7 @@ export default function GoalsTable() {
 
       // Calculate gold value
       if (goal.goldAlloted && goal.goldAlloted > 0) {
-        const goldValue = goal.goldAlloted * currentGoldRate;
+        const goldValue = goal.goldAlloted * currentGoldRate * 0.97; // 3% SafeGold sell deduction
         currentValue += goldValue;
         assetBreakdown.gold.value = goldValue;
         assetBreakdown.gold.grams = goal.goldAlloted;
