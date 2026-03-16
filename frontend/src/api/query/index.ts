@@ -2,6 +2,7 @@ export * from './assetTarget';
 export * from './crypto';
 export * from './epf';
 export * from './expenses';
+export * from './expenseTransactions';
 export * from './fixed-deposits';
 export * from './gold';
 export * from './inflation';

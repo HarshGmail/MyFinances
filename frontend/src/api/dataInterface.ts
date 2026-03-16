@@ -150,6 +150,31 @@ export interface ExpensePayload {
   isFixed?: boolean;
 }
 
+export interface ExpenseTransaction {
+  _id: string;
+  userId: string;
+  date: string;
+  name: string;
+  amount: number;
+  category: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ExpenseTransactionPayload {
+  date: string;
+  name: string;
+  amount: number;
+  category: string;
+  notes?: string;
+}
+
+export interface UpdateExpenseTransactionPayload {
+  id: string;
+  data: Partial<ExpenseTransactionPayload>;
+}
+
 export interface ExpenseResponse {
   success: boolean;
   data: Expense[];

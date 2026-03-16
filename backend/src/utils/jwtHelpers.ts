@@ -21,19 +21,23 @@ export function generateToken(userData: UserData): string {
 }
 
 export function setAuthCookie(res: Response, token: string): void {
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie('token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProd,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax',
+    domain: isProd ? '.my-finances.site' : undefined,
   });
 }
 
 export function clearAuthCookie(res: Response): void {
+  const isProd = process.env.NODE_ENV === 'production';
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'none',
+    secure: isProd,
+    sameSite: 'lax',
+    domain: isProd ? '.my-finances.site' : undefined,
   });
 }
 

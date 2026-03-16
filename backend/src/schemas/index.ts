@@ -3,6 +3,7 @@ export * from './crypto';
 export * from './digitalGold';
 export * from './epf';
 export * from './expense';
+export * from './expenseTransaction';
 export * from './fixedDeposits';
 export * from './mutual-funds-info';
 export * from './mutual-funds';

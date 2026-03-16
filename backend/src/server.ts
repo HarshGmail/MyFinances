@@ -21,6 +21,7 @@ import {
   recurringDepositsRouter,
   inflationRouter,
   expenseRouter,
+  expenseTransactionsRouter,
   assetTargetRouter,
 } from './routes';
 import { requestLogger } from './middleware';
@@ -70,6 +71,7 @@ app.use('/api/fixed-deposit', fixedDepositsRouter);
 app.use('/api/recurring-deposit', recurringDepositsRouter);
 app.use('/api/inflation', inflationRouter);
 app.use('/api/expenses', expenseRouter);
+app.use('/api/expense-transactions', expenseTransactionsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/health', (req, res) => {
