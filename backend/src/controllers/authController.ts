@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import database from '../database';
 import {
@@ -200,6 +201,16 @@ export async function userProfile(req: Request, res: Response) {
             )[0]?.baseSalary ?? null)
         : (user.monthlySalary ?? null);
 
+    // Generate ingest token lazily if not present
+    let ingestToken: string = user.ingestToken;
+    if (!ingestToken) {
+      ingestToken = crypto.randomBytes(32).toString('hex');
+      await usersCollection.updateOne(
+        { _id: new ObjectId(userPayload.userId) },
+        { $set: { ingestToken } }
+      );
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -211,6 +222,7 @@ export async function userProfile(req: Request, res: Response) {
         currentBaseSalary,
         salaryHistory: user.salaryHistory ?? [],
         paymentHistory: user.paymentHistory ?? [],
+        ingestToken,
         session: {
           loginTime: userPayload.iat ? new Date(userPayload.iat * 1000) : null,
           expiry: userPayload.exp ? new Date(userPayload.exp * 1000) : null,
@@ -378,5 +390,27 @@ export async function updateUserProfile(req: Request, res: Response) {
       success: false,
       message: 'Internal server error',
     });
+  }
+}
+
+export async function regenerateIngestToken(req: Request, res: Response) {
+  try {
+    const userPayload = getUserFromRequest(req);
+    if (!userPayload) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const ingestToken = crypto.randomBytes(32).toString('hex');
+
+    const db = database.getDb();
+    await db
+      .collection('users')
+      .updateOne({ _id: new ObjectId(userPayload.userId) }, { $set: { ingestToken } });
+
+    res.status(200).json({ success: true, data: { ingestToken } });
+  } catch (err) {
+    console.error('Regenerate ingest token error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

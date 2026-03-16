@@ -13,3 +13,4 @@ export { default as recurringDepositsRouter } from './recurringDeposits';
 export { default as inflationRouter } from './inflation';
 export { default as expenseRouter } from './expense';
 export { default as expenseTransactionsRouter } from './expenseTransactions';
+export { default as ingestRouter } from './ingest';

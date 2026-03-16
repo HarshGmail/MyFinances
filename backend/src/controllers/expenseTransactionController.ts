@@ -17,9 +17,7 @@ export async function addExpenseTransaction(req: Request, res: Response) {
       date: new Date(req.body.date),
     };
 
-    const parsed = expenseTransactionSchema
-      .omit({ userId: true, _id: true })
-      .parse(body);
+    const parsed = expenseTransactionSchema.omit({ userId: true, _id: true }).parse(body);
 
     const now = new Date();
     const newEntry = {
@@ -32,7 +30,9 @@ export async function addExpenseTransaction(req: Request, res: Response) {
     const db = database.getDb();
     const result = await db.collection('expenseTransactions').insertOne(newEntry);
 
-    res.status(201).json({ success: true, message: 'Expense transaction added', id: result.insertedId });
+    res
+      .status(201)
+      .json({ success: true, message: 'Expense transaction added', id: result.insertedId });
   } catch (error) {
     console.error('Add expense transaction error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -85,10 +85,7 @@ export async function updateExpenseTransaction(req: Request, res: Response) {
     }
 
     const body = req.body.date ? { ...req.body, date: new Date(req.body.date) } : req.body;
-    const parsed = expenseTransactionSchema
-      .omit({ userId: true, _id: true })
-      .partial()
-      .parse(body);
+    const parsed = expenseTransactionSchema.omit({ userId: true, _id: true }).partial().parse(body);
 
     if (Object.keys(parsed).length === 0) {
       res.status(400).json({ success: false, message: 'No valid fields to update' });
@@ -96,10 +93,12 @@ export async function updateExpenseTransaction(req: Request, res: Response) {
     }
 
     const db = database.getDb();
-    const result = await db.collection('expenseTransactions').updateOne(
-      { _id: new ObjectId(id), userId: new ObjectId(user.userId) },
-      { $set: { ...parsed, updatedAt: new Date() } }
-    );
+    const result = await db
+      .collection('expenseTransactions')
+      .updateOne(
+        { _id: new ObjectId(id), userId: new ObjectId(user.userId) },
+        { $set: { ...parsed, updatedAt: new Date() } }
+      );
 
     if (result.matchedCount === 0) {
       res.status(404).json({ success: false, message: 'Transaction not found' });

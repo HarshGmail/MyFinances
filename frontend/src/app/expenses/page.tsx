@@ -36,15 +36,28 @@ export default function ExpensesPage() {
   const { data: stockTransactions, isLoading: stockLoading } = useStockTransactionsQuery();
   const { data: mutualFundTransactions, isLoading: mfLoading } = useMutualFundTransactionsQuery();
   const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
-  const { data: expenseTransactions, isLoading: transactionsLoading } = useExpenseTransactionsQuery();
+  const { data: expenseTransactions, isLoading: transactionsLoading } =
+    useExpenseTransactionsQuery();
   const { data: expenseNames } = useExpenseTransactionNamesQuery();
 
   const isLoading =
-    userLoading || expensesLoading || goldLoading || cryptoLoading || stockLoading || mfLoading || rdLoading;
+    userLoading ||
+    expensesLoading ||
+    goldLoading ||
+    cryptoLoading ||
+    stockLoading ||
+    mfLoading ||
+    rdLoading;
 
   const dashboard = useDashboardData({
-    user, expenses, goldTransactions, cryptoTransactions,
-    stockTransactions, mutualFundTransactions, rdData, theme,
+    user,
+    expenses,
+    goldTransactions,
+    cryptoTransactions,
+    stockTransactions,
+    mutualFundTransactions,
+    rdData,
+    theme,
   });
   const tracker = useTrackerData({ expenseTransactions, theme });
 
@@ -58,8 +71,12 @@ export default function ExpensesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
-              <CardContent><Skeleton className="h-6 w-20" /></CardContent>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-6 w-20" />
+              </CardContent>
             </Card>
           ))}
         </div>

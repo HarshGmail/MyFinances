@@ -36,9 +36,15 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
     const inRange = (date: Date, start: Date, end: Date) => date >= start && date <= end;
 
     return {
-      toDay: txs.filter((t) => inRange(new Date(t.date), todayStart, todayEnd)).reduce((s, t) => s + t.amount, 0),
-      thisWeek: txs.filter((t) => inRange(new Date(t.date), weekStart, weekEnd)).reduce((s, t) => s + t.amount, 0),
-      thisMonth: txs.filter((t) => inRange(new Date(t.date), monthStart, monthEnd)).reduce((s, t) => s + t.amount, 0),
+      toDay: txs
+        .filter((t) => inRange(new Date(t.date), todayStart, todayEnd))
+        .reduce((s, t) => s + t.amount, 0),
+      thisWeek: txs
+        .filter((t) => inRange(new Date(t.date), weekStart, weekEnd))
+        .reduce((s, t) => s + t.amount, 0),
+      thisMonth: txs
+        .filter((t) => inRange(new Date(t.date), monthStart, monthEnd))
+        .reduce((s, t) => s + t.amount, 0),
       total: txs.reduce((s, t) => s + t.amount, 0),
     };
   }, [txs]);
@@ -51,14 +57,20 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
       const ds = startOfDay(day);
       const de = endOfDay(day);
       const total = txs
-        .filter((t) => { const d = new Date(t.date); return d >= ds && d <= de; })
+        .filter((t) => {
+          const d = new Date(t.date);
+          return d >= ds && d <= de;
+        })
         .reduce((s, t) => s + t.amount, 0);
       return [day.getTime(), total];
     });
 
     return {
       chart: { type: 'area', backgroundColor: 'transparent', height: 280 },
-      title: { text: 'Last 30 Days', style: { color: textColor, fontSize: '16px', fontWeight: '600' } },
+      title: {
+        text: 'Last 30 Days',
+        style: { color: textColor, fontSize: '16px', fontWeight: '600' },
+      },
       xAxis: { type: 'datetime', labels: { style: { color: textColor }, format: '{value:%d %b}' } },
       yAxis: {
         title: { text: null },
@@ -71,10 +83,24 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
       },
       tooltip: {
         formatter: function (this: { x: number; y: number }): string {
-          return '<b>' + format(new Date(this.x), 'dd MMM yyyy') + '</b><br/>₹' + (this.y || 0).toLocaleString('en-IN');
+          return (
+            '<b>' +
+            format(new Date(this.x), 'dd MMM yyyy') +
+            '</b><br/>₹' +
+            (this.y || 0).toLocaleString('en-IN')
+          );
         },
       },
-      series: [{ name: 'Spending', data, color: '#f97316', fillOpacity: 0.15, lineWidth: 2, marker: { enabled: false } }],
+      series: [
+        {
+          name: 'Spending',
+          data,
+          color: '#f97316',
+          fillOpacity: 0.15,
+          lineWidth: 2,
+          marker: { enabled: false },
+        },
+      ],
       credits: { enabled: false },
       legend: { enabled: false },
     };
@@ -82,7 +108,9 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
 
   const categoryOptions = useMemo(() => {
     const byCategory: Record<string, number> = {};
-    txs.forEach((t) => { byCategory[t.category] = (byCategory[t.category] || 0) + t.amount; });
+    txs.forEach((t) => {
+      byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+    });
 
     const seriesData = Object.entries(byCategory)
       .filter(([, v]) => v > 0)
@@ -91,16 +119,33 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
 
     return {
       chart: { type: 'pie', backgroundColor: 'transparent', height: 280 },
-      title: { text: 'By Category', style: { color: textColor, fontSize: '16px', fontWeight: '600' } },
+      title: {
+        text: 'By Category',
+        style: { color: textColor, fontSize: '16px', fontWeight: '600' },
+      },
       tooltip: {
-        formatter: function (this: { point: { name: string; y: number; percentage: number } }): string {
-          return '<b>' + this.point.name + '</b><br/>₹' + (this.point.y || 0).toLocaleString('en-IN') + ' (' + this.point.percentage.toFixed(1) + '%)';
+        formatter: function (this: {
+          point: { name: string; y: number; percentage: number };
+        }): string {
+          return (
+            '<b>' +
+            this.point.name +
+            '</b><br/>₹' +
+            (this.point.y || 0).toLocaleString('en-IN') +
+            ' (' +
+            this.point.percentage.toFixed(1) +
+            '%)'
+          );
         },
       },
       plotOptions: {
         pie: {
           innerSize: '55%',
-          dataLabels: { enabled: true, format: '{point.name}', style: { color: textColor, fontSize: '11px' } },
+          dataLabels: {
+            enabled: true,
+            format: '{point.name}',
+            style: { color: textColor, fontSize: '11px' },
+          },
         },
       },
       series: [{ name: 'Spending', data: seriesData }],
@@ -116,13 +161,24 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
     const data = months.map((m) => {
       const ms = startOfMonth(m);
       const me = endOfMonth(m);
-      return txs.filter((t) => { const d = new Date(t.date); return d >= ms && d <= me; }).reduce((s, t) => s + t.amount, 0);
+      return txs
+        .filter((t) => {
+          const d = new Date(t.date);
+          return d >= ms && d <= me;
+        })
+        .reduce((s, t) => s + t.amount, 0);
     });
 
     return {
       chart: { type: 'column', backgroundColor: 'transparent', height: 280 },
-      title: { text: 'Monthly Totals', style: { color: textColor, fontSize: '16px', fontWeight: '600' } },
-      xAxis: { categories: months.map((m) => format(m, 'MMM yyyy')), labels: { style: { color: textColor } } },
+      title: {
+        text: 'Monthly Totals',
+        style: { color: textColor, fontSize: '16px', fontWeight: '600' },
+      },
+      xAxis: {
+        categories: months.map((m) => format(m, 'MMM yyyy')),
+        labels: { style: { color: textColor } },
+      },
       yAxis: {
         title: { text: null },
         labels: {

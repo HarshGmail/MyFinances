@@ -12,14 +12,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import {
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle,
-} from '@/components/ui/drawer';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/utils/numbers';
@@ -61,17 +68,30 @@ export function TrackerTab({
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const { mutateAsync: addTransaction, isPending: isAdding } = useAddExpenseTransactionMutation();
-  const { mutateAsync: updateTransaction, isPending: isUpdating } = useUpdateExpenseTransactionMutation();
+  const { mutateAsync: updateTransaction, isPending: isUpdating } =
+    useUpdateExpenseTransactionMutation();
   const { mutate: deleteTransaction } = useDeleteExpenseTransactionMutation();
 
   const form = useForm<TrackerFormValues>({
     resolver: zodResolver(trackerSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), name: '', amount: 0, category: '', notes: '' },
+    defaultValues: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      name: '',
+      amount: 0,
+      category: '',
+      notes: '',
+    },
   });
 
   const editForm = useForm<TrackerFormValues>({
     resolver: zodResolver(trackerSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), name: '', amount: 0, category: '', notes: '' },
+    defaultValues: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      name: '',
+      amount: 0,
+      category: '',
+      notes: '',
+    },
   });
 
   useEffect(() => {
@@ -99,7 +119,13 @@ export function TrackerTab({
     try {
       await addTransaction(values);
       toast.success('Expense logged');
-      form.reset({ date: format(new Date(), 'yyyy-MM-dd'), name: '', amount: 0, category: '', notes: '' });
+      form.reset({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        name: '',
+        amount: 0,
+        category: '',
+        notes: '',
+      });
       onDrawerOpenChange(false);
     } catch {
       toast.error('Failed to log expense');
@@ -148,67 +174,119 @@ export function TrackerTab({
           <div className="p-4 overflow-y-auto">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expense Name</FormLabel>
-                    <FormControl>
-                      <div className="relative" ref={suggestionsRef}>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expense Name</FormLabel>
+                      <FormControl>
+                        <div className="relative" ref={suggestionsRef}>
+                          <Input
+                            placeholder="e.g., Doctor visit, Amazon order"
+                            {...field}
+                            onChange={(e) => handleNameInput(e.target.value)}
+                            onFocus={() => {
+                              if (nameSuggestions.length > 0) setShowSuggestions(true);
+                            }}
+                            autoComplete="off"
+                          />
+                          {showSuggestions && nameSuggestions.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto">
+                              {nameSuggestions.map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                                  onMouseDown={() => {
+                                    form.setValue('name', s);
+                                    setShowSuggestions(false);
+                                  }}
+                                >
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount (₹)</FormLabel>
+                      <FormControl>
                         <Input
-                          placeholder="e.g., Doctor visit, Amazon order"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
                           {...field}
-                          onChange={(e) => handleNameInput(e.target.value)}
-                          onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
-                          autoComplete="off"
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
-                        {showSuggestions && nameSuggestions.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto">
-                            {nameSuggestions.map((s) => (
-                              <button
-                                key={s}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                                onMouseDown={() => { form.setValue('name', s); setShowSuggestions(false); }}
-                              >
-                                {s}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="amount" render={({ field }) => (
-                  <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
-                  </FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {EXPENSE_TAGS.map((tag) => (
+                            <SelectItem key={tag} value={tag}>
+                              {tag}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="category" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {EXPENSE_TAGS.map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Notes (optional)</FormLabel><FormControl>
-                    <Input placeholder="Any details..." {...field} />
-                  </FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Any details..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Button type="submit" className="w-full" disabled={isAdding}>
                   {isAdding ? 'Saving...' : 'Log Expense'}
@@ -222,35 +300,92 @@ export function TrackerTab({
       {/* Edit Transaction Dialog */}
       <Dialog open={!!editingTransaction} onOpenChange={(o) => !o && setEditingTransaction(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Edit Expense</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Edit Expense</DialogTitle>
+          </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <FormField control={editForm.control} name="date" render={({ field }) => (
-                <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={editForm.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={editForm.control} name="amount" render={({ field }) => (
-                <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl>
-                  <Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={editForm.control} name="category" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {EXPENSE_TAGS.map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={editForm.control} name="notes" render={({ field }) => (
-                <FormItem><FormLabel>Notes (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={editForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {EXPENSE_TAGS.map((tag) => (
+                          <SelectItem key={tag} value={tag}>
+                            {tag}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button type="submit" className="w-full" disabled={isUpdating}>
                 {isUpdating ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -262,20 +397,38 @@ export function TrackerTab({
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-orange-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Today</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.toDay)}</div></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.toDay)}</div>
+          </CardContent>
         </Card>
         <Card className="border-l-4 border-l-yellow-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">This Week</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-yellow-600">{formatCurrency(stats.thisWeek)}</div></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">This Week</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">
+              {formatCurrency(stats.thisWeek)}
+            </div>
+          </CardContent>
         </Card>
         <Card className="border-l-4 border-l-red-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{formatCurrency(stats.thisMonth)}</div></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(stats.thisMonth)}</div>
+          </CardContent>
         </Card>
         <Card className="border-l-4 border-l-purple-500">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-purple-600">{formatCurrency(stats.total)}</div></CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{formatCurrency(stats.total)}</div>
+          </CardContent>
         </Card>
       </div>
 
@@ -283,10 +436,22 @@ export function TrackerTab({
       {txList.length > 0 ? (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card><CardContent className="pt-4"><HighchartsReact highcharts={Highcharts} options={timelineOptions} /></CardContent></Card>
-            <Card><CardContent className="pt-4"><HighchartsReact highcharts={Highcharts} options={categoryOptions} /></CardContent></Card>
+            <Card>
+              <CardContent className="pt-4">
+                <HighchartsReact highcharts={Highcharts} options={timelineOptions} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <HighchartsReact highcharts={Highcharts} options={categoryOptions} />
+              </CardContent>
+            </Card>
           </div>
-          <Card><CardContent className="pt-4"><HighchartsReact highcharts={Highcharts} options={monthlyOptions} /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-4">
+              <HighchartsReact highcharts={Highcharts} options={monthlyOptions} />
+            </CardContent>
+          </Card>
         </>
       ) : (
         <Card>
@@ -301,7 +466,9 @@ export function TrackerTab({
       {/* Transactions table */}
       {txList.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>All Logged Expenses</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>All Logged Expenses</CardTitle>
+          </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-40 w-full" />
@@ -321,16 +488,32 @@ export function TrackerTab({
                   <tbody>
                     {txList.map((tx) => (
                       <tr key={tx._id} className="border-b hover:bg-muted/50">
-                        <td className="p-2 whitespace-nowrap">{format(new Date(tx.date), 'dd MMM yyyy')}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          {format(new Date(tx.date), 'dd MMM yyyy')}
+                        </td>
                         <td className="p-2">{tx.name}</td>
-                        <td className="p-2"><Badge variant="secondary" className="text-xs">{tx.category}</Badge></td>
+                        <td className="p-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {tx.category}
+                          </Badge>
+                        </td>
                         <td className="p-2 font-medium">{formatCurrency(tx.amount)}</td>
                         <td className="p-2 text-muted-foreground text-xs">{tx.notes || '—'}</td>
                         <td className="p-2 flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => handleEditClick(tx)} className="h-8 w-8 p-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditClick(tx)}
+                            className="h-8 w-8 p-0"
+                          >
                             <Pencil className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleDelete(tx._id)} className="h-8 w-8 p-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(tx._id)}
+                            className="h-8 w-8 p-0"
+                          >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </td>

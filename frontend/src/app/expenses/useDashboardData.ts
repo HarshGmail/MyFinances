@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  eachMonthOfInterval,
-  subMonths,
-} from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
 import Highcharts from 'highcharts';
-import { Expense, UserProfile, GoldTransaction, CryptoTransaction, StockTransaction, MutualFundTransaction, RecurringDeposit } from '@/api/dataInterface';
+import {
+  Expense,
+  UserProfile,
+  GoldTransaction,
+  CryptoTransaction,
+  StockTransaction,
+  MutualFundTransaction,
+  RecurringDeposit,
+} from '@/api/dataInterface';
 import { MonthlyData, FIXED_EXPENSE_TAGS } from './types';
 
 interface UseDashboardDataParams {
@@ -96,32 +98,51 @@ export function useDashboardData({
 
       const goldInv =
         goldTransactions
-          ?.filter((tx) => { const d = new Date(tx.date); return d >= monthStart && d <= monthEnd; })
+          ?.filter((tx) => {
+            const d = new Date(tx.date);
+            return d >= monthStart && d <= monthEnd;
+          })
           .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
       const cryptoInv =
         cryptoTransactions
-          ?.filter((tx) => { const d = new Date(tx.date); return d >= monthStart && d <= monthEnd; })
+          ?.filter((tx) => {
+            const d = new Date(tx.date);
+            return d >= monthStart && d <= monthEnd;
+          })
           .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
       const stockInv =
         stockTransactions
-          ?.filter((tx) => { const d = new Date(tx.date); return d >= monthStart && d <= monthEnd && tx.type !== 'debit'; })
+          ?.filter((tx) => {
+            const d = new Date(tx.date);
+            return d >= monthStart && d <= monthEnd && tx.type !== 'debit';
+          })
           .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
       const mfInv =
         mutualFundTransactions
-          ?.filter((tx) => { const d = new Date(tx.date); return d >= monthStart && d <= monthEnd && tx.type !== 'debit'; })
+          ?.filter((tx) => {
+            const d = new Date(tx.date);
+            return d >= monthStart && d <= monthEnd && tx.type !== 'debit';
+          })
           .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
       const rdInv =
         rdData
-          ?.filter((rd) => { const d = new Date(rd.dateOfCreation); return d >= monthStart && d <= monthEnd; })
+          ?.filter((rd) => {
+            const d = new Date(rd.dateOfCreation);
+            return d >= monthStart && d <= monthEnd;
+          })
           .reduce((sum, rd) => sum + rd.monthlyDeposit, 0) || 0;
 
       const totalInvestments = goldInv + cryptoInv + stockInv + mfInv + rdInv;
       const investmentsByType: Record<string, number> = {
-        Gold: goldInv, Crypto: cryptoInv, Stocks: stockInv, 'Mutual Funds': mfInv, RD: rdInv,
+        Gold: goldInv,
+        Crypto: cryptoInv,
+        Stocks: stockInv,
+        'Mutual Funds': mfInv,
+        RD: rdInv,
       };
 
       let fixedExpenses = 0;
@@ -131,9 +152,15 @@ export function useDashboardData({
       expenses?.forEach((exp) => {
         let monthlyAmount = exp.expenseAmount;
         switch (exp.expenseFrequency) {
-          case 'daily': monthlyAmount = exp.expenseAmount * 30; break;
-          case 'weekly': monthlyAmount = exp.expenseAmount * 4; break;
-          case 'yearly': monthlyAmount = exp.expenseAmount / 12; break;
+          case 'daily':
+            monthlyAmount = exp.expenseAmount * 30;
+            break;
+          case 'weekly':
+            monthlyAmount = exp.expenseAmount * 4;
+            break;
+          case 'yearly':
+            monthlyAmount = exp.expenseAmount / 12;
+            break;
         }
 
         if (FIXED_EXPENSE_TAGS.includes(exp.tag)) {
@@ -145,33 +172,61 @@ export function useDashboardData({
       });
 
       const totalExpenses = fixedExpenses + variableExpenses;
-      const discretionarySpending = Math.max(0, payment.totalPaid - totalInvestments - fixedExpenses);
+      const discretionarySpending = Math.max(
+        0,
+        payment.totalPaid - totalInvestments - fixedExpenses
+      );
       const savingsRate = payment.totalPaid > 0 ? (totalInvestments / payment.totalPaid) * 100 : 0;
 
       return {
-        month, monthStr,
+        month,
+        monthStr,
         salary: effectiveSalary,
         actualPaid: payment.totalPaid,
         bonus: payment.bonus,
         arrears: payment.arrears,
-        totalInvestments, fixedExpenses, variableExpenses, totalExpenses,
-        discretionarySpending, savingsRate, investmentsByType, expensesByCategory,
+        totalInvestments,
+        fixedExpenses,
+        variableExpenses,
+        totalExpenses,
+        discretionarySpending,
+        savingsRate,
+        investmentsByType,
+        expensesByCategory,
       };
     });
 
     return monthlyData.reverse();
-  }, [user, expenses, goldTransactions, cryptoTransactions, stockTransactions, mutualFundTransactions, rdData]);
+  }, [
+    user,
+    expenses,
+    goldTransactions,
+    cryptoTransactions,
+    stockTransactions,
+    mutualFundTransactions,
+    rdData,
+  ]);
 
   const overallStats = useMemo(() => {
     if (monthlyAnalysis.length === 0) {
-      return { avgMonthlyIncome: 0, avgMonthlyExpenses: 0, avgMonthlyInvestments: 0, avgSavingsRate: 0, totalInvested: 0, totalExpenses: 0, avgDiscretionarySpending: 0 };
+      return {
+        avgMonthlyIncome: 0,
+        avgMonthlyExpenses: 0,
+        avgMonthlyInvestments: 0,
+        avgSavingsRate: 0,
+        totalInvested: 0,
+        totalExpenses: 0,
+        avgDiscretionarySpending: 0,
+      };
     }
 
     const totalIncome = monthlyAnalysis.reduce((sum, m) => sum + m.actualPaid, 0);
     const totalExpenses = monthlyAnalysis.reduce((sum, m) => sum + m.totalExpenses, 0);
     const totalInvestments = monthlyAnalysis.reduce((sum, m) => sum + m.totalInvestments, 0);
-    const avgSavingsRate = monthlyAnalysis.reduce((sum, m) => sum + m.savingsRate, 0) / monthlyAnalysis.length;
-    const avgDiscretionarySpending = monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) / monthlyAnalysis.length;
+    const avgSavingsRate =
+      monthlyAnalysis.reduce((sum, m) => sum + m.savingsRate, 0) / monthlyAnalysis.length;
+    const avgDiscretionarySpending =
+      monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) / monthlyAnalysis.length;
 
     return {
       avgMonthlyIncome: totalIncome / monthlyAnalysis.length,
@@ -189,7 +244,10 @@ export function useDashboardData({
     const textColor = theme === 'dark' ? '#fff' : '#18181b';
     return {
       chart: { type: 'column', backgroundColor: 'transparent', height: 400 },
-      title: { text: 'Monthly Cash Flow Analysis', style: { color: textColor, fontSize: '18px', fontWeight: '600' } },
+      title: {
+        text: 'Monthly Cash Flow Analysis',
+        style: { color: textColor, fontSize: '18px', fontWeight: '600' },
+      },
       xAxis: { categories, labels: { style: { color: textColor } } },
       yAxis: {
         title: { text: 'Amount (₹)', style: { color: textColor } },
@@ -205,17 +263,44 @@ export function useDashboardData({
         formatter: function (this: { x: string; points?: Highcharts.Point[] }): string {
           let s = '<b>' + this.x + '</b><br/>';
           this.points?.forEach((point: Highcharts.Point) => {
-            s += '<span style="color:' + point.color + '">\u25CF</span> ' + point.series.name + ': ₹' + (point.y || 0).toLocaleString('en-IN') + '<br/>';
+            s +=
+              '<span style="color:' +
+              point.color +
+              '">\u25CF</span> ' +
+              point.series.name +
+              ': ₹' +
+              (point.y || 0).toLocaleString('en-IN') +
+              '<br/>';
           });
           return s;
         },
       },
       plotOptions: { column: { stacking: 'normal' } },
       series: [
-        { name: 'Income', data: monthlyAnalysis.map((m) => m.actualPaid).reverse(), color: '#10b981', stack: 'income' },
-        { name: 'Investments', data: monthlyAnalysis.map((m) => m.totalInvestments).reverse(), color: '#3b82f6', stack: 'outflow' },
-        { name: 'Fixed Expenses', data: monthlyAnalysis.map((m) => m.fixedExpenses).reverse(), color: '#ef4444', stack: 'outflow' },
-        { name: 'Variable Expenses', data: monthlyAnalysis.map((m) => m.variableExpenses).reverse(), color: '#f97316', stack: 'outflow' },
+        {
+          name: 'Income',
+          data: monthlyAnalysis.map((m) => m.actualPaid).reverse(),
+          color: '#10b981',
+          stack: 'income',
+        },
+        {
+          name: 'Investments',
+          data: monthlyAnalysis.map((m) => m.totalInvestments).reverse(),
+          color: '#3b82f6',
+          stack: 'outflow',
+        },
+        {
+          name: 'Fixed Expenses',
+          data: monthlyAnalysis.map((m) => m.fixedExpenses).reverse(),
+          color: '#ef4444',
+          stack: 'outflow',
+        },
+        {
+          name: 'Variable Expenses',
+          data: monthlyAnalysis.map((m) => m.variableExpenses).reverse(),
+          color: '#f97316',
+          stack: 'outflow',
+        },
       ],
       credits: { enabled: false },
       legend: { itemStyle: { color: textColor } },
@@ -226,8 +311,14 @@ export function useDashboardData({
     const textColor = theme === 'dark' ? '#fff' : '#18181b';
     return {
       chart: { type: 'line', backgroundColor: 'transparent', height: 300 },
-      title: { text: 'Savings Rate Trend', style: { color: textColor, fontSize: '16px', fontWeight: '600' } },
-      xAxis: { categories: monthlyAnalysis.map((m) => m.monthStr).reverse(), labels: { style: { color: textColor } } },
+      title: {
+        text: 'Savings Rate Trend',
+        style: { color: textColor, fontSize: '16px', fontWeight: '600' },
+      },
+      xAxis: {
+        categories: monthlyAnalysis.map((m) => m.monthStr).reverse(),
+        labels: { style: { color: textColor } },
+      },
       yAxis: {
         title: { text: 'Savings Rate (%)', style: { color: textColor } },
         labels: {
@@ -236,9 +327,24 @@ export function useDashboardData({
           },
           style: { color: textColor },
         },
-        plotLines: [{ value: 70, color: '#10b981', dashStyle: 'Dash', width: 2, label: { text: 'Target: 70%', style: { color: textColor } } }],
+        plotLines: [
+          {
+            value: 70,
+            color: '#10b981',
+            dashStyle: 'Dash',
+            width: 2,
+            label: { text: 'Target: 70%', style: { color: textColor } },
+          },
+        ],
       },
-      series: [{ name: 'Savings Rate', data: monthlyAnalysis.map((m) => m.savingsRate).reverse(), color: '#8b5cf6', marker: { enabled: true, radius: 4 } }],
+      series: [
+        {
+          name: 'Savings Rate',
+          data: monthlyAnalysis.map((m) => m.savingsRate).reverse(),
+          color: '#8b5cf6',
+          marker: { enabled: true, radius: 4 },
+        },
+      ],
       credits: { enabled: false },
       legend: { enabled: false },
     };

@@ -12,6 +12,16 @@ async function updateUserProfile(data: UpdateUserProfile) {
   });
 }
 
+export function useRegenerateIngestTokenMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiRequest({ endpoint: '/auth/ingest-token/regenerate', method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+  });
+}
+
 export function useUpdateUserProfileMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({

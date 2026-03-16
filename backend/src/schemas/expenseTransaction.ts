@@ -8,6 +8,8 @@ export const expenseTransactionSchema = z.object({
   name: z.string().min(1),
   amount: z.number().positive(),
   category: z.string(),
+  reason: z.string().optional(),
+  categoryUmbrella: z.string().optional(),
   notes: z.string().optional(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),

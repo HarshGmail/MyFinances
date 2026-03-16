@@ -1,7 +1,11 @@
 'use client';
 
 import { useUserProfileQuery } from '@/api/query';
-import { UpdateUserProfile, useUpdateUserProfileMutation } from '@/api/mutations';
+import {
+  UpdateUserProfile,
+  useUpdateUserProfileMutation,
+  useRegenerateIngestTokenMutation,
+} from '@/api/mutations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,8 +38,11 @@ import {
   Trash2,
   TrendingUp,
   Wallet,
+  Smartphone,
+  Copy,
+  RefreshCw,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 // Types for salary and payment records
@@ -430,15 +437,16 @@ function AddPaymentRecordDialog({
 export default function ProfilePage() {
   const { data: user, isLoading, isError, refetch } = useUserProfileQuery();
   const { mutateAsync: updateProfile, isPending: isUpdating } = useUpdateUserProfileMutation();
+  const { mutateAsync: regenerateToken, isPending: isRegenerating } =
+    useRegenerateIngestTokenMutation();
 
   const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<MonthlyPayment[]>([]);
 
-  // Initialize histories from user data
-  useState(() => {
+  useEffect(() => {
     if (user?.salaryHistory) setSalaryHistory(user.salaryHistory);
     if (user?.paymentHistory) setPaymentHistory(user.paymentHistory);
-  });
+  }, [user]);
 
   const handleUpdate = async (field: keyof UpdateUserProfile, value: string | number) => {
     try {
@@ -448,6 +456,16 @@ export default function ProfilePage() {
     } catch (error) {
       toast.error('Failed to update profile');
       console.error('Update error:', error);
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    try {
+      await regenerateToken();
+      toast.success('Token regenerated successfully');
+      await refetch();
+    } catch {
+      toast.error('Failed to regenerate token');
     }
   };
 
@@ -688,6 +706,75 @@ export default function ProfilePage() {
                       {user.joined ? format(new Date(user.joined), 'PPP') : '—'}
                     </div>
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* UPI Auto-Track */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                UPI Auto-Track
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Use this token in your iPhone Shortcut to auto-log UPI payments
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">Ingest Token</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={user.ingestToken ?? ''} className="font-mono text-xs" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.ingestToken ?? '');
+                      toast.success('Token copied!');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Keep this secret. Regenerate if compromised.
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRegenerateToken}
+                  disabled={isRegenerating}
+                  className="gap-1.5 text-muted-foreground"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                  Regenerate
+                </Button>
+              </div>
+              <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground space-y-1">
+                <div className="font-medium text-foreground mb-1">Shortcut setup (iPhone):</div>
+                <div>
+                  Method: <span className="font-mono">POST</span>
+                </div>
+                <div>
+                  URL:{' '}
+                  <span className="font-mono break-all">
+                    {process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000'}/api/ingest/upi
+                  </span>
+                </div>
+                <div>
+                  Body: JSON with <span className="font-mono">token</span> +{' '}
+                  <span className="font-mono">smsText</span> (Shortcut Input) +
+                  <span className="font-mono">reason(Ask immediately)</span>
+                </div>
+                <div>
+                  <span className="font-mono">reason(Ask immediately)</span>
+                </div>
+                <div>
+                  <span className="font-mono">timestamp(current date)</span>
                 </div>
               </div>
             </CardContent>

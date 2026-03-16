@@ -150,31 +150,6 @@ export interface ExpensePayload {
   isFixed?: boolean;
 }
 
-export interface ExpenseTransaction {
-  _id: string;
-  userId: string;
-  date: string;
-  name: string;
-  amount: number;
-  category: string;
-  notes?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ExpenseTransactionPayload {
-  date: string;
-  name: string;
-  amount: number;
-  category: string;
-  notes?: string;
-}
-
-export interface UpdateExpenseTransactionPayload {
-  id: string;
-  data: Partial<ExpenseTransactionPayload>;
-}
-
 export interface ExpenseResponse {
   success: boolean;
   data: Expense[];
@@ -186,6 +161,30 @@ export interface ExpenseSummary {
   expensesByFrequency: Record<string, number>;
   monthlyRecurring: number;
   yearlyRecurring: number;
+}
+
+export interface ExpenseTransaction {
+  _id: string;
+  userId: string;
+  date: string;
+  name: string;
+  amount: number;
+  category: string;
+  reason?: string;
+  categoryUmbrella?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ExpenseTransactionPayload {
+  date: string;
+  name: string;
+  amount: number;
+  category: string;
+  reason?: string;
+  categoryUmbrella?: string;
+  notes?: string;
 }
 
 export interface FixedDeposit {
@@ -436,6 +435,11 @@ export interface UpdateExpensePayload {
   data: Partial<ExpensePayload>;
 }
 
+export interface UpdateExpenseTransactionPayload {
+  id: string;
+  data: Partial<ExpenseTransactionPayload>;
+}
+
 export interface User {
   name: string | null;
   email: string | null;
@@ -463,6 +467,7 @@ export interface UserProfile {
   currentBaseSalary?: number | null;
   salaryHistory?: SalaryRecord[];
   paymentHistory?: MonthlyPayment[];
+  ingestToken?: string;
   session?: {
     loginTime: string | null;
     expiry: string | null;
