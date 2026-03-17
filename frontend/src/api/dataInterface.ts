@@ -233,6 +233,49 @@ export interface InflationResult {
   average?: number;
 }
 
+export interface MonthlyInvestmentSummaryItem {
+  monthKey: string; // 'YYYY-MM'
+  investments: {
+    stocks: number;
+    gold: number;
+    crypto: number;
+    mutualFunds: number;
+    rd: number;
+  };
+  total: number;
+}
+
+export interface StocksPortfolioItem {
+  stockName: string;
+  numOfShares: number;
+  avgPrice: number;
+  investedAmount: number;
+  currentPrice: number;
+  previousClose: number;
+  currentValuation: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  oneDayChange: number;
+  oneDayChangePercentage: number;
+  isDataAvailable: boolean;
+}
+
+export interface StocksPortfolioSummary {
+  totalInvested: number;
+  totalCurrentValue: number;
+  totalProfitLoss: number;
+  totalProfitLossPercentage: number;
+  totalOneDayChange: number;
+  totalOneDayChangePercentage: number;
+}
+
+export interface StocksPortfolioResponse {
+  portfolio: StocksPortfolioItem[];
+  priceData: Record<string, StockData>;
+  summary: StocksPortfolioSummary;
+  transactions: StockTransaction[];
+}
+
 export interface MonthlyPayment {
   month: string;
   baseAmount: number;

@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { StockSearchResponse, StockTransaction } from '@/api/dataInterface';
+import {
+  StockSearchResponse,
+  StockTransaction,
+  StocksPortfolioResponse,
+} from '@/api/dataInterface';
 
 export function useStockTransactionsQuery() {
   return useQuery<StockTransaction[]>({
@@ -43,6 +47,19 @@ export function useSearchStockByNameQuery(symbol: string) {
     },
     staleTime: 5 * 60 * 1000,
     enabled: symbol.length > 3,
+  });
+}
+
+export function useStocksPortfolioQuery() {
+  return useQuery<StocksPortfolioResponse>({
+    queryKey: ['stocks-portfolio'],
+    queryFn: async () => {
+      const response = await apiRequest({ endpoint: '/stocks/portfolio', method: 'GET' });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: true,
   });
 }
 

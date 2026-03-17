@@ -191,6 +191,98 @@ export async function getExpensesByTag(req: Request, res: Response) {
   }
 }
 
+export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const months = Math.min(parseInt(req.query.months as string) || 12, 24);
+    const userId = new ObjectId(user.userId);
+    const db = database.getDb();
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months + 1);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Fetch all investment transactions in parallel
+    const [stocks, gold, crypto, mf, rd] = await Promise.all([
+      db.collection('stocks').find({ userId, date: { $gte: startDate, $lte: endDate } }).toArray(),
+      db
+        .collection('digitalGold')
+        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .toArray(),
+      db.collection('crypto').find({ userId, date: { $gte: startDate, $lte: endDate } }).toArray(),
+      db
+        .collection('mutualFunds')
+        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .toArray(),
+      db
+        .collection('recurringDeposits')
+        .find({ userId, dateOfCreation: { $gte: startDate, $lte: endDate } })
+        .toArray(),
+    ]);
+
+    // Initialize monthly buckets for the full range
+    type InvestmentBucket = {
+      stocks: number;
+      gold: number;
+      crypto: number;
+      mutualFunds: number;
+      rd: number;
+    };
+    const monthlyMap: Record<string, InvestmentBucket> = {};
+    for (let i = 0; i < months; i++) {
+      const d = new Date(endDate);
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMap[key] = { stocks: 0, gold: 0, crypto: 0, mutualFunds: 0, rd: 0 };
+    }
+
+    const addToMonth = (date: Date, bucket: keyof InvestmentBucket, amount: number) => {
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyMap[key]) monthlyMap[key][bucket] += amount;
+    };
+
+    for (const tx of stocks) {
+      if (tx.type === 'debit') continue;
+      addToMonth(new Date(tx.date), 'stocks', tx.amount || 0);
+    }
+    for (const tx of gold) {
+      if (tx.type === 'debit') continue;
+      addToMonth(new Date(tx.date), 'gold', tx.amount || 0);
+    }
+    for (const tx of crypto) {
+      if (tx.type === 'debit') continue;
+      addToMonth(new Date(tx.date), 'crypto', tx.amount || 0);
+    }
+    for (const tx of mf) {
+      if (tx.type === 'debit') continue;
+      addToMonth(new Date(tx.date), 'mutualFunds', tx.amount || 0);
+    }
+    for (const rdItem of rd) {
+      addToMonth(new Date(rdItem.dateOfCreation), 'rd', rdItem.monthlyDeposit || 0);
+    }
+
+    const result = Object.entries(monthlyMap)
+      .map(([monthKey, investments]) => ({
+        monthKey,
+        investments,
+        total: Object.values(investments).reduce((s, v) => s + v, 0),
+      }))
+      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Monthly investment summary error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getExpensesByFrequency(req: Request, res: Response) {
   try {
     const user = getUserFromRequest(req);

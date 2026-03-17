@@ -10,13 +10,12 @@ import {
   useCryptoCoinPricesQuery,
   useMutualFundInfoFetchQuery,
   useMfapiNavHistoryBatchQuery,
-  useStockTransactionsQuery,
-  useNseQuoteQuery,
   useEpfQuery,
   useEpfTimelineQuery,
   useFixedDepositsQuery,
   useRecurringDepositsQuery,
 } from '@/api/query';
+import { useStocksPortfolioQuery } from '@/api/query/stocks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { Card } from '@/components/ui/card';
@@ -62,8 +61,12 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   // ===== STOCKS DATA =====
-  const { data: stockTransactions, isLoading: stockTransactionsLoading } =
-    useStockTransactionsQuery();
+  // Single query replaces: useStockTransactionsQuery + useNseQuoteQuery (dependent waterfall)
+  const { data: stocksPortfolioData, isLoading: stocksPortfolioLoading } =
+    useStocksPortfolioQuery();
+  const stockTransactions = stocksPortfolioData?.transactions;
+  const nseQuoteData = stocksPortfolioData?.priceData;
+
   const { data: mutualFundsTransactionsData, isLoading: mfTransactionsLoading } =
     useMutualFundTransactionsQuery();
   const { data: mfInfoData, isLoading: mfInfoLoading } = useMutualFundInfoFetchQuery();
@@ -75,56 +78,8 @@ export default function Home() {
   const { data: fdData, isLoading: fdLoading } = useFixedDepositsQuery();
   const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
 
-  const stockGroupedRows = useMemo(() => {
-    if (!stockTransactions) return [];
-    const grouped = _.groupBy(stockTransactions, 'stockName');
-    return Object.entries(grouped).map(([stockName, group]) => {
-      const txs = group as typeof stockTransactions;
-      const totalShares = txs.reduce(
-        (sum: number, tx: (typeof txs)[0]) => sum + (tx.numOfShares ?? 0),
-        0
-      );
-      const totalAmount = txs.reduce(
-        (sum: number, tx: (typeof txs)[0]) => sum + (tx.amount ?? 0),
-        0
-      );
-      const avgAmount = totalShares > 0 ? formatToTwoDecimals(totalAmount / totalShares) : 0;
-      return {
-        stockName,
-        numOfShares: totalShares,
-        avgPrice: avgAmount.toFixed(2),
-      };
-    });
-  }, [stockTransactions]);
-
-  // Fetch NSE data for stocks
-  const stockNames = stockGroupedRows.map((row) => row.stockName).filter(Boolean);
-  const { data: nseQuoteData, isLoading: nseQuoteLoading } = useNseQuoteQuery(stockNames);
-
-  // Process stock portfolio data
-  const stockPortfolioData = useMemo(() => {
-    if (!stockGroupedRows.length) return [];
-
-    return stockGroupedRows.map((row) => {
-      const stockData = nseQuoteData?.[row.stockName];
-      const currentPrice = stockData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      const currentValuation = currentPrice ? currentPrice * row.numOfShares : 0;
-      const investedAmount = parseFloat(row.avgPrice) * row.numOfShares;
-      const profitLoss = currentValuation - investedAmount;
-      const profitLossPercentage =
-        investedAmount > 0 ? formatToPercentage(profitLoss, investedAmount) : 0;
-
-      return {
-        ...row,
-        currentPrice: currentPrice || 0,
-        currentValuation,
-        investedAmount,
-        profitLoss,
-        profitLossPercentage,
-        isDataAvailable: !!currentPrice,
-      };
-    });
-  }, [stockGroupedRows, nseQuoteData]);
+  // Portfolio data comes pre-computed from backend — no grouping or price fetching needed
+  const stockPortfolioData = stocksPortfolioData?.portfolio ?? [];
 
   // ===== MUTUAL FUNDS DATA =====
   const schemeNumbers = useMemo(() => {
@@ -692,8 +647,7 @@ export default function Home() {
 
   // Loading states
   const isLoading =
-    stockTransactionsLoading ||
-    nseQuoteLoading ||
+    stocksPortfolioLoading ||
     mfInfoLoading ||
     mfTransactionsLoading ||
     navHistoryLoading ||

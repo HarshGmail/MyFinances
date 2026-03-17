@@ -1,6 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { Expense, ExpenseSummary } from '../dataInterface';
+import { Expense, ExpenseSummary, MonthlyInvestmentSummaryItem } from '../dataInterface';
+
+export function useMonthlyInvestmentSummaryQuery(months = 12) {
+  return useQuery<MonthlyInvestmentSummaryItem[]>({
+    queryKey: ['monthly-investment-summary', months],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: `/expenses/monthly-investment-summary?months=${months}`,
+        method: 'GET',
+      });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Get all expenses for the authenticated user
 export function useExpensesQuery() {

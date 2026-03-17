@@ -234,17 +234,21 @@ export function Navbar() {
               <NavigationMenuList>
                 {/* Always visible items */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger onClick={() => router.push('/home')}>
-                    <ChartNoAxesCombined className="w-4 h-4 mr-2" />
-                    Home
-                  </NavigationMenuTrigger>
+                  <NavigationMenuLink asChild>
+                    <Link href="/home" className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded">
+                      <ChartNoAxesCombined className="w-4 h-4 mr-2" />
+                      Home
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger onClick={() => router.push('/expenses')}>
-                    <Calculator className="w-4 h-4 mr-2" />
-                    Expenses
-                  </NavigationMenuTrigger>
+                  <NavigationMenuLink asChild>
+                    <Link href="/expenses" className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded">
+                      <Calculator className="w-4 h-4 mr-2" />
+                      Expenses
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
 
                 {/* Hide these on tablets, show on desktop */}

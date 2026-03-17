@@ -1,25 +1,13 @@
 import { useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
 import Highcharts from 'highcharts';
-import {
-  Expense,
-  UserProfile,
-  GoldTransaction,
-  CryptoTransaction,
-  StockTransaction,
-  MutualFundTransaction,
-  RecurringDeposit,
-} from '@/api/dataInterface';
+import { Expense, UserProfile, MonthlyInvestmentSummaryItem } from '@/api/dataInterface';
 import { MonthlyData, FIXED_EXPENSE_TAGS } from './types';
 
 interface UseDashboardDataParams {
   user: UserProfile | undefined;
   expenses: Expense[] | undefined;
-  goldTransactions: GoldTransaction[] | undefined;
-  cryptoTransactions: CryptoTransaction[] | undefined;
-  stockTransactions: StockTransaction[] | undefined;
-  mutualFundTransactions: MutualFundTransaction[] | undefined;
-  rdData: RecurringDeposit[] | undefined;
+  monthlyInvestmentSummary: MonthlyInvestmentSummaryItem[] | undefined;
   theme: string;
 }
 
@@ -74,11 +62,7 @@ function getPaymentForMonth(month: Date, user: UserProfile) {
 export function useDashboardData({
   user,
   expenses,
-  goldTransactions,
-  cryptoTransactions,
-  stockTransactions,
-  mutualFundTransactions,
-  rdData,
+  monthlyInvestmentSummary,
   theme,
 }: UseDashboardDataParams) {
   const monthlyAnalysis = useMemo(() => {
@@ -92,49 +76,18 @@ export function useDashboardData({
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
       const monthStr = format(month, 'MMM yyyy');
+      const monthKey = format(month, 'yyyy-MM');
 
       const effectiveSalary = getSalaryForMonth(month, user);
       const payment = getPaymentForMonth(month, user);
 
-      const goldInv =
-        goldTransactions
-          ?.filter((tx) => {
-            const d = new Date(tx.date);
-            return d >= monthStart && d <= monthEnd;
-          })
-          .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-      const cryptoInv =
-        cryptoTransactions
-          ?.filter((tx) => {
-            const d = new Date(tx.date);
-            return d >= monthStart && d <= monthEnd;
-          })
-          .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-      const stockInv =
-        stockTransactions
-          ?.filter((tx) => {
-            const d = new Date(tx.date);
-            return d >= monthStart && d <= monthEnd && tx.type !== 'debit';
-          })
-          .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-      const mfInv =
-        mutualFundTransactions
-          ?.filter((tx) => {
-            const d = new Date(tx.date);
-            return d >= monthStart && d <= monthEnd && tx.type !== 'debit';
-          })
-          .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-      const rdInv =
-        rdData
-          ?.filter((rd) => {
-            const d = new Date(rd.dateOfCreation);
-            return d >= monthStart && d <= monthEnd;
-          })
-          .reduce((sum, rd) => sum + rd.monthlyDeposit, 0) || 0;
+      // Pull pre-aggregated investment totals from backend summary
+      const summaryItem = monthlyInvestmentSummary?.find((s) => s.monthKey === monthKey);
+      const goldInv = summaryItem?.investments.gold ?? 0;
+      const cryptoInv = summaryItem?.investments.crypto ?? 0;
+      const stockInv = summaryItem?.investments.stocks ?? 0;
+      const mfInv = summaryItem?.investments.mutualFunds ?? 0;
+      const rdInv = summaryItem?.investments.rd ?? 0;
 
       const totalInvestments = goldInv + cryptoInv + stockInv + mfInv + rdInv;
       const investmentsByType: Record<string, number> = {
@@ -150,6 +103,12 @@ export function useDashboardData({
       const expensesByCategory: Record<string, number> = {};
 
       expenses?.forEach((exp) => {
+        // Only count this expense from the month it was created (timestamp fix)
+        if (exp.createdAt) {
+          const expCreatedDate = startOfMonth(new Date(exp.createdAt));
+          if (expCreatedDate > monthEnd) return;
+        }
+
         let monthlyAmount = exp.expenseAmount;
         switch (exp.expenseFrequency) {
           case 'daily':
@@ -197,15 +156,7 @@ export function useDashboardData({
     });
 
     return monthlyData.reverse();
-  }, [
-    user,
-    expenses,
-    goldTransactions,
-    cryptoTransactions,
-    stockTransactions,
-    mutualFundTransactions,
-    rdData,
-  ]);
+  }, [user, expenses, monthlyInvestmentSummary]);
 
   const overallStats = useMemo(() => {
     if (monthlyAnalysis.length === 0) {
@@ -226,7 +177,8 @@ export function useDashboardData({
     const avgSavingsRate =
       monthlyAnalysis.reduce((sum, m) => sum + m.savingsRate, 0) / monthlyAnalysis.length;
     const avgDiscretionarySpending =
-      monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) / monthlyAnalysis.length;
+      monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) /
+      monthlyAnalysis.length;
 
     return {
       avgMonthlyIncome: totalIncome / monthlyAnalysis.length,

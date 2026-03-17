@@ -4,11 +4,7 @@ import { useState } from 'react';
 import {
   useExpensesQuery,
   useUserProfileQuery,
-  useGoldTransactionsQuery,
-  useCryptoTransactionsQuery,
-  useStockTransactionsQuery,
-  useMutualFundTransactionsQuery,
-  useRecurringDepositsQuery,
+  useMonthlyInvestmentSummaryQuery,
   useExpenseTransactionsQuery,
   useExpenseTransactionNamesQuery,
 } from '@/api/query';
@@ -31,32 +27,18 @@ export default function ExpensesPage() {
 
   const { data: user, isLoading: userLoading } = useUserProfileQuery();
   const { data: expenses, isLoading: expensesLoading } = useExpensesQuery();
-  const { data: goldTransactions, isLoading: goldLoading } = useGoldTransactionsQuery();
-  const { data: cryptoTransactions, isLoading: cryptoLoading } = useCryptoTransactionsQuery();
-  const { data: stockTransactions, isLoading: stockLoading } = useStockTransactionsQuery();
-  const { data: mutualFundTransactions, isLoading: mfLoading } = useMutualFundTransactionsQuery();
-  const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
+  const { data: monthlyInvestmentSummary, isLoading: summaryLoading } =
+    useMonthlyInvestmentSummaryQuery();
   const { data: expenseTransactions, isLoading: transactionsLoading } =
     useExpenseTransactionsQuery();
   const { data: expenseNames } = useExpenseTransactionNamesQuery();
 
-  const isLoading =
-    userLoading ||
-    expensesLoading ||
-    goldLoading ||
-    cryptoLoading ||
-    stockLoading ||
-    mfLoading ||
-    rdLoading;
+  const isLoading = userLoading || expensesLoading || summaryLoading;
 
   const dashboard = useDashboardData({
     user,
     expenses,
-    goldTransactions,
-    cryptoTransactions,
-    stockTransactions,
-    mutualFundTransactions,
-    rdData,
+    monthlyInvestmentSummary,
     theme,
   });
   const tracker = useTrackerData({ expenseTransactions, theme });

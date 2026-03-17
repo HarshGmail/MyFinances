@@ -7,6 +7,7 @@ import {
   getFullStockProfile,
   updateStockTransaction,
   deleteStockTransaction,
+  getStocksPortfolio,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -29,6 +30,9 @@ router.get('/nse-quote', getNSEQuote);
 
 // GET /stocks/stock-profile?symbol=SYMBOL&range=time period&interval=time interval
 router.get('/stock-profile', getFullStockProfile);
+
+// GET /stocks/portfolio - Grouped portfolio with live prices, summary and raw transactions
+router.get('/portfolio', getStocksPortfolio);
 
 router.delete('/transaction/:id', deleteStockTransaction);
 export default router;
