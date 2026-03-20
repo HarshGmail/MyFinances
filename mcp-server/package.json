@@ -1,0 +1,26 @@
+{
+  "name": "mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for ourFinance — exposes finance tools to Claude via Streamable HTTP transport",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:@modelcontextprotocol/sdk --external:axios --external:express --external:zod --external:dotenv",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch src --ext ts --exec \"ts-node --transpile-only src/index.ts\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "esbuild": "^0.25.0",
+    "express": "^4.21.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "nodemon": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

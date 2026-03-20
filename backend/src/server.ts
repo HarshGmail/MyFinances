@@ -41,6 +41,7 @@ const corsOptions: CorsOptions = {
     'https://my-finances-alpha.vercel.app',
     'https://www.my-finances.site',
     'https://my-finances.site',
+    'https://mcp.my-finances.site',
   ],
   credentials: true,
   optionsSuccessStatus: 200,

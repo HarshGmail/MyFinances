@@ -41,6 +41,8 @@ import {
   Smartphone,
   Copy,
   RefreshCw,
+  Bot,
+  ExternalLink,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -776,6 +778,78 @@ export default function ProfilePage() {
                 <div>
                   <span className="font-mono">timestamp(current date)</span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Claude MCP Integration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                Claude MCP Integration
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Connect your finances to Claude AI — ask questions, log expenses, and analyse your
+                portfolio in natural language
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                <p className="font-medium text-foreground">What you can do with Claude:</p>
+                <ul className="text-muted-foreground space-y-1 list-disc list-inside text-xs">
+                  <li>Ask &quot;How much did I spend on food this month?&quot;</li>
+                  <li>Say &quot;Log ₹450 expense for dinner&quot;</li>
+                  <li>Ask &quot;What&apos;s my stock portfolio P&amp;L?&quot;</li>
+                  <li>Ask &quot;Show me my investment goals&quot;</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Setup in Claude.ai:</p>
+                <ol className="space-y-2 text-xs text-muted-foreground list-decimal list-inside">
+                  <li>
+                    Go to{' '}
+                    <a
+                      href="https://claude.ai/settings/integrations"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline inline-flex items-center gap-0.5"
+                    >
+                      claude.ai → Settings → Integrations
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </li>
+                  <li>
+                    Click <span className="font-mono bg-muted px-1 rounded">Add MCP Server</span>
+                  </li>
+                  <li>
+                    Enter URL:{' '}
+                    <span
+                      className="font-mono bg-muted px-1 rounded break-all cursor-pointer hover:bg-accent"
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://mcp.my-finances.site/mcp');
+                        toast.success('MCP URL copied!');
+                      }}
+                    >
+                      https://mcp.my-finances.site/mcp
+                    </span>
+                  </li>
+                  <li>
+                    Set auth type to{' '}
+                    <span className="font-mono bg-muted px-1 rounded">Bearer Token</span>
+                  </li>
+                  <li>Paste your Ingest Token (from the card above) as the token value</li>
+                </ol>
+              </div>
+
+              <div className="p-3 border rounded-lg text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Your ingest token = your MCP key</p>
+                <p>
+                  The same token used for UPI auto-tracking authenticates you with the MCP server.
+                  Each user gets their own isolated data. If compromised, regenerate it above and
+                  update your Claude.ai integration.
+                </p>
               </div>
             </CardContent>
           </Card>

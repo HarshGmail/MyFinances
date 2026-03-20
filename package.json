@@ -4,8 +4,11 @@
   "description": "My Finance Application",
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:all": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:mcp\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
+    "dev:mcp": "cd mcp-server && npm run dev",
+    "build:mcp": "cd mcp-server && npm run build",
     "prettier:auto": "node scripts/prettier-auto.js",
     "prettier:frontend": "cd frontend && npm run prettier:fix",
     "prettier:backend": "cd backend && npm run prettier:fix",

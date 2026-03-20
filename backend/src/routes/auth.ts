@@ -6,6 +6,7 @@ import {
   userProfile,
   updateUserProfile,
   regenerateIngestToken,
+  ingestTokenExchange,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -17,5 +18,6 @@ router.post('/logout', logout);
 router.get('/profile', authenticateToken, userProfile);
 router.put('/profile', authenticateToken, updateUserProfile);
 router.post('/ingest-token/regenerate', authenticateToken, regenerateIngestToken);
+router.post('/ingest-token/exchange', ingestTokenExchange);
 
 export default router;

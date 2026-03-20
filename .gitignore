@@ -1,2 +1,4 @@
 node_modules
 .claude
+mcp-server/.env
+mcp-server/dist

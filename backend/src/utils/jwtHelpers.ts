@@ -50,7 +50,9 @@ export function authenticateUser(res: Response, userData: UserData): string {
 export function getUserFromRequest(
   req: Request
 ): { userId: string; name?: string; email?: string; iat?: number; exp?: number } | null {
-  const token = req.cookies?.token;
+  const authHeader = req.headers['authorization'];
+  const token =
+    authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.token;
   if (!token) return null;
   try {
     const payload = jwt.verify(token, config.JWT_SECRET) as {

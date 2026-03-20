@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import database from '../database';
 import {
@@ -13,6 +14,7 @@ import {
   MonthlyPayment,
 } from '../schemas';
 import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
+import config from '../config';
 
 export async function signup(req: Request, res: Response) {
   try {
@@ -411,6 +413,31 @@ export async function regenerateIngestToken(req: Request, res: Response) {
     res.status(200).json({ success: true, data: { ingestToken } });
   } catch (err) {
     console.error('Regenerate ingest token error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function ingestTokenExchange(req: Request, res: Response) {
+  try {
+    const { ingestToken } = req.body;
+    if (!ingestToken || typeof ingestToken !== 'string') {
+      res.status(400).json({ success: false, message: 'ingestToken is required' });
+      return;
+    }
+    const db = database.getDb();
+    const user = await db.collection('users').findOne({ ingestToken });
+    if (!user) {
+      res.status(403).json({ success: false, message: 'Invalid ingest token' });
+      return;
+    }
+    const token = jwt.sign(
+      { name: user.name, email: user.email, userId: user._id.toString() },
+      config.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    res.json({ success: true, token });
+  } catch (err) {
+    console.error('Ingest token exchange error:', err);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
