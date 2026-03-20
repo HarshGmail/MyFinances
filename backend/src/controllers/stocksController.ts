@@ -115,6 +115,22 @@ export async function deleteStockTransaction(req: Request, res: Response) {
   }
 }
 
+export async function deleteAllUserStockTransactions(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+    const db = database.getDb();
+    const result = await db.collection('stocks').deleteMany({ userId: new ObjectId(user.userId) });
+    res.status(200).json({ success: true, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Delete all stock transactions error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getNSEQuote(req: Request, res: Response) {
   try {
     const symbolsParam = req.query.symbols;

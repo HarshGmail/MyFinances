@@ -124,6 +124,22 @@ export async function deleteGoldTransaction(req: Request, res: Response) {
   }
 }
 
+export async function deleteAllUserGoldTransactions(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+    const db = database.getDb();
+    const result = await db.collection('digitalGold').deleteMany({ userId: new ObjectId(user.userId) });
+    res.status(200).json({ success: true, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Delete all gold transactions error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 const TROY_OZ_TO_GRAM = 31.1035;
 const SAFEGOLD_MARKUP = 1.0783;
 const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0' };

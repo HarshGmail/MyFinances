@@ -10,3 +10,4 @@ export * from './epfController';
 export * from './expenseController';
 export * from './fixedDepositsController';
 export * from './recurringDepositsController';
+export * from './expenseTransactionController';

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { addMutualFundTransaction, getMutualFundTransactions } from '../controllers';
+import { addMutualFundTransaction, getMutualFundTransactions, deleteAllUserMutualFundTransactions } from '../controllers';
 import { authenticateToken } from '../middleware';
 import { searchMutualFundsByName } from '../controllers/mutualFundsInfoController';
 
@@ -14,5 +14,6 @@ router.get('/transactions', getMutualFundTransactions);
 
 // GET /mutual-funds/search - Search mutual funds by name
 router.get('/search', searchMutualFundsByName);
+router.delete('/all', deleteAllUserMutualFundTransactions);
 
 export default router;

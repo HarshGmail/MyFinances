@@ -7,6 +7,7 @@ import {
   getFullStockProfile,
   updateStockTransaction,
   deleteStockTransaction,
+  deleteAllUserStockTransactions,
   getStocksPortfolio,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
@@ -35,4 +36,5 @@ router.get('/stock-profile', getFullStockProfile);
 router.get('/portfolio', getStocksPortfolio);
 
 router.delete('/transaction/:id', deleteStockTransaction);
+router.delete('/all', deleteAllUserStockTransactions);
 export default router;

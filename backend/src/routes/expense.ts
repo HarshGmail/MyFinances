@@ -5,6 +5,7 @@ import {
   getExpenseById,
   updateExpense,
   deleteExpense,
+  deleteAllUserExpenses,
   getExpensesByTag,
   getExpensesByFrequency,
   getMonthlyInvestmentSummary,
@@ -26,6 +27,7 @@ router.post('/', addExpense);
 router.get('/', getExpenses);
 router.get('/:id', getExpenseById);
 router.put('/:id', updateExpense);
+router.delete('/all', deleteAllUserExpenses);
 router.delete('/:id', deleteExpense);
 
 export default router;

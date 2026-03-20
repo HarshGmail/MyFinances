@@ -121,6 +121,22 @@ export async function deleteCryptoTransaction(req: Request, res: Response) {
   }
 }
 
+export async function deleteAllUserCryptoTransactions(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+    const db = database.getDb();
+    const result = await db.collection('crypto').deleteMany({ userId: new ObjectId(user.userId) });
+    res.status(200).json({ success: true, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Delete all crypto transactions error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function fetchUserBalance(req: Request, res: Response) {
   try {
     const userData = await coindcxService.getUserBalances();

@@ -4,7 +4,6 @@ import { useUserProfileQuery } from '@/api/query';
 import {
   UpdateUserProfile,
   useUpdateUserProfileMutation,
-  useRegenerateIngestTokenMutation,
 } from '@/api/mutations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,20 +31,27 @@ import {
   User,
   Mail,
   Calendar,
-  DollarSign,
   Clock,
   Plus,
   Trash2,
   TrendingUp,
   Wallet,
-  Smartphone,
-  Copy,
-  RefreshCw,
-  Bot,
-  ExternalLink,
+  Database,
+  AlertTriangle,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import {
+  useDeleteAllStocksMutation,
+  useDeleteAllGoldMutation,
+  useDeleteAllCryptoMutation,
+  useDeleteAllMutualFundsMutation,
+  useDeleteAllExpensesMutation,
+  useDeleteAllExpenseTransactionsMutation,
+  useDeleteAllEpfMutation,
+  useDeleteAllFixedDepositsMutation,
+  useDeleteAllRecurringDepositsMutation,
+} from '@/api/mutations';
 
 // Types for salary and payment records
 interface SalaryRecord {
@@ -439,8 +445,17 @@ function AddPaymentRecordDialog({
 export default function ProfilePage() {
   const { data: user, isLoading, isError, refetch } = useUserProfileQuery();
   const { mutateAsync: updateProfile, isPending: isUpdating } = useUpdateUserProfileMutation();
-  const { mutateAsync: regenerateToken, isPending: isRegenerating } =
-    useRegenerateIngestTokenMutation();
+  const { mutateAsync: deleteAllStocks, isPending: isDeletingStocks } = useDeleteAllStocksMutation();
+  const { mutateAsync: deleteAllGold, isPending: isDeletingGold } = useDeleteAllGoldMutation();
+  const { mutateAsync: deleteAllCrypto, isPending: isDeletingCrypto } = useDeleteAllCryptoMutation();
+  const { mutateAsync: deleteAllMf, isPending: isDeletingMf } = useDeleteAllMutualFundsMutation();
+  const { mutateAsync: deleteAllExpenses, isPending: isDeletingExpenses } = useDeleteAllExpensesMutation();
+  const { mutateAsync: deleteAllExpenseTxns, isPending: isDeletingExpenseTxns } = useDeleteAllExpenseTransactionsMutation();
+  const { mutateAsync: deleteAllEpf, isPending: isDeletingEpf } = useDeleteAllEpfMutation();
+  const { mutateAsync: deleteAllFd, isPending: isDeletingFd } = useDeleteAllFixedDepositsMutation();
+  const { mutateAsync: deleteAllRd, isPending: isDeletingRd } = useDeleteAllRecurringDepositsMutation();
+
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [salaryHistory, setSalaryHistory] = useState<SalaryRecord[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<MonthlyPayment[]>([]);
@@ -458,16 +473,6 @@ export default function ProfilePage() {
     } catch (error) {
       toast.error('Failed to update profile');
       console.error('Update error:', error);
-    }
-  };
-
-  const handleRegenerateToken = async () => {
-    try {
-      await regenerateToken();
-      toast.success('Token regenerated successfully');
-      await refetch();
-    } catch {
-      toast.error('Failed to regenerate token');
     }
   };
 
@@ -712,145 +717,15 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
-          {/* UPI Auto-Track */}
+          {/* Integrations link */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                UPI Auto-Track
-              </CardTitle>
+            <CardContent className="py-4">
               <p className="text-sm text-muted-foreground">
-                Use this token in your iPhone Shortcut to auto-log UPI payments
+                Looking for UPI Auto-Track or Claude MCP setup?{' '}
+                <a href="/integrations" className="text-primary underline font-medium">
+                  Visit the Integrations page →
+                </a>
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-muted-foreground">Ingest Token</Label>
-                <div className="flex gap-2">
-                  <Input readOnly value={user.ingestToken ?? ''} className="font-mono text-xs" />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(user.ingestToken ?? '');
-                      toast.success('Token copied!');
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Keep this secret. Regenerate if compromised.
-                </p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRegenerateToken}
-                  disabled={isRegenerating}
-                  className="gap-1.5 text-muted-foreground"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
-                  Regenerate
-                </Button>
-              </div>
-              <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground space-y-1">
-                <div className="font-medium text-foreground mb-1">Shortcut setup (iPhone):</div>
-                <div>
-                  Method: <span className="font-mono">POST</span>
-                </div>
-                <div>
-                  URL:{' '}
-                  <span className="font-mono break-all">
-                    {process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000'}/api/ingest/upi
-                  </span>
-                </div>
-                <div>
-                  Body: JSON with <span className="font-mono">token</span> +{' '}
-                  <span className="font-mono">smsText</span> (Shortcut Input) +
-                  <span className="font-mono">reason(Ask immediately)</span>
-                </div>
-                <div>
-                  <span className="font-mono">reason(Ask immediately)</span>
-                </div>
-                <div>
-                  <span className="font-mono">timestamp(current date)</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Claude MCP Integration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5" />
-                Claude MCP Integration
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Connect your finances to Claude AI — ask questions, log expenses, and analyse your
-                portfolio in natural language
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                <p className="font-medium text-foreground">What you can do with Claude:</p>
-                <ul className="text-muted-foreground space-y-1 list-disc list-inside text-xs">
-                  <li>Ask &quot;How much did I spend on food this month?&quot;</li>
-                  <li>Say &quot;Log ₹450 expense for dinner&quot;</li>
-                  <li>Ask &quot;What&apos;s my stock portfolio P&amp;L?&quot;</li>
-                  <li>Ask &quot;Show me my investment goals&quot;</li>
-                </ul>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Setup in Claude.ai:</p>
-                <ol className="space-y-2 text-xs text-muted-foreground list-decimal list-inside">
-                  <li>
-                    Go to{' '}
-                    <a
-                      href="https://claude.ai/settings/integrations"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline inline-flex items-center gap-0.5"
-                    >
-                      claude.ai → Settings → Integrations
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </li>
-                  <li>
-                    Click <span className="font-mono bg-muted px-1 rounded">Add MCP Server</span>
-                  </li>
-                  <li>
-                    Enter URL:{' '}
-                    <span
-                      className="font-mono bg-muted px-1 rounded break-all cursor-pointer hover:bg-accent"
-                      onClick={() => {
-                        navigator.clipboard.writeText('https://mcp.my-finances.site/mcp');
-                        toast.success('MCP URL copied!');
-                      }}
-                    >
-                      https://mcp.my-finances.site/mcp
-                    </span>
-                  </li>
-                  <li>
-                    Set auth type to{' '}
-                    <span className="font-mono bg-muted px-1 rounded">Bearer Token</span>
-                  </li>
-                  <li>Paste your Ingest Token (from the card above) as the token value</li>
-                </ol>
-              </div>
-
-              <div className="p-3 border rounded-lg text-xs text-muted-foreground space-y-1">
-                <p className="font-medium text-foreground">Your ingest token = your MCP key</p>
-                <p>
-                  The same token used for UPI auto-tracking authenticates you with the MCP server.
-                  Each user gets their own isolated data. If compromised, regenerate it above and
-                  update your Claude.ai integration.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -995,6 +870,79 @@ export default function ProfilePage() {
                   </div>
                 ))
               )}
+            </CardContent>
+          </Card>
+
+          {/* Data Management */}
+          <Card className="border-destructive/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <Database className="h-5 w-5" />
+                Data Management
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Permanently delete all data for a specific asset type. This cannot be undone.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {[
+                { key: 'stocks', label: 'Stock Transactions', fn: deleteAllStocks, pending: isDeletingStocks },
+                { key: 'gold', label: 'Gold Transactions', fn: deleteAllGold, pending: isDeletingGold },
+                { key: 'crypto', label: 'Crypto Transactions', fn: deleteAllCrypto, pending: isDeletingCrypto },
+                { key: 'mf', label: 'Mutual Fund Transactions', fn: deleteAllMf, pending: isDeletingMf },
+                { key: 'expenses', label: 'Recurring Expenses', fn: deleteAllExpenses, pending: isDeletingExpenses },
+                { key: 'expense-txns', label: 'Daily Expense Log', fn: deleteAllExpenseTxns, pending: isDeletingExpenseTxns },
+                { key: 'epf', label: 'EPF Accounts', fn: deleteAllEpf, pending: isDeletingEpf },
+                { key: 'fd', label: 'Fixed Deposits', fn: deleteAllFd, pending: isDeletingFd },
+                { key: 'rd', label: 'Recurring Deposits', fn: deleteAllRd, pending: isDeletingRd },
+              ].map(({ key, label, fn, pending }) => (
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                  <span className="text-sm font-medium">{label}</span>
+                  {confirmDelete === key ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Are you sure?
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-7 text-xs px-2"
+                        disabled={pending}
+                        onClick={async () => {
+                          try {
+                            await fn();
+                            toast.success(`${label} deleted`);
+                          } catch {
+                            toast.error(`Failed to delete ${label}`);
+                          } finally {
+                            setConfirmDelete(null);
+                          }
+                        }}
+                      >
+                        {pending ? 'Deleting…' : 'Confirm'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs px-2"
+                        onClick={() => setConfirmDelete(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs px-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={() => setConfirmDelete(key)}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete All
+                    </Button>
+                  )}
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>

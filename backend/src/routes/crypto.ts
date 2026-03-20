@@ -9,6 +9,7 @@ import {
   getMultipleCoinCandles,
   updateCryptoTransaction,
   deleteCryptoTransaction,
+  deleteAllUserCryptoTransactions,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -33,5 +34,6 @@ router.get('/multipleCoinCandles', getMultipleCoinCandles);
 router.get('/search', searchCryptoCoinsByName);
 
 router.delete('/transaction/:id', deleteCryptoTransaction);
+router.delete('/all', deleteAllUserCryptoTransactions);
 
 export default router;

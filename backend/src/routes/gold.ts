@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   addGoldTransaction,
   deleteGoldTransaction,
+  deleteAllUserGoldTransactions,
   getGoldTransactions,
   getSafeGoldRates,
   updateGoldTransaction,
@@ -22,5 +23,6 @@ router.get('/safe-gold-rates', getSafeGoldRates);
 
 router.put('/transaction/:id', updateGoldTransaction);
 router.delete('/transaction/:id', deleteGoldTransaction);
+router.delete('/all', deleteAllUserGoldTransactions);
 
 export default router;

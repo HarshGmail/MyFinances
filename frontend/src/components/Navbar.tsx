@@ -23,6 +23,7 @@ import {
   X,
   Calculator,
   PictureInPicture2,
+  Plug,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useLogoutMutation } from '@/api/mutations';
@@ -199,6 +200,11 @@ export function Navbar() {
       title: 'Goals',
       icon: <Goal className="w-4 h-4" />,
       path: '/goals',
+    },
+    {
+      title: 'Integrations',
+      icon: <Plug className="w-4 h-4" />,
+      path: '/integrations',
     },
   ];
 
@@ -535,6 +541,17 @@ export function Navbar() {
                           >
                             <PictureInPicture2 className="w-4 h-4" />
                             Popup Settings
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href="/integrations"
+                            className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                          >
+                            <Plug className="w-4 h-4" />
+                            Integrations
                           </Link>
                         </NavigationMenuLink>
                       </li>
