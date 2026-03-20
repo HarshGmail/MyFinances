@@ -7,7 +7,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
     'get_expense_transactions',
     {
       description:
-        'Fetch daily expense log entries (individual purchases/payments). Supports optional date range filtering. Returns date, name, amount, category, and reason for each entry.',
+        'Fetch daily expense log entries (individual purchases/payments). Supports optional date range filtering. Returns date, name, amount, category, and reason for each entry. If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         startDate: z.string().optional().describe('Start date in ISO format e.g. 2025-01-01'),
         endDate: z.string().optional().describe('End date in ISO format e.g. 2025-03-31'),
@@ -25,7 +25,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
   server.registerTool(
     'add_expense_transaction',
     {
-      description: 'Log a new daily expense transaction (individual purchase or payment).',
+      description: 'Log a new daily expense transaction (individual purchase or payment). If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         date: z.string().describe('Date in ISO format e.g. 2025-03-20'),
         name: z.string().describe('Name/description of the expense e.g. "Coffee at Starbucks"'),
@@ -46,7 +46,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
     'get_recurring_expenses',
     {
       description:
-        'Fetch all recurring expense categories (rent, insurance, subscriptions, utilities etc.). These are fixed/regular expenses with a frequency field (daily, weekly, monthly, yearly, one-time). Different from daily expense transactions.',
+        'Fetch all recurring expense categories (rent, insurance, subscriptions, utilities etc.). These are fixed/regular expenses with a frequency field (daily, weekly, monthly, yearly, one-time). Different from daily expense transactions. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {

@@ -3,19 +3,22 @@
  *
  * Flow:
  *   1. Claude.ai fetches GET /.well-known/oauth-authorization-server
- *   2. Claude.ai redirects user to GET /oauth/authorize  (shows ingest-token form)
- *   3. User submits their ingest token → POST /oauth/authorize
- *   4. Server stores code → ingest_token mapping, redirects back to Claude.ai
- *   5. Claude.ai posts to POST /oauth/token with code + code_verifier
- *   6. Server verifies PKCE and returns { access_token: <ingest_token>, ... }
- *   7. Claude.ai sends every MCP request with Authorization: Bearer <ingest_token>
- *   8. Existing mcpAuthMiddleware extracts it as req.ingestToken — nothing else changes.
+ *   2. Claude.ai redirects user to GET /oauth/authorize
+ *   3. MCP server redirects user to the frontend /connect-mcp page with request_id
+ *   4. Frontend fetches the ingest token (user already logged in) and POSTs to /oauth/authorize
+ *   5. Server stores code → ingest_token mapping, redirects back to Claude.ai
+ *   6. Claude.ai posts to POST /oauth/token with code + code_verifier
+ *   7. Server verifies PKCE and returns { access_token: <ingest_token>, ... }
+ *   8. Claude.ai sends every MCP request with Authorization: Bearer <ingest_token>
+ *   9. Existing mcpAuthMiddleware extracts it as req.ingestToken — nothing else changes.
  */
 
 import { Router, Request, Response } from 'express';
 import { createHash, randomBytes } from 'crypto';
+import { log, logError } from './logger.js';
 
 const SITE_URL = (process.env.SITE_URL ?? 'https://mcp.my-finances.site').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL ?? 'https://www.my-finances.site').replace(/\/$/, '');
 
 // ─── In-memory stores (single process — fine for personal use) ───────────────
 
@@ -24,6 +27,7 @@ interface PendingRequest {
   state?: string;
   codeChallenge?: string;
   codeChallengeMethod?: string;
+  resource?: string;
   expiresAt: number;
 }
 
@@ -31,6 +35,7 @@ interface PendingCode {
   ingestToken: string;
   codeChallenge?: string;
   codeChallengeMethod?: string;
+  resource?: string;
   expiresAt: number;
 }
 
@@ -47,6 +52,23 @@ setInterval(() => {
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 const router = Router();
+
+// RFC 9728 — OAuth Protected Resource Metadata
+// Both variants point to the same resource: the /mcp endpoint.
+const protectedResourceMetadata = {
+  resource: `${SITE_URL}/mcp`,
+  authorization_servers: [SITE_URL],
+  bearer_methods_supported: ['header'],
+  scopes_supported: ['claudeai'],
+};
+
+router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
+  res.json(protectedResourceMetadata);
+});
+
+router.get('/.well-known/oauth-protected-resource/mcp', (_req: Request, res: Response) => {
+  res.json(protectedResourceMetadata);
+});
 
 // RFC 8414 — OAuth 2.0 Authorization Server Metadata
 router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
@@ -67,8 +89,10 @@ router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Respo
 // We accept any registration and echo back a client_id — we don't enforce it.
 router.post('/oauth/register', (req: Request, res: Response) => {
   const { client_name, redirect_uris } = req.body as Record<string, unknown>;
+  const clientId = randomBytes(16).toString('hex');
+  log('OAuth', `Client registered: ${client_name ?? 'unknown'} → client_id=${clientId}`);
   res.status(201).json({
-    client_id: randomBytes(16).toString('hex'),
+    client_id: clientId,
     client_name: client_name ?? 'MCP Client',
     redirect_uris: redirect_uris ?? [],
     grant_types: ['authorization_code'],
@@ -77,7 +101,7 @@ router.post('/oauth/register', (req: Request, res: Response) => {
   });
 });
 
-// GET /oauth/authorize — show the ingest-token form
+// GET /oauth/authorize — redirect to the frontend connect page
 router.get('/oauth/authorize', (req: Request, res: Response) => {
   const {
     response_type,
@@ -85,6 +109,7 @@ router.get('/oauth/authorize', (req: Request, res: Response) => {
     state,
     code_challenge,
     code_challenge_method,
+    resource,
   } = req.query as Record<string, string>;
 
   if (response_type !== 'code') {
@@ -102,116 +127,19 @@ router.get('/oauth/authorize', (req: Request, res: Response) => {
     state,
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method ?? 'S256',
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 min to complete the form
+    resource,
+    expiresAt: Date.now() + 10 * 60 * 1000, // 10 min to complete
   });
+  log('OAuth', `Authorize started → request_id=${requestId} resource=${resource ?? 'none'} redirect_uri=${redirect_uri}`);
 
-  res.setHeader('Content-Type', 'text/html');
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Connect to My Finances</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #09090b;
-      color: #fafafa;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      padding: 1rem;
-    }
-    .card {
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 12px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 420px;
-    }
-    .logo { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .subtitle { color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1.5rem; }
-    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
-    input[type="text"], input[type="password"] {
-      width: 100%;
-      padding: 0.625rem 0.75rem;
-      background: #09090b;
-      border: 1px solid #3f3f46;
-      border-radius: 6px;
-      color: #fafafa;
-      font-size: 0.875rem;
-      font-family: monospace;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    input:focus { border-color: #6366f1; }
-    .hint {
-      font-size: 0.75rem;
-      color: #71717a;
-      margin-top: 0.375rem;
-      line-height: 1.4;
-    }
-    button {
-      margin-top: 1.25rem;
-      width: 100%;
-      padding: 0.625rem;
-      background: #6366f1;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    button:hover { background: #4f46e5; }
-    .divider { border-top: 1px solid #27272a; margin: 1.25rem 0; }
-    .footer { font-size: 0.75rem; color: #52525b; text-align: center; }
-    .footer a { color: #6366f1; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">My Finances</div>
-    <p class="subtitle">Claude wants to connect to your finance data</p>
-
-    <form method="POST" action="/oauth/authorize">
-      <input type="hidden" name="request_id" value="${requestId}" />
-
-      <label for="ingest_token">Your Ingest Token</label>
-      <input
-        id="ingest_token"
-        type="password"
-        name="ingest_token"
-        placeholder="Paste your ingest token"
-        autocomplete="off"
-        required
-      />
-      <p class="hint">
-        Find your ingest token on the
-        <a href="https://www.my-finances.site/profile" target="_blank" style="color:#6366f1">
-          Profile page
-        </a>
-        under "UPI Auto-Track / MCP Integration".
-      </p>
-
-      <button type="submit">Connect</button>
-    </form>
-
-    <div class="divider"></div>
-    <p class="footer">
-      This grants Claude read &amp; write access to your expenses, stocks, and goals.<br/>
-      You can revoke access at any time by regenerating your ingest token.
-    </p>
-  </div>
-</body>
-</html>`);
+  // Redirect to the frontend connect page — user is already logged in there,
+  // so the page can fetch their ingest token and complete the flow automatically.
+  const connectUrl = new URL(`${FRONTEND_URL}/connect-mcp`);
+  connectUrl.searchParams.set('request_id', requestId);
+  res.redirect(302, connectUrl.toString());
 });
 
-// POST /oauth/authorize — handle form submission
+// POST /oauth/authorize — called by the frontend connect page with the ingest token
 router.post(
   '/oauth/authorize',
   (req: Request, res: Response) => {
@@ -220,11 +148,13 @@ router.post(
     const pending = pendingRequests.get(request_id);
     if (!pending || Date.now() > pending.expiresAt) {
       pendingRequests.delete(request_id);
-      res.status(400).send('Authorization request expired. Please try again.');
+      logError('OAuth', `Authorize submitted with expired/unknown request_id=${request_id}`);
+      res.status(400).json({ error: 'Authorization request expired. Please try again.' });
       return;
     }
     if (!ingest_token?.trim()) {
-      res.status(400).send('Ingest token is required.');
+      logError('OAuth', 'Authorize submitted with empty ingest_token');
+      res.status(400).json({ error: 'Ingest token is required.' });
       return;
     }
 
@@ -235,14 +165,17 @@ router.post(
       ingestToken: ingest_token.trim(),
       codeChallenge: pending.codeChallenge,
       codeChallengeMethod: pending.codeChallengeMethod,
+      resource: pending.resource,
       expiresAt: Date.now() + 5 * 60 * 1000, // code valid for 5 min
     });
+
+    log('OAuth', `Token accepted — code issued, redirecting to Claude.ai callback`);
 
     const redirectUrl = new URL(pending.redirectUri);
     redirectUrl.searchParams.set('code', code);
     if (pending.state) redirectUrl.searchParams.set('state', pending.state);
 
-    res.redirect(302, redirectUrl.toString());
+    res.json({ redirect_url: redirectUrl.toString() });
   }
 );
 
@@ -262,6 +195,7 @@ router.post('/oauth/token', (req: Request, res: Response) => {
   const pending = pendingCodes.get(code);
   if (!pending || Date.now() > pending.expiresAt) {
     pendingCodes.delete(code);
+    logError('OAuth', `Token exchange failed — code expired or not found`);
     res.status(400).json({ error: 'invalid_grant', error_description: 'Code expired or not found' });
     return;
   }
@@ -269,11 +203,13 @@ router.post('/oauth/token', (req: Request, res: Response) => {
   // Verify PKCE (S256) if code_challenge was provided during authorization
   if (pending.codeChallenge) {
     if (!code_verifier) {
+      logError('OAuth', 'Token exchange failed — code_verifier missing');
       res.status(400).json({ error: 'invalid_grant', error_description: 'code_verifier required' });
       return;
     }
     const computed = createHash('sha256').update(code_verifier).digest('base64url');
     if (computed !== pending.codeChallenge) {
+      logError('OAuth', 'Token exchange failed — PKCE verification mismatch');
       res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
@@ -281,10 +217,16 @@ router.post('/oauth/token', (req: Request, res: Response) => {
 
   pendingCodes.delete(code);
 
+  // Always bind the token to the exact MCP endpoint URL so Claude.ai sends it
+  // on requests to https://mcp.my-finances.site/mcp (not just the base URL)
+  const tokenResource = `${SITE_URL}/mcp`;
+  log('OAuth', `Token exchange succeeded — issuing access_token bound to ${tokenResource}`);
+
   res.json({
     access_token: pending.ingestToken,
-    token_type: 'bearer',
+    token_type: 'Bearer',   // capital B required by RFC 6750
     expires_in: 86400,
+    resource: tokenResource,
   });
 });
 

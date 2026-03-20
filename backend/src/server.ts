@@ -79,7 +79,7 @@ app.use('/api/ingest', ingestRouter);
 app.use('/api/chatgpt', chatgptRouter);
 app.use('/api', verifyRoutes);
 
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     database: database.isConnected() ? 'connected' : 'disconnected',

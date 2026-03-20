@@ -6,7 +6,7 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   server.registerTool(
     'get_stock_transactions',
     {
-      description: 'Fetch all stock buy and sell transactions. Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount for each transaction.',
+      description: 'Fetch all stock buy and sell transactions. Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount for each transaction. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -19,7 +19,7 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
     'get_portfolio_summary',
     {
       description:
-        'Fetch current stock portfolio with live NSE prices, P&L, and 1-day change for each holding. WARNING: This calls Yahoo Finance in real-time and may take 10-30 seconds depending on portfolio size.',
+        'Fetch current stock portfolio with live NSE prices, P&L, and 1-day change for each holding. WARNING: This calls Yahoo Finance in real-time and may take 10-30 seconds depending on portfolio size. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -31,7 +31,7 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   server.registerTool(
     'add_stock_transaction',
     {
-      description: 'Log a stock buy (credit) or sell (debit) transaction.',
+      description: 'Log a stock buy (credit) or sell (debit) transaction. If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         type: z.enum(['credit', 'debit']).describe('"credit" = buy, "debit" = sell'),
         stockName: z.string().describe('NSE stock symbol e.g. "RELIANCE", "TCS", "INFY"'),

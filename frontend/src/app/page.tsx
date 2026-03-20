@@ -1,8 +1,9 @@
-import { SignupForm, LoginForm, SectionTabs } from '@/components';
+import { SignupForm, LoginForm, SectionTabs, BackendWarmup } from '@/components';
 
 export default function Auth() {
   return (
     <div className="min-h-[calc(100vh-66px)] flex items-center justify-center">
+      <BackendWarmup />
       <div className="w-full max-w-md p-8 rounded-lg bg-[#c7c8cb] dark:bg-[#111214]">
         <SectionTabs
           tabs={[

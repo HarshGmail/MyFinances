@@ -10,10 +10,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Cache last visited route except /, /login, /signup
+  // Cache last visited route except /, /login, /signup (preserve query params)
   useEffect(() => {
     if (pathname !== '/' && pathname !== '/login' && pathname !== '/signup') {
-      localStorage.setItem(LAST_ROUTE_KEY, pathname);
+      localStorage.setItem(LAST_ROUTE_KEY, pathname + window.location.search);
     }
   }, [pathname]);
 

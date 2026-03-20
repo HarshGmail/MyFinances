@@ -9,7 +9,12 @@ import { mcpAuthMiddleware } from './auth.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerStockTools } from './tools/stocks.js';
 import { registerGoalTools } from './tools/goals.js';
+import { registerGoldTools } from './tools/gold.js';
+import { registerCryptoTools } from './tools/crypto.js';
+import { registerMutualFundTools } from './tools/mutualFunds.js';
+import { registerSavingsTools } from './tools/savings.js';
 import oauthRouter from './oauth.js';
+import { requestLogger, log, logError } from './logger.js';
 
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
 
@@ -19,6 +24,10 @@ function createMcpServer(client: ReturnType<typeof createBackendClient>): McpSer
   registerExpenseTools(server, client);
   registerStockTools(server, client);
   registerGoalTools(server, client);
+  registerGoldTools(server, client);
+  registerCryptoTools(server, client);
+  registerMutualFundTools(server, client);
+  registerSavingsTools(server, client);
   return server;
 }
 
@@ -38,6 +47,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false })); // for OAuth form POST
+app.use(requestLogger);
 
 // OAuth 2.0 endpoints (no auth required — these ARE the auth)
 app.use(oauthRouter);
@@ -58,6 +68,7 @@ app.post('/mcp', async (req, res) => {
     if (sessionId) {
       const session = sessions.get(sessionId);
       if (!session) {
+        log('MCP', `Session not found: ${sessionId}`);
         res.status(404).json({ error: 'Session not found' });
         return;
       }
@@ -67,16 +78,21 @@ app.post('/mcp', async (req, res) => {
 
     // No session ID: must be an InitializeRequest to start a new session
     if (!isInitializeRequest(req.body)) {
+      log('MCP', 'Rejected non-InitializeRequest on new session', req.body?.method);
       res.status(400).json({ error: 'Bad Request: expected InitializeRequest for new session' });
       return;
     }
+
+    log('MCP', 'New session initializing — exchanging ingest token with backend...');
 
     // Exchange the ingest token for a user-specific JWT
     const ingestToken = req.ingestToken!;
     let jwt: string;
     try {
       jwt = await exchangeIngestToken(ingestToken);
-    } catch {
+      log('MCP', 'Ingest token exchange succeeded');
+    } catch (err) {
+      logError('MCP', 'Ingest token exchange failed', err);
       res.status(401).json({ error: 'Invalid ingest token' });
       return;
     }
@@ -88,7 +104,7 @@ app.post('/mcp', async (req, res) => {
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
         sessions.set(id, { server, transport });
-        console.error(`[MCP] Session created: ${id}`);
+        log('MCP', `Session created: ${id} (active: ${sessions.size})`);
       },
     });
 
@@ -96,14 +112,14 @@ app.post('/mcp', async (req, res) => {
       const id = transport.sessionId;
       if (id) {
         sessions.delete(id);
-        console.error(`[MCP] Session closed: ${id}`);
+        log('MCP', `Session closed: ${id} (active: ${sessions.size})`);
       }
     };
 
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (err) {
-    console.error('[MCP] POST error:', err);
+    logError('MCP', 'POST /mcp unhandled error', err);
     if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -117,6 +133,7 @@ app.get('/mcp', async (req, res) => {
   }
   const session = sessions.get(sessionId);
   if (!session) {
+    log('MCP', `SSE request for unknown session: ${sessionId}`);
     res.status(404).json({ error: 'Session not found' });
     return;
   }
@@ -139,11 +156,13 @@ app.delete('/mcp', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.error(`[MCP] Server listening on port ${PORT}`);
+  log('MCP', `Server listening on port ${PORT}`);
+  log('MCP', `Backend URL: ${process.env.BACKEND_URL ?? 'http://localhost:5000/api (default)'}`);
+  log('MCP', `Site URL: ${process.env.SITE_URL ?? 'https://mcp.my-finances.site (default)'}`);
 });
 
 process.on('SIGTERM', async () => {
-  console.error('[MCP] Shutting down...');
+  log('MCP', 'Shutting down...');
   for (const { transport } of sessions.values()) {
     await transport.close().catch(() => {});
   }
