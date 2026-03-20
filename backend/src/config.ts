@@ -23,6 +23,9 @@ interface Config {
 
   // JWT secret
   JWT_SECRET: string;
+
+  // MCP server URL (for ChatGPT proxy — defaults to prod)
+  MCP_URL?: string;
 }
 
 // Validate required environment variables
@@ -46,6 +49,7 @@ const config: Config = {
   COINDCX_SECRET_KEY: process.env.COINDCX_SECRET_KEY,
   TWELVE_DATA_API_KEY: process.env.TWELVE_DATA_API_KEY,
   JWT_SECRET: process.env.JWT_SECRET!,
+  MCP_URL: process.env.MCP_URL,
 };
 
 export default config;

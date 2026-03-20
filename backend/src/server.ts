@@ -24,6 +24,7 @@ import {
   expenseTransactionsRouter,
   assetTargetRouter,
   ingestRouter,
+  chatgptRouter,
 } from './routes';
 import { requestLogger } from './middleware';
 
@@ -75,6 +76,7 @@ app.use('/api/inflation', inflationRouter);
 app.use('/api/expenses', expenseRouter);
 app.use('/api/expense-transactions', expenseTransactionsRouter);
 app.use('/api/ingest', ingestRouter);
+app.use('/api/chatgpt', chatgptRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/health', (req, res) => {

@@ -9,6 +9,7 @@ import { mcpAuthMiddleware } from './auth.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerStockTools } from './tools/stocks.js';
 import { registerGoalTools } from './tools/goals.js';
+import oauthRouter from './oauth.js';
 
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
 
@@ -26,6 +27,10 @@ const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPS
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // for OAuth form POST
+
+// OAuth 2.0 endpoints (no auth required — these ARE the auth)
+app.use(oauthRouter);
 
 // Health check — no auth required
 app.get('/health', (_req, res) => {

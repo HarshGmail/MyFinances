@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
+const SITE_URL = (process.env.SITE_URL ?? 'https://mcp.my-finances.site').replace(/\/$/, '');
+
 declare global {
   namespace Express {
     interface Request {
@@ -11,7 +13,12 @@ declare global {
 export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing Authorization header. Use your ingest token as Bearer token.' });
+    // RFC 6750 — tell the client where to find the OAuth server
+    res.setHeader(
+      'WWW-Authenticate',
+      `Bearer realm="${SITE_URL}", resource_metadata="${SITE_URL}/.well-known/oauth-authorization-server"`
+    );
+    res.status(401).json({ error: 'Unauthorized. Authenticate via OAuth at the resource_metadata URL.' });
     return;
   }
   req.ingestToken = authHeader.split(' ')[1];
