@@ -54,10 +54,26 @@ router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Respo
     issuer: SITE_URL,
     authorization_endpoint: `${SITE_URL}/oauth/authorize`,
     token_endpoint: `${SITE_URL}/oauth/token`,
+    registration_endpoint: `${SITE_URL}/oauth/register`,
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
+  });
+});
+
+// RFC 7591 — Dynamic Client Registration
+// Claude.ai registers itself before starting the OAuth flow.
+// We accept any registration and echo back a client_id — we don't enforce it.
+router.post('/oauth/register', (req: Request, res: Response) => {
+  const { client_name, redirect_uris } = req.body as Record<string, unknown>;
+  res.status(201).json({
+    client_id: randomBytes(16).toString('hex'),
+    client_name: client_name ?? 'MCP Client',
+    redirect_uris: redirect_uris ?? [],
+    grant_types: ['authorization_code'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none',
   });
 });
 
