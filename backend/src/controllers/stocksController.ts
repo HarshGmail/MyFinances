@@ -4,6 +4,8 @@ import database from '../database';
 import { stocksSchema } from '../schemas/stocks';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { StocksService } from '../services/stocksService';
+import { StockData } from '../utils/types';
+import { getCached, setCache } from '../utils/priceCache';
 
 export async function addStockTransaction(req: Request, res: Response) {
   try {
@@ -148,7 +150,27 @@ export async function getNSEQuote(req: Request, res: Response) {
       return;
     }
 
-    const dataMap = await StocksService.fetchNSEQuotes(symbols);
+    // Fetch with MongoDB cache fallback
+    const liveData = await StocksService.fetchNSEQuotes(symbols);
+    const dataMap: Record<string, StockData | null> = {};
+
+    for (const symbol of symbols) {
+      const cacheKey = `stock:chart:${symbol}`;
+      const liveResult = liveData[symbol];
+      if (liveResult !== null) {
+        dataMap[symbol] = liveResult;
+        await setCache(cacheKey, liveResult);
+      } else {
+        const cached = await getCached<StockData>(cacheKey);
+        if (cached) {
+          console.log(`Serving cached stock data for ${symbol}`);
+          dataMap[symbol] = cached;
+        } else {
+          dataMap[symbol] = null;
+        }
+      }
+    }
+
     res.status(200).json({ success: true, data: dataMap });
   } catch (error) {
     console.error('Fetch NSE quote error:', error);
@@ -218,7 +240,18 @@ export async function getStocksPortfolio(req: Request, res: Response) {
     }
 
     const stockNames = Object.keys(grouped);
-    const priceData = await StocksService.fetchNSEQuotes(stockNames);
+    const rawPriceData = await StocksService.fetchNSEQuotes(stockNames);
+    const priceData: Record<string, StockData | null> = {};
+    for (const symbol of stockNames) {
+      const cacheKey = `stock:chart:${symbol}`;
+      const liveResult = rawPriceData[symbol];
+      if (liveResult !== null) {
+        priceData[symbol] = liveResult;
+        await setCache(cacheKey, liveResult);
+      } else {
+        priceData[symbol] = (await getCached<StockData>(cacheKey)) ?? null;
+      }
+    }
 
     const portfolio = stockNames.map((stockName) => {
       const txs = grouped[stockName];

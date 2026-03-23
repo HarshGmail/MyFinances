@@ -498,6 +498,7 @@ export default function EPFPage() {
                         placeholder="3000"
                         type="number"
                         {...field}
+                        value={field.value || ''}
                         onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       />
                     </FormControl>
@@ -518,6 +519,7 @@ export default function EPFPage() {
                         min="1"
                         max="31"
                         {...field}
+                        value={field.value || ''}
                         onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       />
                     </FormControl>
@@ -531,7 +533,7 @@ export default function EPFPage() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Start Date</FormLabel>
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -553,6 +555,8 @@ export default function EPFPage() {
                           onSelect={field.onChange}
                           disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
                           captionLayout="dropdown"
+                          startMonth={new Date(1990, 0)}
+                          endMonth={new Date()}
                         />
                       </PopoverContent>
                     </Popover>

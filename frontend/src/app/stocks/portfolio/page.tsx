@@ -583,17 +583,25 @@ export default function StocksPortfolioPage() {
                     </TableCell>
                     <TableCell>
                       {stockUnrealizedByName[row.stockName] ? (
-                        <span className={getProfitLossColor(stockUnrealizedByName[row.stockName].stcg)}>
+                        <span
+                          className={getProfitLossColor(stockUnrealizedByName[row.stockName].stcg)}
+                        >
                           {formatCurrency(stockUnrealizedByName[row.stockName].stcg)}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell>
                       {stockUnrealizedByName[row.stockName] ? (
-                        <span className={getProfitLossColor(stockUnrealizedByName[row.stockName].ltcg)}>
+                        <span
+                          className={getProfitLossColor(stockUnrealizedByName[row.stockName].ltcg)}
+                        >
                           {formatCurrency(stockUnrealizedByName[row.stockName].ltcg)}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                   </TableRow>
                 );

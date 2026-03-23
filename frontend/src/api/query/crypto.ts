@@ -97,22 +97,20 @@ export function useCoinCandlesQuery(symbol: string, interval: string = '1d', lim
   });
 }
 
-export function useMultipleCoinCandlesQuery(
-  symbols: string[],
-  interval: string = '1d',
-  limit: number = 365
-) {
+const MAX_CANDLE_DAYS = 1825; // 5Y — fetch once, filter client-side
+
+export function useMultipleCoinCandlesQuery(symbols: string[], interval: string = '1d') {
   const endTime = getRoundedEndTime(5); // 5 minutes
-  const startTime = endTime - limit * 24 * 60 * 60 * 1000;
+  const startTime = endTime - MAX_CANDLE_DAYS * 24 * 60 * 60 * 1000;
 
   return useQuery<Record<string, CoinCandle[]>>({
-    queryKey: ['multiple-coin-candles', symbols, interval, limit, endTime],
+    queryKey: ['multiple-coin-candles', symbols, interval, endTime],
     queryFn: async () => {
       if (!symbols || symbols.length === 0) return {};
       const params = new URLSearchParams({
         symbols: symbols.join(','),
         interval,
-        limit: String(limit),
+        limit: String(MAX_CANDLE_DAYS),
         startTime: String(startTime),
         endTime: String(endTime),
       });

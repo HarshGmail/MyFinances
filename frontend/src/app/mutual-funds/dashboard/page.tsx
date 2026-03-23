@@ -7,7 +7,7 @@ import {
 import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
 import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import groupBy from 'lodash/groupBy';
 import {
   Table,
@@ -192,147 +192,158 @@ export default function MutualFundsDashboardPage() {
     return profitLoss >= 0 ? 'default' : 'destructive';
   };
 
-  // Update chartSeries to always show all MFs
-  const chartSeries = useMemo(() => {
-    if (!mfInfoData || !mutualFundsTransactionsData || !navHistoryBatch) return [];
-    // We'll build cumulative data as we build each fund's series
-    const cumulativeMap: Record<number, number> = {};
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const allSeries = mfInfoData
-      .map((info) => {
-        const fundName = info.fundName;
-        const schemeNumber = info.schemeNumber;
-        const navData = navHistoryBatch?.[schemeNumber];
-        if (!navData || !navData.data) return null;
-        const navHistory = navData.data; // Array of { date: 'dd-mm-yyyy', nav: '...' }, latest first
-        // Get all transactions for this fund, sorted by date ascending
-        const txs = mutualFundsTransactionsData
-          .filter((tx) => tx.fundName === fundName)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        if (txs.length === 0) return null;
-        // Find first and last transaction dates
-        const firstTxDate = new Date(txs[0].date);
-        // Build a map of date (yyyy-mm-dd) -> cumulative units
-        const dateToUnits: Record<string, number> = {};
-        let cumulativeUnits = 0;
-        let txIdx = 0;
-        // Build a list of all dates from firstTxDate to today
-        const allDates: string[] = [];
-        for (let d = new Date(firstTxDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
-          const yyyy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          const dateStr = `${yyyy}-${mm}-${dd}`;
-          // Add units for all transactions on this date
-          while (
-            txIdx < txs.length &&
-            new Date(txs[txIdx].date).toDateString() === d.toDateString()
-          ) {
-            cumulativeUnits += txs[txIdx].numOfUnits;
-            txIdx++;
-          }
-          dateToUnits[dateStr] = cumulativeUnits;
-          allDates.push(dateStr);
-        }
-        // Prepare a map of nav date (yyyy-mm-dd) -> nav value
-        const navMap: Record<string, number> = {};
-        navHistory.forEach((navPoint: { date: string; nav: string }) => {
-          const [dd, mm, yyyy] = navPoint.date.split('-');
-          const dateStr = `${yyyy}-${mm}-${dd}`;
-          navMap[dateStr] = parseFloat(navPoint.nav);
-        });
-        // For each date, find the NAV (use most recent available NAV if missing)
-        let lastKnownNav = null;
-        const seriesData: [number, number][] = [];
-        for (const dateStr of allDates) {
-          if (navMap[dateStr] !== undefined) {
-            lastKnownNav = navMap[dateStr];
-          }
-          if (lastKnownNav !== null && dateToUnits[dateStr] > 0) {
-            const timestamp = new Date(dateStr + 'T00:00:00').getTime();
-            const valuation = Number((dateToUnits[dateStr] * lastKnownNav).toFixed(2));
-            seriesData.push([timestamp, valuation]);
-            // Accumulate for cumulativeSeriesData
-            cumulativeMap[timestamp] = (cumulativeMap[timestamp] || 0) + valuation;
-          }
-        }
-        return {
-          name: fundName,
-          data: [...seriesData],
-          type: 'line',
-          color: undefined, // Let Highcharts assign default color
-          dashStyle: 'Solid',
-          marker: { enabled: true },
-        };
-      })
-      .filter(Boolean);
-    // Build cumulativeSeriesData as sorted array of [timestamp, cumulativeValuation]
-    const cumulativeSeriesData = Object.entries(cumulativeMap)
-      .map(([timestamp, value]) => [Number(timestamp), value as number])
-      .sort((a, b) => a[0] - b[0]);
+  const [selectedFund, setSelectedFund] = useState('All');
 
-    // Build cumulativeAmountInvested: [timestamp, cumulativeInvested] pairs
-    const investmentMap: Record<number, number> = {};
-    let runningTotal = 0;
-    if (mutualFundsTransactionsData) {
-      // Group all transactions by date (yyyy-mm-dd)
-      const txsByDate: Record<string, number> = {};
-      mutualFundsTransactionsData.forEach((tx) => {
-        const d = new Date(tx.date);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        // Only consider 'credit' transactions as investments
-        if (tx.type === 'credit') {
-          txsByDate[dateStr] = (txsByDate[dateStr] || 0) + tx.amount;
+  // Build combined portfolio and per-fund chart data in one pass
+  const chartData = useMemo(() => {
+    const empty = { combined: [], byFund: {} as Record<string, unknown[]> };
+    if (!mfInfoData || !mutualFundsTransactionsData || !navHistoryBatch) return empty;
+
+    const cumulativeMap: Record<number, number> = {};
+    const byFund: Record<string, unknown[]> = {};
+
+    mfInfoData.forEach((info) => {
+      const fundName = info.fundName;
+      const navData = navHistoryBatch?.[info.schemeNumber];
+      if (!navData?.data) return;
+
+      const txs = mutualFundsTransactionsData
+        .filter((tx) => tx.fundName === fundName)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      if (!txs.length) return;
+
+      // Build date → cumulative units
+      const dateToUnits: Record<string, number> = {};
+      let cumulativeUnits = 0;
+      let txIdx = 0;
+      const allDates: string[] = [];
+      for (let d = new Date(txs[0].date); d <= new Date(); d.setDate(d.getDate() + 1)) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        while (
+          txIdx < txs.length &&
+          new Date(txs[txIdx].date).toDateString() === d.toDateString()
+        ) {
+          cumulativeUnits += txs[txIdx].numOfUnits;
+          txIdx++;
         }
+        dateToUnits[dateStr] = cumulativeUnits;
+        allDates.push(dateStr);
+      }
+
+      // NAV map (dd-mm-yyyy → number)
+      const navMap: Record<string, number> = {};
+      navData.data.forEach((p: { date: string; nav: string }) => {
+        const [dd, mm, yyyy] = p.date.split('-');
+        navMap[`${yyyy}-${mm}-${dd}`] = parseFloat(p.nav);
       });
-      // For each date (sorted), accumulate running total
-      Object.keys(txsByDate)
+
+      // Build per-fund valuation series
+      let lastKnownNav: number | null = null;
+      const valuationData: [number, number][] = [];
+      for (const dateStr of allDates) {
+        if (navMap[dateStr] !== undefined) lastKnownNav = navMap[dateStr];
+        if (lastKnownNav !== null && dateToUnits[dateStr] > 0) {
+          const ts = new Date(dateStr + 'T00:00:00').getTime();
+          const val = Number((dateToUnits[dateStr] * lastKnownNav).toFixed(2));
+          valuationData.push([ts, val]);
+          cumulativeMap[ts] = (cumulativeMap[ts] || 0) + val;
+        }
+      }
+
+      // Build per-fund invested series
+      const investedByDate: Record<string, number> = {};
+      txs.forEach((tx) => {
+        if (tx.type !== 'credit') return;
+        const d = new Date(tx.date);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        investedByDate[dateStr] = (investedByDate[dateStr] || 0) + tx.amount;
+      });
+      const investedTimestamps = new Map<number, number>();
+      let runningInvested = 0;
+      Object.keys(investedByDate)
         .sort()
         .forEach((dateStr) => {
-          runningTotal += txsByDate[dateStr];
-          const timestamp = new Date(dateStr + 'T00:00:00').getTime();
-          investmentMap[timestamp] = runningTotal;
+          runningInvested += investedByDate[dateStr];
+          investedTimestamps.set(new Date(dateStr + 'T00:00:00').getTime(), runningInvested);
         });
-    }
-    const cumulativeAmountInvested = Object.entries(investmentMap)
-      .map(([timestamp, value]) => [Number(timestamp), value as number])
+      let lastInvested = 0;
+      const investedData: [number, number][] = valuationData.map(([ts]) => {
+        if (investedTimestamps.has(ts)) lastInvested = investedTimestamps.get(ts)!;
+        return [ts, lastInvested];
+      });
+
+      byFund[fundName!] = [
+        {
+          name: fundName,
+          data: valuationData,
+          type: 'line',
+          color: '#3b82f6',
+          dashStyle: 'Solid',
+          marker: { enabled: false },
+        },
+        {
+          name: 'Cumulative Invested',
+          data: investedData,
+          type: 'line',
+          color: '#fbbf24',
+          dashStyle: 'Solid',
+          marker: { enabled: false },
+        },
+      ];
+    });
+
+    // Build combined series
+    const cumulativeSeriesData = Object.entries(cumulativeMap)
+      .map(([ts, v]) => [Number(ts), v as number] as [number, number])
       .sort((a, b) => a[0] - b[0]);
 
-    // Fill gaps in cumulativeAmountInvested for all dates in cumulativeSeriesData
-    const investedMap = new Map<number, number>(cumulativeAmountInvested as [number, number][]);
-    let lastAmount = 0;
-    const filledCumulativeAmountInvested: [number, number][] = cumulativeSeriesData.map(
-      ([timestamp]) => {
-        if (investedMap.has(timestamp)) {
-          lastAmount = investedMap.get(timestamp)!;
-        }
-        return [timestamp, lastAmount];
-      }
-    );
+    const allInvestedByDate: Record<string, number> = {};
+    mutualFundsTransactionsData.forEach((tx) => {
+      if (tx.type !== 'credit') return;
+      const d = new Date(tx.date);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      allInvestedByDate[dateStr] = (allInvestedByDate[dateStr] || 0) + tx.amount;
+    });
+    const allInvestedMap = new Map<number, number>();
+    let runningTotal = 0;
+    Object.keys(allInvestedByDate)
+      .sort()
+      .forEach((dateStr) => {
+        runningTotal += allInvestedByDate[dateStr];
+        allInvestedMap.set(new Date(dateStr + 'T00:00:00').getTime(), runningTotal);
+      });
+    let lastAmt = 0;
+    const filledInvested: [number, number][] = cumulativeSeriesData.map(([ts]) => {
+      if (allInvestedMap.has(ts)) lastAmt = allInvestedMap.get(ts)!;
+      return [ts, lastAmt];
+    });
 
-    const chartSeries = [
+    const combined = [
       {
         name: 'Total Portfolio Valuation',
         data: cumulativeSeriesData,
         type: 'line',
-        color: '#3b82f6', // blue
+        color: '#3b82f6',
         dashStyle: 'Solid',
         marker: { enabled: false },
       },
       {
         name: 'Cumulative Amount Invested',
-        data: filledCumulativeAmountInvested,
+        data: filledInvested,
         type: 'line',
-        color: '#fbbf24', // yellow
+        color: '#fbbf24',
         dashStyle: 'Solid',
         marker: { enabled: false },
       },
     ];
-    return chartSeries;
+
+    return { combined, byFund };
   }, [mfInfoData, mutualFundsTransactionsData, navHistoryBatch]);
+
+  const activeChartSeries =
+    selectedFund === 'All'
+      ? chartData.combined
+      : (chartData.byFund[selectedFund] ?? chartData.combined);
 
   const theme = useAppStore((s) => s.theme);
 
@@ -354,7 +365,7 @@ export default function MutualFundsDashboardPage() {
         height: 400,
       },
       title: {
-        text: 'Mutual Fund Valuation Growth',
+        text: selectedFund === 'All' ? 'Mutual Fund Valuation Growth' : selectedFund,
         style: { fontWeight: 600, fontSize: '1.1rem', color: isDark ? '#fff' : '#18181b' },
       },
       rangeSelector: {
@@ -415,7 +426,7 @@ export default function MutualFundsDashboardPage() {
         style: { color: isDark ? '#fff' : '#18181b' },
         borderColor: isDark ? '#333' : '#ccc',
       },
-      series: chartSeries,
+      series: activeChartSeries,
       credits: { enabled: false },
       navigator: { enabled: false },
       scrollbar: { enabled: false },
@@ -459,7 +470,7 @@ export default function MutualFundsDashboardPage() {
         },
       },
     };
-  }, [chartSeries, theme]);
+  }, [activeChartSeries, selectedFund, theme]);
 
   // Loading and error states
   const isLoading = mfInfoLoading || transactionsLoading || navHistoryLoading;
@@ -586,7 +597,7 @@ export default function MutualFundsDashboardPage() {
         />
       </div>
       {/* Mutual Fund Growth Chart */}
-      {chartSeries.length > 0 && (
+      {chartData.combined.length > 0 && (
         <div className="bg-card rounded-lg p-4 mb-6">
           <HighchartsReact
             highcharts={Highcharts}
@@ -618,7 +629,14 @@ export default function MutualFundsDashboardPage() {
               {tableData.map((row, idx) => (
                 <TableRow key={row.fundName}>
                   <TableCell>{idx + 1}</TableCell>
-                  <TableCell className="font-medium">{row.fundName}</TableCell>
+                  <TableCell
+                    className={`font-medium cursor-pointer underline hover:text-primary transition-colors ${selectedFund === row.fundName ? 'text-primary' : ''}`}
+                    onClick={() =>
+                      setSelectedFund(selectedFund === row.fundName ? 'All' : row.fundName)
+                    }
+                  >
+                    {row.fundName}
+                  </TableCell>
                   <TableCell>{row.totalUnits.toFixed(2)}</TableCell>
                   <TableCell>
                     ₹{row.totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -665,14 +683,18 @@ export default function MutualFundsDashboardPage() {
                       <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].stcg)}>
                         {formatCurrency(mfUnrealizedByFund[row.fundName].stcg)}
                       </span>
-                    ) : '-'}
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
                   <TableCell>
                     {mfUnrealizedByFund[row.fundName] ? (
                       <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].ltcg)}>
                         {formatCurrency(mfUnrealizedByFund[row.fundName].ltcg)}
                       </span>
-                    ) : '-'}
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

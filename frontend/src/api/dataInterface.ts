@@ -1,3 +1,5 @@
+// Salary and Payment History types
+// Updated UserProfile interface
 export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
 export interface AdjClose {

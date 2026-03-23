@@ -13,7 +13,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import groupBy from 'lodash/groupBy';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
@@ -88,16 +88,9 @@ export default function CryptoPortfolioPage() {
   const [timeframe, setTimeframe] = useState(CRYPTO_TIMEFRAMES[6].label); // Default to 1Y
   const [selectedCoin, setSelectedCoin] = useState('All');
 
-  // Track the maximum timeframe we've fetched data for
-  const [maxFetchedDays, setMaxFetchedDays] = useState(0);
-
   const selectedTimeframe =
     CRYPTO_TIMEFRAMES.find((tf) => tf.label === timeframe) || CRYPTO_TIMEFRAMES[6];
   const timeframeStart = getPastDate(selectedTimeframe.days);
-
-  // Determine if we need to fetch new data
-  const needsNewData = selectedTimeframe.days > maxFetchedDays;
-  const fetchDays = needsNewData ? selectedTimeframe.days : maxFetchedDays;
 
   const {
     data: transactions,
@@ -263,20 +256,11 @@ export default function CryptoPortfolioPage() {
     return portfolioData.map((coin) => coin.currency).filter(Boolean);
   }, [portfolioData]);
 
-  // Fetch historical data for all coins using the new multiple coins query
-  // Only fetch more data if we need a longer timeframe than what we already have
+  // Fetch 5Y of historical data once; filtering is done client-side by timeframeStart
   const { data: multipleCoinCandles, isLoading: candlesLoading } = useMultipleCoinCandlesQuery(
     coinSymbols,
-    '1d',
-    fetchDays
+    '1d'
   );
-
-  // Update maxFetchedDays when we successfully get new data
-  useEffect(() => {
-    if (multipleCoinCandles && needsNewData) {
-      setMaxFetchedDays(fetchDays);
-    }
-  }, [multipleCoinCandles, needsNewData, fetchDays]);
 
   // Process historical data for charts
   const chartData = useMemo(() => {
@@ -744,7 +728,7 @@ export default function CryptoPortfolioPage() {
 
   const isLoading = transactionsLoading || pricesLoading;
   const error = transactionsError || pricesError;
-  const isChartLoading = candlesLoading && needsNewData;
+  const isChartLoading = candlesLoading;
 
   if (isLoading) {
     return (
@@ -880,7 +864,7 @@ export default function CryptoPortfolioPage() {
               <HighchartsReact
                 highcharts={Highcharts}
                 options={chartOptions}
-                key={`${selectedCoin}-${selectedTimeframe.label}-${fetchDays}`}
+                key={`${selectedCoin}-${selectedTimeframe.label}`}
               />
             ) : (
               <div className="h-[500px] flex items-center justify-center text-muted-foreground">
@@ -972,10 +956,14 @@ export default function CryptoPortfolioPage() {
                       </TableCell>
                       <TableCell>
                         {cryptoUnrealizedByCoin[item.coinName] !== undefined ? (
-                          <span className={getProfitLossColor(cryptoUnrealizedByCoin[item.coinName])}>
+                          <span
+                            className={getProfitLossColor(cryptoUnrealizedByCoin[item.coinName])}
+                          >
                             {formatCurrency(cryptoUnrealizedByCoin[item.coinName])}
                           </span>
-                        ) : '-'}
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
                     </TableRow>
                   );

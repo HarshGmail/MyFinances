@@ -4,6 +4,7 @@ import database from '../database';
 import { mutualFundInfoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
+import { getCached, setCache } from '../utils/priceCache';
 
 export interface MutualFundNavHistoryData {
   date: string;
@@ -89,14 +90,22 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
       }
     }
 
-    // Fetch NAV history for all scheme numbers in parallel
+    // Fetch NAV history for all scheme numbers in parallel, with MongoDB cache fallback
     const navHistoryPromises = schemeNumbers.map(async (schemeNumber) => {
+      const key = `mf:nav:${schemeNumber}`;
       try {
         const url = `https://api.mfapi.in/mf/${schemeNumber}`;
         const response = await axios.get(url);
-        return { schemeNumber: schemeNumber.toString(), data: response.data };
+        const data = response.data;
+        if (data) await setCache(key, data);
+        return { schemeNumber: schemeNumber.toString(), data };
       } catch (error) {
         console.error(`Error fetching NAV history for scheme ${schemeNumber}:`, error);
+        const cached = await getCached(key);
+        if (cached) {
+          console.log(`Serving cached NAV for scheme ${schemeNumber}`);
+          return { schemeNumber: schemeNumber.toString(), data: cached };
+        }
         return { schemeNumber: schemeNumber.toString(), data: null, error: 'Failed to fetch data' };
       }
     });

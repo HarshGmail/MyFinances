@@ -5,6 +5,7 @@ import { cryptoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import coindcxService from '../services/coindcxService';
 import axios from 'axios';
+import { getCached, setCache } from '../utils/priceCache';
 
 export async function addCryptoTransaction(req: Request, res: Response) {
   try {
@@ -207,16 +208,36 @@ export async function getMultipleCoinCandles(req: Request, res: Response) {
     }
 
     const symbolList = symbols.split(',').map((s) => s.trim().toUpperCase());
+    const iv = typeof interval === 'string' ? interval : '1d';
+    const results: Record<string, unknown[]> = {};
 
-    const candles = await coindcxService.getMultipleCoinCandles({
-      symbols: symbolList,
-      interval: typeof interval === 'string' ? interval : '1d',
-      limit: Number(limit),
-      startTime: Number(startTime),
-      endTime: Number(endTime),
-    });
+    for (const symbol of symbolList) {
+      const cacheKey = `crypto:candles:${symbol}:${iv}`;
+      try {
+        const candles = await coindcxService.getCoinCandles({
+          symbol,
+          interval: iv,
+          limit: Number(limit),
+          startTime: Number(startTime),
+          endTime: Number(endTime),
+        });
+        results[symbol] = candles;
+        if (candles.length > 0) {
+          await setCache(cacheKey, candles);
+        }
+      } catch (err) {
+        console.error(`Live candle fetch failed for ${symbol}, trying cache:`, err);
+        const cached = await getCached<unknown[]>(cacheKey);
+        results[symbol] = cached ?? [];
+      }
 
-    res.status(200).json({ success: true, data: candles });
+      // Delay between per-symbol requests
+      if (symbol !== symbolList[symbolList.length - 1]) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+
+    res.status(200).json({ success: true, data: results });
   } catch (error) {
     console.error('Error in getMultipleCoinCandles:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
