@@ -228,8 +228,7 @@ export async function getStocksPortfolio(req: Request, res: Response) {
         0
       );
       const totalAmount = txs.reduce(
-        (sum, tx) =>
-          sum + (tx.type === 'credit' ? (tx.amount as number) : -(tx.amount as number)),
+        (sum, tx) => sum + (tx.type === 'credit' ? (tx.amount as number) : -(tx.amount as number)),
         0
       );
       const avgPrice = numOfShares > 0 ? totalAmount / numOfShares : 0;
@@ -277,16 +276,11 @@ export async function getStocksPortfolio(req: Request, res: Response) {
     );
     const totalProfitLoss = parseFloat((totalCurrentValue - totalInvested).toFixed(2));
     const totalProfitLossPercentage =
-      totalInvested > 0
-        ? parseFloat(((totalProfitLoss / totalInvested) * 100).toFixed(2))
-        : 0;
+      totalInvested > 0 ? parseFloat(((totalProfitLoss / totalInvested) * 100).toFixed(2)) : 0;
     const totalOneDayChange = parseFloat(
       portfolio.reduce((s, p) => s + p.oneDayChange, 0).toFixed(2)
     );
-    const totalPreviousValue = portfolio.reduce(
-      (s, p) => s + p.previousClose * p.numOfShares,
-      0
-    );
+    const totalPreviousValue = portfolio.reduce((s, p) => s + p.previousClose * p.numOfShares, 0);
     const totalOneDayChangePercentage =
       totalPreviousValue > 0
         ? parseFloat(((totalOneDayChange / totalPreviousValue) * 100).toFixed(2))

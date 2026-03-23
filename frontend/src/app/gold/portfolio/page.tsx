@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@/api/query';
+import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import { useAppStore } from '@/store/useAppStore';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
@@ -28,6 +30,7 @@ export default function GoldPortfolioPage() {
 
   const { data, isLoading: ratesLoading, error } = useSafeGoldRatesQuery({ startDate, endDate });
   const { data: transactions, isLoading: transactionsLoading } = useGoldTransactionsQuery();
+  const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   const isLoading = ratesLoading || transactionsLoading;
 
@@ -85,6 +88,19 @@ export default function GoldPortfolioPage() {
       currentPrice: lastRate,
     };
   }, [transactions, filteredRates]);
+
+  const goldUnrealized = useMemo(() => {
+    const lots = cgData?.byAsset?.gold?.currentLots ?? [];
+    const livePrice = goldStats?.currentPrice ?? 0;
+    let stcg = 0,
+      ltcg = 0;
+    for (const lot of lots) {
+      const gain = (livePrice - lot.costPerGram) * lot.grams;
+      if (lot.holdingDays > 730) ltcg += gain;
+      else stcg += gain;
+    }
+    return { stcg, ltcg, flat30: 0, stcgTax: 0, ltcgTax: Math.max(0, ltcg) * 0.125, flatTax: 0 };
+  }, [cgData, goldStats]);
 
   const transactionPlotLines = useMemo(() => {
     if (!transactions?.length) return [];
@@ -674,6 +690,16 @@ export default function GoldPortfolioPage() {
           />
         </div>
       )}
+
+      <div className="mt-6">
+        <CapitalGainsSummary
+          realizedByFY={cgData?.byAsset?.gold?.realizedByFY ?? {}}
+          unrealized={goldUnrealized}
+          assetType="gold"
+          currentFY={cgData?.summary?.currentFY ?? ''}
+          isLoading={cgLoading}
+        />
+      </div>
     </div>
   );
 }

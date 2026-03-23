@@ -241,7 +241,10 @@ export function Navbar() {
                 {/* Always visible items */}
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
-                    <Link href="/home" className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded">
+                    <Link
+                      href="/home"
+                      className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded"
+                    >
                       <ChartNoAxesCombined className="w-4 h-4 mr-2" />
                       Home
                     </Link>
@@ -250,7 +253,10 @@ export function Navbar() {
 
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
-                    <Link href="/expenses" className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded">
+                    <Link
+                      href="/expenses"
+                      className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded"
+                    >
                       <Calculator className="w-4 h-4 mr-2" />
                       Expenses
                     </Link>

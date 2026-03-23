@@ -69,7 +69,9 @@ function ConnectMcpContent() {
           const data = await res.json();
           if (data.redirect_url) {
             setStatus('success');
-            setTimeout(() => { window.location.href = data.redirect_url; }, 800);
+            setTimeout(() => {
+              window.location.href = data.redirect_url;
+            }, 800);
           } else {
             setStatus('error');
             setErrorMsg(data.error ?? 'Authorization failed. Please try again.');
@@ -97,9 +99,15 @@ function ConnectMcpContent() {
           </div>
 
           <div className="flex items-center gap-1 mb-4">
-            <div className={`w-8 h-0.5 transition-colors duration-500 ${status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`} />
-            <div className={`w-2 h-2 rounded-full transition-colors duration-700 ${status === 'success' ? 'bg-green-500' : status === 'error' ? 'bg-red-500' : status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`} />
-            <div className={`w-8 h-0.5 transition-colors duration-500 ${status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`} />
+            <div
+              className={`w-8 h-0.5 transition-colors duration-500 ${status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`}
+            />
+            <div
+              className={`w-2 h-2 rounded-full transition-colors duration-700 ${status === 'success' ? 'bg-green-500' : status === 'error' ? 'bg-red-500' : status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`}
+            />
+            <div
+              className={`w-8 h-0.5 transition-colors duration-500 ${status === 'loading' ? 'bg-zinc-700' : 'bg-indigo-500'}`}
+            />
           </div>
 
           <div className="flex flex-col items-center gap-2">
@@ -124,7 +132,9 @@ function ConnectMcpContent() {
             <>
               <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-4" />
               <h1 className="text-xl font-semibold text-white mb-2">Waking up server</h1>
-              <p className="text-zinc-400 text-sm">The server was sleeping — this takes about 30–60 seconds…</p>
+              <p className="text-zinc-400 text-sm">
+                The server was sleeping — this takes about 30–60 seconds…
+              </p>
             </>
           )}
 
@@ -151,17 +161,26 @@ function ConnectMcpContent() {
               <p className="text-zinc-400 text-sm mb-5">{errorMsg}</p>
               <div className="flex flex-col gap-2">
                 {errorMsg.includes('ingest token') && (
-                  <a href="/profile" className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">
+                  <a
+                    href="/profile"
+                    className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                  >
                     Go to Profile
                   </a>
                 )}
                 {!errorMsg.includes('logged in') && (
-                  <button onClick={() => window.history.back()} className="w-full py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors">
+                  <button
+                    onClick={() => window.history.back()}
+                    className="w-full py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors"
+                  >
                     Go back
                   </button>
                 )}
                 {errorMsg.includes('logged in') && (
-                  <a href="/" className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">
+                  <a
+                    href="/"
+                    className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                  >
                     Log in
                   </a>
                 )}
@@ -174,7 +193,10 @@ function ConnectMcpContent() {
           This grants Claude access to your expenses, stocks, and investments.
           <br />
           Revoke anytime by regenerating your ingest token on the{' '}
-          <a href="/profile" className="text-zinc-500 hover:text-zinc-400 underline">Profile page</a>.
+          <a href="/profile" className="text-zinc-500 hover:text-zinc-400 underline">
+            Profile page
+          </a>
+          .
         </p>
       </div>
     </div>
@@ -183,11 +205,13 @@ function ConnectMcpContent() {
 
 export default function ConnectMcpPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+        </div>
+      }
+    >
       <ConnectMcpContent />
     </Suspense>
   );

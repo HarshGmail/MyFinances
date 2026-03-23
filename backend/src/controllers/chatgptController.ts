@@ -15,7 +15,9 @@ async function wrapTool(
 ) {
   const token = getIngestToken(req);
   if (!token) {
-    res.status(401).json({ error: 'Missing Authorization header. Use your ingest token as Bearer token.' });
+    res
+      .status(401)
+      .json({ error: 'Missing Authorization header. Use your ingest token as Bearer token.' });
     return;
   }
   try {
@@ -95,7 +97,8 @@ export function getToolDefinitions(_req: Request, res: Response) {
         type: 'function',
         function: {
           name: 'get_expense_transactions',
-          description: 'Fetch the user\'s daily expense log. Optionally filter by date range or limit count.',
+          description:
+            "Fetch the user's daily expense log. Optionally filter by date range or limit count.",
           parameters: {
             type: 'object',
             properties: {
@@ -127,7 +130,8 @@ export function getToolDefinitions(_req: Request, res: Response) {
         type: 'function',
         function: {
           name: 'get_recurring_expenses',
-          description: 'Get the user\'s recurring expense categories (rent, subscriptions, etc.) with frequency and amount.',
+          description:
+            "Get the user's recurring expense categories (rent, subscriptions, etc.) with frequency and amount.",
           parameters: { type: 'object', properties: {} },
         },
       },
@@ -135,11 +139,14 @@ export function getToolDefinitions(_req: Request, res: Response) {
         type: 'function',
         function: {
           name: 'get_stock_transactions',
-          description: 'Fetch the user\'s stock transactions. Optionally filter by symbol.',
+          description: "Fetch the user's stock transactions. Optionally filter by symbol.",
           parameters: {
             type: 'object',
             properties: {
-              symbol: { type: 'string', description: 'Stock symbol to filter by (e.g. RELIANCE.NS)' },
+              symbol: {
+                type: 'string',
+                description: 'Stock symbol to filter by (e.g. RELIANCE.NS)',
+              },
             },
           },
         },
@@ -148,7 +155,8 @@ export function getToolDefinitions(_req: Request, res: Response) {
         type: 'function',
         function: {
           name: 'get_portfolio_summary',
-          description: 'Get live portfolio summary with current values and P&L for all held stocks. May take a few seconds as it fetches live prices.',
+          description:
+            'Get live portfolio summary with current values and P&L for all held stocks. May take a few seconds as it fetches live prices.',
           parameters: { type: 'object', properties: {} },
         },
       },
@@ -161,7 +169,11 @@ export function getToolDefinitions(_req: Request, res: Response) {
             type: 'object',
             properties: {
               symbol: { type: 'string', description: 'Stock symbol (e.g. RELIANCE.NS)' },
-              type: { type: 'string', enum: ['credit', 'debit'], description: 'credit = buy, debit = sell' },
+              type: {
+                type: 'string',
+                enum: ['credit', 'debit'],
+                description: 'credit = buy, debit = sell',
+              },
               numOfUnits: { type: 'number', description: 'Number of shares' },
               price: { type: 'number', description: 'Price per share in INR' },
               date: { type: 'string', description: 'ISO date string (defaults to today)' },
@@ -174,7 +186,7 @@ export function getToolDefinitions(_req: Request, res: Response) {
         type: 'function',
         function: {
           name: 'get_goals',
-          description: 'Get the user\'s investment goals with target amounts and current progress.',
+          description: "Get the user's investment goals with target amounts and current progress.",
           parameters: { type: 'object', properties: {} },
         },
       },

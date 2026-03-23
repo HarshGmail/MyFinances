@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { addMutualFundTransaction, getMutualFundTransactions, deleteAllUserMutualFundTransactions } from '../controllers';
+import {
+  addMutualFundTransaction,
+  getMutualFundTransactions,
+  deleteAllUserMutualFundTransactions,
+} from '../controllers';
 import { authenticateToken } from '../middleware';
 import { searchMutualFundsByName } from '../controllers/mutualFundsInfoController';
 

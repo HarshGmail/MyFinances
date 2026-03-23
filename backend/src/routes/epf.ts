@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { addEpfAccount, getEpfAccounts, getEpfTimeline, deleteAllUserEpfAccounts } from '../controllers';
+import {
+  addEpfAccount,
+  getEpfAccounts,
+  getEpfTimeline,
+  deleteAllUserEpfAccounts,
+} from '../controllers';
 import { authenticateToken } from '../middleware';
 
 const router = Router();

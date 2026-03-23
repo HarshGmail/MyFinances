@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { addRecurringDeposit, getRecurringDeposits, deleteAllUserRecurringDeposits } from '../controllers';
+import {
+  addRecurringDeposit,
+  getRecurringDeposits,
+  deleteAllUserRecurringDeposits,
+} from '../controllers';
 import { authenticateToken } from '../middleware';
 
 const router = Router();

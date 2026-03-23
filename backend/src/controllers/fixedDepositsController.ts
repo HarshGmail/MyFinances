@@ -55,7 +55,9 @@ export async function deleteAllUserFixedDeposits(req: Request, res: Response) {
       return;
     }
     const db = database.getDb();
-    const result = await db.collection('fixedDeposits').deleteMany({ userId: new ObjectId(user.userId) });
+    const result = await db
+      .collection('fixedDeposits')
+      .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error('Delete all fixed deposits error:', error);

@@ -5,6 +5,8 @@ import {
   useMfapiNavHistoryBatchQuery,
 } from '@/api/query/mutual-funds-info';
 import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
+import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import { useMemo } from 'react';
 import groupBy from 'lodash/groupBy';
 import {
@@ -31,6 +33,7 @@ export default function MutualFundsDashboardPage() {
   const { data: mfInfoData, isLoading: mfInfoLoading } = useMutualFundInfoFetchQuery();
   const { data: mutualFundsTransactionsData, isLoading: transactionsLoading } =
     useMutualFundTransactionsQuery();
+  const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   // Get unique schemeNumbers
   const schemeNumbers = useMemo(() => {
@@ -113,6 +116,47 @@ export default function MutualFundsDashboardPage() {
       };
     });
   }, [grouped, mfInfoData, mutualFundsTransactionsData, navDataMap]);
+
+  const mfUnrealized = useMemo(() => {
+    const lots = cgData?.byAsset?.mutualFunds?.currentLots ?? [];
+    let stcg = 0,
+      ltcg = 0;
+    for (const lot of lots) {
+      const info = mfInfoData?.find((i) => i.fundName === lot.fundName);
+      const schemeNumber = info?.schemeNumber;
+      const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
+      if (!navInfo) continue;
+      const gain = (navInfo.nav - lot.costPerUnit) * lot.units;
+      if (lot.holdingDays > 365) ltcg += gain;
+      else stcg += gain;
+    }
+    return {
+      stcg,
+      ltcg,
+      flat30: 0,
+      stcgTax: Math.max(0, stcg) * 0.2,
+      ltcgTax: Math.max(0, ltcg) * 0.125,
+      flatTax: 0,
+    };
+  }, [cgData, mfInfoData, navDataMap]);
+
+  // Per-fund unrealized STCG/LTCG split (what if sold today)
+  const mfUnrealizedByFund = useMemo(() => {
+    const map: Record<string, { stcg: number; ltcg: number }> = {};
+    const currentLots = cgData?.byAsset?.mutualFunds?.currentLots ?? [];
+    for (const lot of currentLots) {
+      const name = lot.fundName ?? '';
+      const info = mfInfoData?.find((i) => i.fundName === name);
+      const schemeNumber = info?.schemeNumber;
+      const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
+      if (!navInfo) continue;
+      const gain = (navInfo.nav - lot.costPerUnit) * lot.units;
+      if (!map[name]) map[name] = { stcg: 0, ltcg: 0 };
+      if (lot.holdingDays > 365) map[name].ltcg += gain;
+      else map[name].stcg += gain;
+    }
+    return map;
+  }, [cgData, mfInfoData, navDataMap]);
 
   // Summary calculations for cards
   const summary = useMemo(() => {
@@ -566,6 +610,8 @@ export default function MutualFundsDashboardPage() {
                 <TableHead>P&L (₹)</TableHead>
                 <TableHead>P&L %</TableHead>
                 <TableHead>XIRR %</TableHead>
+                <TableHead>STCG (Unrealized)</TableHead>
+                <TableHead>LTCG (Unrealized)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -614,6 +660,20 @@ export default function MutualFundsDashboardPage() {
                       'N/A'
                     )}
                   </TableCell>
+                  <TableCell>
+                    {mfUnrealizedByFund[row.fundName] ? (
+                      <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].stcg)}>
+                        {formatCurrency(mfUnrealizedByFund[row.fundName].stcg)}
+                      </span>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {mfUnrealizedByFund[row.fundName] ? (
+                      <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].ltcg)}>
+                        {formatCurrency(mfUnrealizedByFund[row.fundName].ltcg)}
+                      </span>
+                    ) : '-'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -622,6 +682,16 @@ export default function MutualFundsDashboardPage() {
       ) : (
         <div className="text-center text-muted-foreground">No mutual fund investments found.</div>
       )}
+
+      <div className="mt-6">
+        <CapitalGainsSummary
+          realizedByFY={cgData?.byAsset?.mutualFunds?.realizedByFY ?? {}}
+          unrealized={mfUnrealized}
+          assetType="mutualFunds"
+          currentFY={cgData?.summary?.currentFY ?? ''}
+          isLoading={cgLoading}
+        />
+      </div>
     </div>
   );
 }

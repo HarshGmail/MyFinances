@@ -1,10 +1,7 @@
 'use client';
 
 import { useUserProfileQuery } from '@/api/query';
-import {
-  UpdateUserProfile,
-  useUpdateUserProfileMutation,
-} from '@/api/mutations';
+import { UpdateUserProfile, useUpdateUserProfileMutation } from '@/api/mutations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -445,15 +442,20 @@ function AddPaymentRecordDialog({
 export default function ProfilePage() {
   const { data: user, isLoading, isError, refetch } = useUserProfileQuery();
   const { mutateAsync: updateProfile, isPending: isUpdating } = useUpdateUserProfileMutation();
-  const { mutateAsync: deleteAllStocks, isPending: isDeletingStocks } = useDeleteAllStocksMutation();
+  const { mutateAsync: deleteAllStocks, isPending: isDeletingStocks } =
+    useDeleteAllStocksMutation();
   const { mutateAsync: deleteAllGold, isPending: isDeletingGold } = useDeleteAllGoldMutation();
-  const { mutateAsync: deleteAllCrypto, isPending: isDeletingCrypto } = useDeleteAllCryptoMutation();
+  const { mutateAsync: deleteAllCrypto, isPending: isDeletingCrypto } =
+    useDeleteAllCryptoMutation();
   const { mutateAsync: deleteAllMf, isPending: isDeletingMf } = useDeleteAllMutualFundsMutation();
-  const { mutateAsync: deleteAllExpenses, isPending: isDeletingExpenses } = useDeleteAllExpensesMutation();
-  const { mutateAsync: deleteAllExpenseTxns, isPending: isDeletingExpenseTxns } = useDeleteAllExpenseTransactionsMutation();
+  const { mutateAsync: deleteAllExpenses, isPending: isDeletingExpenses } =
+    useDeleteAllExpensesMutation();
+  const { mutateAsync: deleteAllExpenseTxns, isPending: isDeletingExpenseTxns } =
+    useDeleteAllExpenseTransactionsMutation();
   const { mutateAsync: deleteAllEpf, isPending: isDeletingEpf } = useDeleteAllEpfMutation();
   const { mutateAsync: deleteAllFd, isPending: isDeletingFd } = useDeleteAllFixedDepositsMutation();
-  const { mutateAsync: deleteAllRd, isPending: isDeletingRd } = useDeleteAllRecurringDepositsMutation();
+  const { mutateAsync: deleteAllRd, isPending: isDeletingRd } =
+    useDeleteAllRecurringDepositsMutation();
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -886,17 +888,50 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {[
-                { key: 'stocks', label: 'Stock Transactions', fn: deleteAllStocks, pending: isDeletingStocks },
-                { key: 'gold', label: 'Gold Transactions', fn: deleteAllGold, pending: isDeletingGold },
-                { key: 'crypto', label: 'Crypto Transactions', fn: deleteAllCrypto, pending: isDeletingCrypto },
-                { key: 'mf', label: 'Mutual Fund Transactions', fn: deleteAllMf, pending: isDeletingMf },
-                { key: 'expenses', label: 'Recurring Expenses', fn: deleteAllExpenses, pending: isDeletingExpenses },
-                { key: 'expense-txns', label: 'Daily Expense Log', fn: deleteAllExpenseTxns, pending: isDeletingExpenseTxns },
+                {
+                  key: 'stocks',
+                  label: 'Stock Transactions',
+                  fn: deleteAllStocks,
+                  pending: isDeletingStocks,
+                },
+                {
+                  key: 'gold',
+                  label: 'Gold Transactions',
+                  fn: deleteAllGold,
+                  pending: isDeletingGold,
+                },
+                {
+                  key: 'crypto',
+                  label: 'Crypto Transactions',
+                  fn: deleteAllCrypto,
+                  pending: isDeletingCrypto,
+                },
+                {
+                  key: 'mf',
+                  label: 'Mutual Fund Transactions',
+                  fn: deleteAllMf,
+                  pending: isDeletingMf,
+                },
+                {
+                  key: 'expenses',
+                  label: 'Recurring Expenses',
+                  fn: deleteAllExpenses,
+                  pending: isDeletingExpenses,
+                },
+                {
+                  key: 'expense-txns',
+                  label: 'Daily Expense Log',
+                  fn: deleteAllExpenseTxns,
+                  pending: isDeletingExpenseTxns,
+                },
                 { key: 'epf', label: 'EPF Accounts', fn: deleteAllEpf, pending: isDeletingEpf },
                 { key: 'fd', label: 'Fixed Deposits', fn: deleteAllFd, pending: isDeletingFd },
                 { key: 'rd', label: 'Recurring Deposits', fn: deleteAllRd, pending: isDeletingRd },
               ].map(({ key, label, fn, pending }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                <div
+                  key={key}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                >
                   <span className="text-sm font-medium">{label}</span>
                   {confirmDelete === key ? (
                     <div className="flex items-center gap-2">

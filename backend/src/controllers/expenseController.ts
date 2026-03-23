@@ -211,12 +211,18 @@ export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
 
     // Fetch all investment transactions in parallel
     const [stocks, gold, crypto, mf, rd] = await Promise.all([
-      db.collection('stocks').find({ userId, date: { $gte: startDate, $lte: endDate } }).toArray(),
+      db
+        .collection('stocks')
+        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .toArray(),
       db
         .collection('digitalGold')
         .find({ userId, date: { $gte: startDate, $lte: endDate } })
         .toArray(),
-      db.collection('crypto').find({ userId, date: { $gte: startDate, $lte: endDate } }).toArray(),
+      db
+        .collection('crypto')
+        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .toArray(),
       db
         .collection('mutualFunds')
         .find({ userId, date: { $gte: startDate, $lte: endDate } })
@@ -318,7 +324,9 @@ export async function deleteAllUserExpenses(req: Request, res: Response) {
       return;
     }
     const db = database.getDb();
-    const result = await db.collection('expenses').deleteMany({ userId: new ObjectId(user.userId) });
+    const result = await db
+      .collection('expenses')
+      .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error('Delete all expenses error:', error);

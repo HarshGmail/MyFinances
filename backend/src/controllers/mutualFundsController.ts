@@ -52,7 +52,9 @@ export async function deleteAllUserMutualFundTransactions(req: Request, res: Res
       return;
     }
     const db = database.getDb();
-    const result = await db.collection('mutualFunds').deleteMany({ userId: new ObjectId(user.userId) });
+    const result = await db
+      .collection('mutualFunds')
+      .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error('Delete all mutual fund transactions error:', error);

@@ -1,6 +1,8 @@
 'use client';
 
 import { useStocksPortfolioQuery } from '@/api/query/stocks';
+import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import {
   Table,
   TableHeader,
@@ -43,6 +45,7 @@ export default function StocksPortfolioPage() {
   const [showTxPlotLines, setShowTxPlotLines] = useState(false);
 
   const { data: portfolioData, isLoading, error } = useStocksPortfolioQuery();
+  const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   // All data comes from the single portfolio query — no dependent waterfall
   const processedPortfolioData = portfolioData?.portfolio ?? [];
@@ -105,8 +108,16 @@ export default function StocksPortfolioPage() {
     if (!processedPortfolioData.length || !Object.keys(priceData).length) return null;
 
     const colors = [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-      '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+      '#FF6B6B',
+      '#4ECDC4',
+      '#45B7D1',
+      '#FFA07A',
+      '#98D8C8',
+      '#F7DC6F',
+      '#BB8FCE',
+      '#85C1E9',
+      '#F8C471',
+      '#82E0AA',
     ];
 
     const stockSeries: unknown[] = [];
@@ -168,7 +179,12 @@ export default function StocksPortfolioPage() {
     }
 
     return {
-      chart: { type: 'line', height: 500, backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      chart: {
+        type: 'line',
+        height: 500,
+        backgroundColor: 'transparent',
+        style: { fontFamily: 'inherit' },
+      },
       title: {
         text: 'Portfolio Performance Over Time',
         style: { fontSize: '18px', fontWeight: 'bold', color: isDark ? '#fff' : '#374151' },
@@ -246,7 +262,14 @@ export default function StocksPortfolioPage() {
             ),
       credits: { enabled: false },
       responsive: {
-        rules: [{ condition: { maxWidth: 500 }, chartOptions: { legend: { layout: 'horizontal', align: 'center', verticalAlign: 'bottom' } } }],
+        rules: [
+          {
+            condition: { maxWidth: 500 },
+            chartOptions: {
+              legend: { layout: 'horizontal', align: 'center', verticalAlign: 'bottom' },
+            },
+          },
+        ],
       },
     };
   }, [chartData, isDark, processedPortfolioData, selectedStock, showTxPlotLines, txPlotLines]);
@@ -267,9 +290,52 @@ export default function StocksPortfolioPage() {
     }
   }, [stockTransactions, portfolioTotals.totalCurrentValue]);
 
+  // Per-stock unrealized STCG/LTCG split (what if sold today)
+  const stockUnrealizedByName = useMemo(() => {
+    const map: Record<string, { stcg: number; ltcg: number }> = {};
+    const currentLots = cgData?.byAsset?.stocks?.currentLots ?? [];
+    for (const lot of currentLots) {
+      const name = lot.stockName ?? '';
+      const row = processedPortfolioData.find((s) => s.stockName === name);
+      if (!row?.isDataAvailable) continue;
+      const gain = (row.currentPrice - lot.costPerUnit) * lot.units;
+      if (!map[name]) map[name] = { stcg: 0, ltcg: 0 };
+      if (lot.holdingDays > 365) map[name].ltcg += gain;
+      else map[name].stcg += gain;
+    }
+    return map;
+  }, [cgData, processedPortfolioData]);
+
+  const stockUnrealized = useMemo(() => {
+    const lots = cgData?.byAsset?.stocks?.currentLots ?? [];
+    let stcg = 0,
+      ltcg = 0;
+    for (const lot of lots) {
+      const row = processedPortfolioData.find((s) => s.stockName === lot.stockName);
+      if (!row?.isDataAvailable) continue;
+      const gain = (row.currentPrice - lot.costPerUnit) * lot.units;
+      if (lot.holdingDays > 365) ltcg += gain;
+      else stcg += gain;
+    }
+    return {
+      stcg,
+      ltcg,
+      flat30: 0,
+      stcgTax: Math.max(0, stcg) * 0.2,
+      ltcgTax: Math.max(0, ltcg) * 0.125,
+      flatTax: 0,
+    };
+  }, [cgData, processedPortfolioData]);
+
   const chartKey = useMemo(
     () =>
-      [selectedStock, timeframe, showTxPlotLines ? 'on' : 'off', txPlotLines.length, timeframeStart].join('|'),
+      [
+        selectedStock,
+        timeframe,
+        showTxPlotLines ? 'on' : 'off',
+        txPlotLines.length,
+        timeframeStart,
+      ].join('|'),
     [selectedStock, timeframe, showTxPlotLines, txPlotLines.length, timeframeStart]
   );
 
@@ -278,16 +344,26 @@ export default function StocksPortfolioPage() {
       <div className="p-4 h-full">
         <h2 className="text-xl font-bold mb-4 text-center">Stocks Portfolio</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="w-full h-[120px]" />)}
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="w-full h-[120px]" />
+          ))}
         </div>
         <div className="max-w-7xl mx-auto border rounded-lg">
           <div className="bg-muted/50 p-4 border-b grid grid-cols-12 gap-4">
-            {Array(12).fill(null).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
+            {Array(12)
+              .fill(null)
+              .map((_, i) => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
           </div>
           <div className="divide-y">
             {[1, 2, 3, 4, 5].map((row) => (
               <div key={row} className="p-4 grid grid-cols-12 gap-4">
-                {Array(12).fill(null).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
+                {Array(12)
+                  .fill(null)
+                  .map((_, i) => (
+                    <Skeleton key={i} className="h-4 w-full" />
+                  ))}
               </div>
             ))}
           </div>
@@ -347,7 +423,9 @@ export default function StocksPortfolioPage() {
         <SummaryStatCard
           label="XIRR %"
           value={overallXirr !== null ? `${overallXirr.toFixed(2)}%` : 'N/A'}
-          valueClassName={overallXirr !== null && overallXirr >= 0 ? 'text-green-600' : 'text-red-600'}
+          valueClassName={
+            overallXirr !== null && overallXirr >= 0 ? 'text-green-600' : 'text-red-600'
+          }
           loading={isLoading}
         />
       </div>
@@ -422,6 +500,8 @@ export default function StocksPortfolioPage() {
                 <TableHead>P/L (₹)</TableHead>
                 <TableHead>P/L %</TableHead>
                 <TableHead>XIRR %</TableHead>
+                <TableHead>STCG (Unrealized)</TableHead>
+                <TableHead>LTCG (Unrealized)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -467,14 +547,18 @@ export default function StocksPortfolioPage() {
                         <span className={getProfitLossColor(row.oneDayChange)}>
                           {formatCurrency(formatToTwoDecimals(row.oneDayChange))}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell>
                       {row.isDataAvailable ? (
                         <span className={`text-sm ${getProfitLossColor(row.oneDayChange)}`}>
                           {row.oneDayChangePercentage}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={getProfitLossColor(row.profitLoss)}>
@@ -493,7 +577,23 @@ export default function StocksPortfolioPage() {
                         <span className={getProfitLossColor(row.profitLoss)}>
                           {stockXirr.toFixed(2)}%
                         </span>
-                      ) : 'N/A'}
+                      ) : (
+                        'N/A'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {stockUnrealizedByName[row.stockName] ? (
+                        <span className={getProfitLossColor(stockUnrealizedByName[row.stockName].stcg)}>
+                          {formatCurrency(stockUnrealizedByName[row.stockName].stcg)}
+                        </span>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {stockUnrealizedByName[row.stockName] ? (
+                        <span className={getProfitLossColor(stockUnrealizedByName[row.stockName].ltcg)}>
+                          {formatCurrency(stockUnrealizedByName[row.stockName].ltcg)}
+                        </span>
+                      ) : '-'}
                     </TableCell>
                   </TableRow>
                 );
@@ -508,6 +608,16 @@ export default function StocksPortfolioPage() {
           No stock investments found. Add some transactions to see your portfolio.
         </div>
       )}
+
+      <div className="mt-6">
+        <CapitalGainsSummary
+          realizedByFY={cgData?.byAsset?.stocks?.realizedByFY ?? {}}
+          unrealized={stockUnrealized}
+          assetType="stocks"
+          currentFY={cgData?.summary?.currentFY ?? ''}
+          isLoading={cgLoading}
+        />
+      </div>
     </div>
   );
 }

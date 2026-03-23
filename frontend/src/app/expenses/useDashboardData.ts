@@ -177,8 +177,7 @@ export function useDashboardData({
     const avgSavingsRate =
       monthlyAnalysis.reduce((sum, m) => sum + m.savingsRate, 0) / monthlyAnalysis.length;
     const avgDiscretionarySpending =
-      monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) /
-      monthlyAnalysis.length;
+      monthlyAnalysis.reduce((sum, m) => sum + m.discretionarySpending, 0) / monthlyAnalysis.length;
 
     return {
       avgMonthlyIncome: totalIncome / monthlyAnalysis.length,

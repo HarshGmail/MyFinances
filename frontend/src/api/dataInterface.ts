@@ -245,37 +245,6 @@ export interface MonthlyInvestmentSummaryItem {
   total: number;
 }
 
-export interface StocksPortfolioItem {
-  stockName: string;
-  numOfShares: number;
-  avgPrice: number;
-  investedAmount: number;
-  currentPrice: number;
-  previousClose: number;
-  currentValuation: number;
-  profitLoss: number;
-  profitLossPercentage: number;
-  oneDayChange: number;
-  oneDayChangePercentage: number;
-  isDataAvailable: boolean;
-}
-
-export interface StocksPortfolioSummary {
-  totalInvested: number;
-  totalCurrentValue: number;
-  totalProfitLoss: number;
-  totalProfitLossPercentage: number;
-  totalOneDayChange: number;
-  totalOneDayChangePercentage: number;
-}
-
-export interface StocksPortfolioResponse {
-  portfolio: StocksPortfolioItem[];
-  priceData: Record<string, StockData>;
-  summary: StocksPortfolioSummary;
-  transactions: StockTransaction[];
-}
-
 export interface MonthlyPayment {
   month: string;
   baseAmount: number;
@@ -440,6 +409,37 @@ export interface StockSearchResponse {
   sectorDisp: string;
   industry: string;
   industryDisp: string;
+}
+
+export interface StocksPortfolioItem {
+  stockName: string;
+  numOfShares: number;
+  avgPrice: number;
+  investedAmount: number;
+  currentPrice: number;
+  previousClose: number;
+  currentValuation: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  oneDayChange: number;
+  oneDayChangePercentage: number;
+  isDataAvailable: boolean;
+}
+
+export interface StocksPortfolioResponse {
+  portfolio: StocksPortfolioItem[];
+  priceData: Record<string, StockData>;
+  summary: StocksPortfolioSummary;
+  transactions: StockTransaction[];
+}
+
+export interface StocksPortfolioSummary {
+  totalInvested: number;
+  totalCurrentValue: number;
+  totalProfitLoss: number;
+  totalProfitLossPercentage: number;
+  totalOneDayChange: number;
+  totalOneDayChangePercentage: number;
 }
 
 export interface StockTransaction {

@@ -2,6 +2,8 @@
 
 import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@/api/query';
 import { useMultipleCoinCandlesQuery } from '@/api/query/crypto';
+import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import {
   Table,
   TableHeader,
@@ -140,6 +142,7 @@ export default function CryptoPortfolioPage() {
     isLoading: pricesLoading,
     error: pricesError,
   } = useCryptoCoinPricesQuery(validCoins);
+  const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   const portfolioData = useMemo(() => {
     if (!coinPrices?.data) return [];
@@ -169,6 +172,34 @@ export default function CryptoPortfolioPage() {
 
     return portfolioItems;
   }, [coinPrices, investedMap, validCoins]);
+
+  const cryptoUnrealized = useMemo(() => {
+    const lots = cgData?.byAsset?.crypto?.currentLots ?? [];
+    let flat30 = 0;
+    for (const lot of lots) {
+      const priceEntry = coinPrices?.data;
+      if (!priceEntry) continue;
+      // Match by coinName to portfolio item to get live price
+      const portfolioItem = portfolioData.find((p) => p.coinName === lot.coinName);
+      if (!portfolioItem?.currentPrice) continue;
+      flat30 += (portfolioItem.currentPrice - lot.costPerUnit) * lot.units;
+    }
+    return { stcg: 0, ltcg: 0, flat30, stcgTax: 0, ltcgTax: 0, flatTax: Math.max(0, flat30) * 0.3 };
+  }, [cgData, portfolioData, coinPrices]);
+
+  // Per-coin unrealized gains (what if sold today, flat 30%)
+  const cryptoUnrealizedByCoin = useMemo(() => {
+    const map: Record<string, number> = {};
+    const currentLots = cgData?.byAsset?.crypto?.currentLots ?? [];
+    for (const lot of currentLots) {
+      const name = lot.coinName ?? '';
+      const portfolioItem = portfolioData.find((p) => p.coinName === name);
+      if (!portfolioItem?.currentPrice) continue;
+      const gain = (portfolioItem.currentPrice - lot.costPerUnit) * lot.units;
+      map[name] = (map[name] ?? 0) + gain;
+    }
+    return map;
+  }, [cgData, portfolioData]);
 
   // Create a color mapping for coins based on their order in portfolioData
   const coinColorMap = useMemo(() => {
@@ -877,6 +908,7 @@ export default function CryptoPortfolioPage() {
                   <TableHead>P&L (₹)</TableHead>
                   <TableHead>P&L %</TableHead>
                   <TableHead>XIRR %</TableHead>
+                  <TableHead>Unrealized Gains</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -938,6 +970,13 @@ export default function CryptoPortfolioPage() {
                           'N/A'
                         )}
                       </TableCell>
+                      <TableCell>
+                        {cryptoUnrealizedByCoin[item.coinName] !== undefined ? (
+                          <span className={getProfitLossColor(cryptoUnrealizedByCoin[item.coinName])}>
+                            {formatCurrency(cryptoUnrealizedByCoin[item.coinName])}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -967,6 +1006,16 @@ export default function CryptoPortfolioPage() {
           No crypto investments found. Add some transactions to see your portfolio.
         </div>
       )}
+
+      <div className="mt-6">
+        <CapitalGainsSummary
+          realizedByFY={cgData?.byAsset?.crypto?.realizedByFY ?? {}}
+          unrealized={cryptoUnrealized}
+          assetType="crypto"
+          currentFY={cgData?.summary?.currentFY ?? ''}
+          isLoading={cgLoading}
+        />
+      </div>
     </div>
   );
 }

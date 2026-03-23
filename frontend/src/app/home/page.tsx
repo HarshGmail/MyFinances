@@ -16,6 +16,7 @@ import {
   useRecurringDepositsQuery,
 } from '@/api/query';
 import { useStocksPortfolioQuery } from '@/api/query/stocks';
+import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { Card } from '@/components/ui/card';
@@ -61,6 +62,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   // ===== STOCKS DATA =====
+  const { data: cgData } = useCapitalGainsQuery();
   // Single query replaces: useStockTransactionsQuery + useNseQuoteQuery (dependent waterfall)
   const { data: stocksPortfolioData, isLoading: stocksPortfolioLoading } =
     useStocksPortfolioQuery();
@@ -1179,6 +1181,53 @@ export default function Home() {
           )}
         </Card>
       </div>
+
+      {/* Capital Gains Summary */}
+      {cgData &&
+        (() => {
+          const fy = cgData.summary?.currentFY ?? '';
+          const s = cgData.summary?.byFY?.[fy];
+          if (!s) return null;
+          const totalTax = s.totalEstimatedTax ?? 0;
+          return (
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm">Capital Gains — FY {fy}</h3>
+                <span className="text-xs text-muted-foreground">Realized only</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Equity STCG</p>
+                  <p
+                    className={`font-medium ${s.equityStcg >= 0 ? 'text-green-500' : 'text-red-500'}`}
+                  >
+                    {formatCurrency(s.equityStcg)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Equity LTCG</p>
+                  <p
+                    className={`font-medium ${s.equityLtcg >= 0 ? 'text-green-500' : 'text-red-500'}`}
+                  >
+                    {formatCurrency(s.equityLtcg)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Crypto Gains</p>
+                  <p
+                    className={`font-medium ${s.cryptoGains >= 0 ? 'text-green-500' : 'text-red-500'}`}
+                  >
+                    {formatCurrency(s.cryptoGains)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Est. Tax Liability</p>
+                  <p className="font-medium text-orange-500">{formatCurrency(totalTax)}</p>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
 
       {/* Quick Stats */}
       <div className="text-center text-muted-foreground">

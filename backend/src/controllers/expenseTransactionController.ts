@@ -172,7 +172,9 @@ export async function deleteAllUserExpenseTransactions(req: Request, res: Respon
       return;
     }
     const db = database.getDb();
-    const result = await db.collection('expenseTransactions').deleteMany({ userId: new ObjectId(user.userId) });
+    const result = await db
+      .collection('expenseTransactions')
+      .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error('Delete all expense transactions error:', error);
