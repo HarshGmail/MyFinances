@@ -14,6 +14,7 @@ import {
   MonthlyPayment,
 } from '../schemas';
 import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
+import { encrypt, decrypt } from '../utils/encryption';
 import config from '../config';
 
 export async function signup(req: Request, res: Response) {
@@ -213,12 +214,25 @@ export async function userProfile(req: Request, res: Response) {
       );
     }
 
+    // Decrypt and mask PAN if present
+    let panNumber: string | undefined;
+    if (user.panNumber) {
+      try {
+        const decrypted = decrypt(user.panNumber);
+        panNumber = decrypted.slice(0, 5) + '****' + decrypted.slice(-1); // e.g. ABCDE****F
+      } catch {
+        panNumber = undefined;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
         userName: user.name,
         userEmail: user.email,
         dob: user.dob,
+        phone: user.phone,
+        panNumber,
         joined: user.createdAt,
         monthlySalary: user.monthlySalary ?? null, // Keep for backward compatibility
         currentBaseSalary,
@@ -262,7 +276,20 @@ export async function updateUserProfile(req: Request, res: Response) {
       name: req.body.userName,
       email: req.body.userEmail,
       dob: req.body.dob ? new Date(req.body.dob) : undefined,
+      phone: req.body.phone || undefined,
     };
+
+    // Encrypt PAN if provided (validate format before encrypting)
+    if (req.body.panNumber && typeof req.body.panNumber === 'string') {
+      const pan = req.body.panNumber.toUpperCase().trim();
+      if (/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+        try {
+          (rawUpdates as Record<string, unknown>).panNumber = encrypt(pan);
+        } catch {
+          // ENCRYPTION_KEY not configured — skip PAN encryption silently
+        }
+      }
+    }
 
     // Step 2: Filter out undefined values (critical!)
     const mappedUpdates = Object.fromEntries(
@@ -380,6 +407,7 @@ export async function updateUserProfile(req: Request, res: Response) {
         userName: updatedUser.name,
         userEmail: updatedUser.email,
         dob: updatedUser.dob,
+        phone: updatedUser.phone,
         joined: updatedUser.createdAt,
         currentBaseSalary,
         salaryHistory: updatedUser.salaryHistory ?? [],

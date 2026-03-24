@@ -26,6 +26,7 @@ import {
   ingestRouter,
   chatgptRouter,
   capitalGainsRouter,
+  emailIntegrationsRouter,
 } from './routes';
 import { requestLogger } from './middleware';
 
@@ -79,6 +80,7 @@ app.use('/api/expense-transactions', expenseTransactionsRouter);
 app.use('/api/ingest', ingestRouter);
 app.use('/api/chatgpt', chatgptRouter);
 app.use('/api/capital-gains', capitalGainsRouter);
+app.use('/api/email-integration', emailIntegrationsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/api/health', (req, res) => {

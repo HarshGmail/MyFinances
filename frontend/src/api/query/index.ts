@@ -13,3 +13,4 @@ export * from './recurring-deposits';
 export * from './stocks';
 export * from './userGoals';
 export * from './capitalGains';
+export * from './emailIntegration';

@@ -16,3 +16,4 @@ export { default as expenseTransactionsRouter } from './expenseTransactions';
 export { default as ingestRouter } from './ingest';
 export { default as chatgptRouter } from './chatgpt';
 export { default as capitalGainsRouter } from './capitalGains';
+export { default as emailIntegrationsRouter } from './emailIntegrations';

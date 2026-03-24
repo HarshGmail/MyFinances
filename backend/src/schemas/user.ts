@@ -28,6 +28,11 @@ export const userSchema = z.object({
   name: z.string().min(2).max(50),
   email: z.string().email(),
   dob: z.date().optional(),
+  phone: z
+    .string()
+    .regex(/^\d{10}$/)
+    .optional(),
+  panNumber: z.string().optional(), // stored AES-256-GCM encrypted in DB
   salaryHistory: z.array(salaryRecordSchema).default([]), // Track base salary changes
   paymentHistory: z.array(monthlyPaymentSchema).default([]), // Track actual payments
   password: z.string().min(6),

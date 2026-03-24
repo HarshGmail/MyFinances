@@ -1,5 +1,3 @@
-// Salary and Payment History types
-// Updated UserProfile interface
 export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
 
 export interface AdjClose {
@@ -105,6 +103,20 @@ export interface CurrentTradingPeriod {
   pre: TradingPeriod;
   regular: TradingPeriod;
   post: TradingPeriod;
+}
+
+export interface EmailIntegrationStatus {
+  connected: boolean;
+  email?: string;
+  lastSyncAt?: string | null;
+  safegoldSender?: string;
+}
+
+export interface EmailSyncPreview {
+  mutualFunds: ParsedMFTransaction[];
+  gold: ParsedGoldTransaction[];
+  duplicatesSkipped: number;
+  errors: string[];
 }
 
 export interface EpfAccount {
@@ -313,6 +325,25 @@ export interface MutualFundTransaction {
   updatedAt?: string;
 }
 
+export interface ParsedGoldTransaction {
+  date: string;
+  goldPrice: number;
+  quantity: number;
+  amount: number;
+  tax: number;
+  type: 'credit' | 'debit';
+  platform: string;
+}
+
+export interface ParsedMFTransaction {
+  date: string;
+  fundName: string;
+  numOfUnits: number;
+  fundPrice: number;
+  amount: number;
+  type: 'credit' | 'debit';
+}
+
 export interface Quote {
   open: number[];
   volume: number[];
@@ -513,6 +544,8 @@ export interface UserProfile {
   salaryHistory?: SalaryRecord[];
   paymentHistory?: MonthlyPayment[];
   ingestToken?: string;
+  phone?: string;
+  panNumber?: string; // masked, e.g. "ABCDE****F"
   session?: {
     loginTime: string | null;
     expiry: string | null;

@@ -26,6 +26,14 @@ interface Config {
 
   // MCP server URL (for ChatGPT proxy — defaults to prod)
   MCP_URL?: string;
+
+  // Google OAuth2 for Gmail integration
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
+
+  // AES-256-GCM encryption key (64-char hex = 32 bytes)
+  ENCRYPTION_KEY?: string;
 }
 
 // Validate required environment variables
@@ -50,6 +58,10 @@ const config: Config = {
   TWELVE_DATA_API_KEY: process.env.TWELVE_DATA_API_KEY,
   JWT_SECRET: process.env.JWT_SECRET!,
   MCP_URL: process.env.MCP_URL,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
 };
 
 export default config;
