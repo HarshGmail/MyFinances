@@ -4,7 +4,7 @@ import database from '../database';
 import { mutualFundInfoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
-import { getCached, setCache } from '../utils/priceCache';
+import { getCached, getCachedToday, setCache } from '../utils/priceCache';
 
 export interface MutualFundNavHistoryData {
   date: string;
@@ -90,9 +90,18 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
       }
     }
 
-    // Fetch NAV history for all scheme numbers in parallel, with MongoDB cache fallback
+    // Fetch NAV history for all scheme numbers in parallel.
+    // MFAPI updates once a day, so serve from MongoDB cache if already fetched today.
     const navHistoryPromises = schemeNumbers.map(async (schemeNumber) => {
       const key = `mf:nav:${schemeNumber}`;
+
+      // 1. Fresh cache hit → return immediately, no network call
+      const fresh = await getCachedToday<MutualFundNavHistoryItem>(key);
+      if (fresh) {
+        return { schemeNumber: schemeNumber.toString(), data: fresh };
+      }
+
+      // 2. Cache miss or stale → fetch from MFAPI
       try {
         const url = `https://api.mfapi.in/mf/${schemeNumber}`;
         const response = await axios.get(url);
@@ -101,10 +110,11 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
         return { schemeNumber: schemeNumber.toString(), data };
       } catch (error) {
         console.error(`Error fetching NAV history for scheme ${schemeNumber}:`, error);
-        const cached = await getCached(key);
-        if (cached) {
-          console.log(`Serving cached NAV for scheme ${schemeNumber}`);
-          return { schemeNumber: schemeNumber.toString(), data: cached };
+        // Stale cache is better than nothing
+        const stale = await getCached<MutualFundNavHistoryItem>(key);
+        if (stale) {
+          console.log(`Serving stale cache for scheme ${schemeNumber}`);
+          return { schemeNumber: schemeNumber.toString(), data: stale };
         }
         return { schemeNumber: schemeNumber.toString(), data: null, error: 'Failed to fetch data' };
       }

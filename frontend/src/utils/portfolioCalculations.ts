@@ -41,20 +41,28 @@ export function calcMFPortfolio(
   const grouped = groupBy(transactions, 'fundName');
 
   const fundData: MFFundData[] = Object.entries(grouped).map(([fundName, txs]) => {
+    const totalCreditUnits = txs
+      .filter((tx) => tx.type === 'credit')
+      .reduce((s, tx) => s + tx.numOfUnits, 0);
+    const totalCreditAmount = txs
+      .filter((tx) => tx.type === 'credit')
+      .reduce((s, tx) => s + tx.amount, 0);
+    const avgCostPerUnit = totalCreditUnits > 0 ? totalCreditAmount / totalCreditUnits : 0;
+
     const totalUnits = txs.reduce(
       (sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits : -tx.numOfUnits),
       0
     );
-    const totalInvested = txs.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
-      0
-    );
+    // Amount invested = cost basis of remaining units (avg cost method).
+    // Subtracting sale proceeds instead of cost was causing negative invested values.
+    const remainingUnits = Math.max(0, totalUnits);
+    const totalInvested = remainingUnits * avgCostPerUnit;
 
     const info = mfInfoData.find((i) => i.fundName === fundName);
     const schemeNumber = info?.schemeNumber;
     const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
     const currentNav = navInfo ? navInfo.nav : null;
-    const currentValue = currentNav !== null ? totalUnits * currentNav : null;
+    const currentValue = currentNav !== null ? remainingUnits * currentNav : null;
     const profitLoss = currentValue !== null ? currentValue - totalInvested : null;
     const profitLossPercentage =
       profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;

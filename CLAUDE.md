@@ -36,7 +36,7 @@ ourFinance/
 | Database | MongoDB (direct driver, no ORM) |
 | Auth | JWT — cookie-based (`credentials: 'include'` on all fetch calls) |
 | Validation | Zod schemas in backend |
-| External APIs | Yahoo Finance (stocks), SafeGold API (gold), CoinDCX (crypto), MFAPI (MF NAV) |
+| External APIs | Yahoo Finance (stocks), SafeGold API (gold), CoinDCX (crypto), MFAPI (MF NAV), Gmail API (email import) |
 
 ---
 
@@ -73,14 +73,17 @@ frontend/src/
 │   ├── fd/                   Fixed deposits
 │   ├── rd/                   Recurring deposits
 │   ├── goals/                Investment goals
-│   ├── profile/              User profile + salary history
+│   ├── profile/              User profile + salary history (Phone + PAN Number fields; PAN has show/hide toggle)
+│   ├── integrations/         3 tabs: UPI Auto-Track, Claude MCP, Email Import
 │   └── popup/                Browser extension popup
 ├── api/
 │   ├── configs/
 │   │   ├── api.ts            apiRequest() — base fetch wrapper (handles 401 → redirect to /)
 │   │   └── baseUrl.ts        API_BASE_URL from env
 │   ├── query/                One file per domain, exports useXxxQuery hooks
+│   │   └── emailIntegration.ts  useEmailIntegrationStatusQuery
 │   ├── mutations/            One file per domain, exports useXxxMutation hooks
+│   │   └── emailIntegration.ts  useEmailSyncMutation, useEmailImportMutation, useEmailDisconnectMutation, useEmailUpdateSettingsMutation, useEmailResetSyncMutation
 │   └── dataInterface.ts      ALL TypeScript interfaces for API data
 ├── components/
 │   ├── custom/
@@ -107,7 +110,7 @@ frontend/src/
 ```
 backend/src/
 ├── server.ts             Express app + route mounting + startup
-├── config.ts             Env config (PORT, JWT_SECRET, DB_URI, etc.)
+├── config.ts             Env config (PORT, JWT_SECRET, DB_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, ENCRYPTION_KEY, etc.)
 ├── database.ts           MongoDB connection singleton
 ├── routes/               One file per domain, imports controller + authenticateToken
 ├── controllers/          Route handlers — call services or DB directly
@@ -115,12 +118,18 @@ backend/src/
 │   ├── stocksService.ts       Yahoo Finance calls (includes 300ms delay between requests)
 │   ├── stockServiceHelper.ts  NSE quote formatting
 │   ├── coindcxService.ts      CoinDCX API
-│   └── inflationService.ts    Inflation data
+│   ├── inflationService.ts    Inflation data
+│   ├── gmailService.ts        Gmail OAuth2 + PDF attachment fetching (paginated, supports incremental sync via afterDate)
+│   ├── pdfParser.ts           Password-protected PDF text extraction using pdf-parse
+│   ├── cdslParser.ts          CDSL eCAS MF transaction parser
+│   └── safegoldParser.ts      SafeGold gold transaction parser
 ├── middleware/
 │   ├── jwt.ts            authenticateToken middleware — extracts { name, email, userId }
 │   └── requestLogger.ts
 ├── schemas/              Zod validation schemas
+│   └── emailIntegration.ts   Zod schema for emailIntegrations collection
 └── utils/
+    └── encryption.ts     AES-256-GCM encrypt/decrypt for PAN and refresh tokens
 ```
 
 ### All API Route Prefixes
@@ -142,6 +151,7 @@ backend/src/
 | `/api/targets` | Asset allocation targets |
 | `/api/inflation` | Inflation rate data |
 | `/api/ingest` | SMS-based transaction ingestion |
+| `/api/email-integration` | Email import (Gmail OAuth, CDSL eCAS + SafeGold PDF parsing) |
 | `/api` (verify) | Token verification |
 
 ---
@@ -240,6 +250,17 @@ totalUnits = txs.reduce((sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits
 ### Salary history
 `UserProfile` has both `salaryHistory[]` (base salary effective dates) and `paymentHistory[]` (actual monthly payments with bonus/arrears). `useDashboardData` resolves the correct salary for any given month via `getSalaryForMonth()` and `getPaymentForMonth()`.
 
+### UserProfile — sensitive fields
+`UserProfile` includes `phone` (stored as plaintext) and `panNumber` (stored AES-256-GCM encrypted in DB; returned masked to the frontend — only the last 4 characters are revealed). The profile page exposes a show/hide toggle for the PAN field.
+
+### emailIntegrations collection
+MongoDB collection storing per-user Gmail integration state:
+```
+{ userId, email, refreshToken (AES-256-GCM encrypted), linkedAt, lastSyncAt, safegoldSender }
+```
+- `safegoldSender` — configurable sender email used to filter SafeGold PDF emails (defaults to SafeGold's known sender)
+- `lastSyncAt` — null on first sync or after a full re-sync reset; used for incremental sync (only emails after this date are fetched)
+
 ### MF Scheme Numbers
 MF fund names in transactions don't carry scheme numbers. `MutualFundInfo` (from `/api/funds/infoFetch`) maps `fundName → schemeNumber`. Scheme numbers are needed for MFAPI NAV fetches. This is why MF pages need two queries before pricing is possible.
 
@@ -269,6 +290,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 | MFAPI (NAV history) | Frontend direct (batch POST via backend route) | Batch endpoint fetches all schemes in parallel |
 | SafeGold | Backend controller | Date-range based |
 | CoinDCX | Backend (`coindcxService.ts`) | POST with coin names array |
+| Gmail API | Backend (`gmailService.ts`) | Paginated fetch; incremental sync via `afterDate` |
 
 ---
 
@@ -293,3 +315,13 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 9. **CORS origins are hardcoded in `server.ts`** — `localhost:3000`, `localhost:5000`, and the production domain. Add new origins there.
 
 10. **`apiRequest()` is the only HTTP client** — don't use axios or raw fetch in new code. All API calls go through `apiRequest()` from `@/api/configs`.
+
+11. **Email import is on-demand only** — there is no background cron. The user manually triggers a sync from the Integrations page. After the first sync, `lastSyncAt` is set and subsequent syncs only fetch emails received after that timestamp (incremental sync). A "Full re-sync" button resets `lastSyncAt` to null to force a complete history fetch.
+
+12. **CDSL eCAS parsing limitation** — only MF transactions are extracted from CDSL CAS PDFs. The equity holdings section is a point-in-time snapshot with no historical buy/sell data, so it is intentionally skipped.
+
+13. **SafeGold PDF parsing rules** — only rows with transaction type "Purchased" or "Sold" are imported. Lease, TDS, and rental income rows are skipped. Parser is in `backend/src/services/safegoldParser.ts`.
+
+14. **Email import deduplication** — before inserting a parsed transaction, a ±1 day window check is performed on the date combined with other matching fields (symbol/fund name/amount). Duplicates within that window are silently skipped.
+
+15. **Encryption key env var** — `ENCRYPTION_KEY` must be a 64-character hex string (representing 32 bytes). Used by `backend/src/utils/encryption.ts` for AES-256-GCM. Required alongside `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` for email integration to function.

@@ -23,10 +23,10 @@ const MONTHS: Record<string, number> = {
   december: 11,
 };
 
-/** Parse "3rd February 2026" → Date */
+const ORDINAL_DATE_RE = /(\d{1,2})(?:st|nd|rd|th)\s+([A-Za-z]+)\s+(\d{4})/i;
+
 function parseOrdinalDate(dateStr: string): Date | null {
-  // Match: "3rd February 2026" or "1st January 2025" etc.
-  const match = dateStr.match(/(\d{1,2})(?:st|nd|rd|th)\s+([A-Za-z]+)\s+(\d{4})/i);
+  const match = dateStr.match(ORDINAL_DATE_RE);
   if (!match) return null;
   const day = parseInt(match[1]);
   const month = MONTHS[match[2].toLowerCase()];
@@ -35,80 +35,141 @@ function parseOrdinalDate(dateStr: string): Date | null {
   return new Date(year, month, day);
 }
 
+/** Skip rows that are not actual buy/sell events */
+function isSkippable(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    lower.includes('lease rental') ||
+    lower.includes('deducted as tds') ||
+    lower.includes('tds on') ||
+    lower.includes('leased ') ||
+    lower.includes('lease income') ||
+    lower.includes('opening gold wallet') ||
+    lower.includes('closing gold wallet')
+  );
+}
+
+/** Parse a number that may be prefixed by ₹ or Rs. or nothing */
+function parseCurrencyNum(raw: string): number {
+  return parseFloat(raw.replace(/,/g, ''));
+}
+
 export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[] {
   const transactions: ParsedGoldTransaction[] = [];
 
-  // Find the transaction statement section
-  const sectionIdx = text.indexOf('Transaction Statement');
-  if (sectionIdx === -1) {
-    console.log('[SafeGold Parser] Transaction Statement section not found');
+  // Find the transaction statement section (case-insensitive)
+  const idx = text.search(/transaction statement/i);
+  if (idx === -1) {
+    console.log('[SafeGold Parser] "Transaction Statement" not found in text');
+    console.log('[SafeGold Parser] First 300 chars:', text.slice(0, 300).replace(/\n/g, '|'));
     return transactions;
   }
 
-  const section = text.slice(sectionIdx);
+  const section = text.slice(idx);
   const lines = section
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 
+  // Build transaction blocks: each block = all lines belonging to one transaction row.
+  // A new block starts when we see an ordinal date line (e.g. "1st February 2026").
+  // We accumulate subsequent lines (description, quantity, closing balance) into the block.
+  const blocks: { date: Date; text: string }[] = [];
   let currentDate: Date | null = null;
+  let blockLines: string[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  const flush = () => {
+    if (currentDate && blockLines.length > 0) {
+      blocks.push({ date: currentDate, text: blockLines.join(' ') });
+    }
+  };
 
-    // Detect date lines: "3rd February 2026 06:06:01 PM" or just "3rd February 2026"
-    const dateMatch = line.match(/(\d{1,2}(?:st|nd|rd|th)\s+[A-Za-z]+\s+\d{4})/i);
+  for (const line of lines) {
+    // Skip table header rows
+    if (/date\s*&\s*time|transaction details|quantity|closing balance/i.test(line)) continue;
+
+    const dateMatch = line.match(ORDINAL_DATE_RE);
     if (dateMatch) {
-      const parsed = parseOrdinalDate(dateMatch[1]);
-      if (parsed) currentDate = parsed;
+      const parsed = parseOrdinalDate(dateMatch[0]);
+      if (parsed) {
+        flush();
+        currentDate = parsed;
+        blockLines = [line];
+        continue;
+      }
     }
 
-    // Detect purchase: "Purchased X grams of 24K gold for ₹TOTAL at ₹RATE/g Incl. GST of ₹GST"
-    // Also handle "₹" which may appear as "Rs." or just a number after currency symbol
-    const purchaseMatch = line.match(
-      /Purchased\s+([\d.]+)\s+grams?\s+of\s+24K\s+gold\s+for\s+[₹Rs.]*([\d,]+\.?\d*)\s+at\s+[₹Rs.]*([\d,]+\.?\d*)\/g\s+Incl\.\s+GST\s+of\s+[₹Rs.]*([\d,]+\.?\d*)/i
-    );
+    if (currentDate) {
+      blockLines.push(line);
+    }
+  }
+  flush();
 
-    if (purchaseMatch && currentDate) {
-      const quantity = parseFloat(purchaseMatch[1]);
-      const amount = parseFloat(purchaseMatch[2].replace(/,/g, ''));
-      const goldPrice = parseFloat(purchaseMatch[3].replace(/,/g, ''));
-      const tax = parseFloat(purchaseMatch[4].replace(/,/g, ''));
+  console.log(`[SafeGold Parser] Built ${blocks.length} transaction block(s)`);
 
-      transactions.push({
-        date: currentDate,
-        goldPrice,
-        quantity,
-        amount,
-        tax,
-        type: 'credit',
-        platform: 'SafeGold',
-      });
+  // Count how many blocks actually contain purchased/sold for debugging
+  const purchaseBlocks = blocks.filter((b) => /purchased/i.test(b.text));
+  const soldBlocks = blocks.filter((b) => /\bsold\b/i.test(b.text));
+  console.log(
+    `[SafeGold Parser] Blocks with 'Purchased': ${purchaseBlocks.length}, 'Sold': ${soldBlocks.length}`
+  );
+
+  for (const block of blocks) {
+    const t = block.text;
+
+    if (isSkippable(t)) continue;
+
+    const lower = t.toLowerCase();
+
+    // ── Purchase ──────────────────────────────────────────────────────────────
+    if (lower.includes('purchased')) {
+      // "Purchased 2.1694 grams of 24K gold for ₹35000.0 at ₹15662.91/g Incl. GST of ₹1019.42"
+      // Currency symbol may be ₹, Rs., Rs or absent
+      const CURRENCY = '(?:(?:Rs\\.?|₹)\\s*)?';
+
+      const qtyMatch = t.match(/Purchased\s+([\d.]+)\s+grams?/i);
+      const amtMatch = t.match(new RegExp(`for\\s+${CURRENCY}([\\d,]+\\.?\\d*)`, 'i'));
+      const rateMatch = t.match(new RegExp(`at\\s+${CURRENCY}([\\d,]+\\.?\\d*)\\s*/\\s*g`, 'i'));
+      const gstMatch = t.match(new RegExp(`GST\\s+of\\s+${CURRENCY}([\\d,]+\\.?\\d*)`, 'i'));
+
+      if (qtyMatch && amtMatch && rateMatch) {
+        transactions.push({
+          date: block.date,
+          quantity: parseFloat(qtyMatch[1]),
+          amount: parseCurrencyNum(amtMatch[1]),
+          goldPrice: parseCurrencyNum(rateMatch[1]),
+          tax: gstMatch ? parseCurrencyNum(gstMatch[1]) : 0,
+          type: 'credit',
+          platform: 'SafeGold',
+        });
+      } else {
+        console.log('[SafeGold Parser] Could not parse purchase block:', t.slice(0, 120));
+      }
       continue;
     }
 
-    // Detect sale: "Sold X grams of 24K gold for ₹TOTAL at ₹RATE/g"
-    const saleMatch = line.match(
-      /Sold\s+([\d.]+)\s+grams?\s+of\s+24K\s+gold\s+for\s+[₹Rs.]*([\d,]+\.?\d*)\s+at\s+[₹Rs.]*([\d,]+\.?\d*)\/g/i
-    );
+    // ── Sale ──────────────────────────────────────────────────────────────────
+    if (/\bsold\b/i.test(t)) {
+      const CURRENCY = '(?:(?:Rs\\.?|₹)\\s*)?';
 
-    if (saleMatch && currentDate) {
-      const quantity = parseFloat(saleMatch[1]);
-      const amount = parseFloat(saleMatch[2].replace(/,/g, ''));
-      const goldPrice = parseFloat(saleMatch[3].replace(/,/g, ''));
+      const qtyMatch = t.match(/Sold\s+([\d.]+)\s+grams?/i);
+      const amtMatch = t.match(new RegExp(`for\\s+${CURRENCY}([\\d,]+\\.?\\d*)`, 'i'));
+      const rateMatch = t.match(new RegExp(`at\\s+${CURRENCY}([\\d,]+\\.?\\d*)\\s*/\\s*g`, 'i'));
 
-      transactions.push({
-        date: currentDate,
-        goldPrice,
-        quantity,
-        amount,
-        tax: 0,
-        type: 'debit',
-        platform: 'SafeGold',
-      });
+      if (qtyMatch && amtMatch && rateMatch) {
+        transactions.push({
+          date: block.date,
+          quantity: parseFloat(qtyMatch[1]),
+          amount: parseCurrencyNum(amtMatch[1]),
+          goldPrice: parseCurrencyNum(rateMatch[1]),
+          tax: 0,
+          type: 'debit',
+          platform: 'SafeGold',
+        });
+      } else {
+        console.log('[SafeGold Parser] Could not parse sale block:', t.slice(0, 120));
+      }
     }
-
-    // Skip all other transaction types (lease, TDS, rental)
   }
 
   console.log(`[SafeGold Parser] Extracted ${transactions.length} gold transactions`);

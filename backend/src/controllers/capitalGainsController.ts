@@ -2,13 +2,7 @@ import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import database from '../database';
 import { getUserFromRequest } from '../utils/jwtHelpers';
-import {
-  runFifo,
-  computeAssetFYGains,
-  buildSummary,
-  getIndianFY,
-  type AssetType,
-} from '../utils/capitalGains';
+import { runFifo, computeAssetFYGains, buildSummary, getIndianFY } from '../utils/capitalGains';
 
 export async function getCapitalGains(req: Request, res: Response) {
   try {
@@ -69,8 +63,8 @@ export async function getCapitalGains(req: Request, res: Response) {
       _id: doc._id,
       type: doc.type as 'credit' | 'debit',
       date: doc.date,
-      qty: doc.numOfUnits,
-      costPerUnit: doc.fundPrice,
+      qty: Number(doc.numOfUnits) || 0,
+      costPerUnit: Number(doc.fundPrice) || 0,
       label: doc.fundName,
     }));
     const mfFifo = runFifo(mfTxs, 'mutualFunds');
@@ -128,7 +122,7 @@ export async function getCapitalGains(req: Request, res: Response) {
         notes: [
           'LTCG exemption: ₹1.25L per year across equity + equity MF combined (not auto-applied per asset)',
           'Mutual funds: All treated as equity funds (STCG 20%, LTCG 12.5%). Debt MF taxed at slab rate.',
-          'Gold STCG: Taxable at your income slab rate (not computed here)',
+          'Digital gold (SafeGold): Gains are tax-free — no tax computed',
           'Crypto (VDA): 30% flat tax, no STCG/LTCG distinction',
           'Rates shown use Finance Act 2024 (effective July 23, 2024) for sales on/after that date',
         ],

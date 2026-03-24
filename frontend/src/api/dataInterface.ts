@@ -115,6 +115,7 @@ export interface EmailIntegrationStatus {
 export interface EmailSyncPreview {
   mutualFunds: ParsedMFTransaction[];
   gold: ParsedGoldTransaction[];
+  stocks: ParsedEmailStockHolding[];
   duplicatesSkipped: number;
   errors: string[];
 }
@@ -323,6 +324,15 @@ export interface MutualFundTransaction {
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ParsedEmailStockHolding {
+  stockName: string;
+  numOfShares: number;
+  marketPrice: number;
+  amount: number;
+  date: string;
+  type: 'credit';
 }
 
 export interface ParsedGoldTransaction {

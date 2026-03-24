@@ -13,12 +13,20 @@ const CREDIT_KEYWORDS = [
   'systematic investment',
   'sip',
   'switch in',
+  'lateral shift in',
   'dividend reinvestment',
   'nfo allotment',
+  'allotment',
 ];
 
 // Keywords that indicate a debit (redemption) transaction
-const DEBIT_KEYWORDS = ['redemption', 'switch out', 'withdrawal', 'repurchase'];
+const DEBIT_KEYWORDS = [
+  'redemption',
+  'switch out',
+  'lateral shift out',
+  'withdrawal',
+  'repurchase',
+];
 
 function isCredit(description: string): boolean {
   const lower = description.toLowerCase();
@@ -131,32 +139,22 @@ export function parseCdslMFTransactions(text: string): ParsedMFTransaction[] {
         restOfLine += ' ' + nextLine;
       }
 
-      // Extract: amount, NAV, price, units from restOfLine
-      // Pattern based on actual PDF: "... description ... 3999.8 169.236 169.236 23.634 .2 0 0"
-      // We want: amount (1st number), NAV (2nd number), price (3rd), units (4th)
-      const numMatches = [...restOfLine.matchAll(/([\d,]+\.?\d*)/g)].map((m) =>
+      // Extract all numbers including decimals like ".2" (stamp duty format)
+      // Columns: Amount (₹) | NAV (₹) | Price (₹) | Units | Stamp Duty | Income Dist | Capital Withdrawal
+      // = always 7 trailing data columns. Descriptions may contain reference numbers (e.g.
+      // "Lateral Shift In 73658086"), so we take the LAST 7 numbers to skip description numbers.
+      const numMatches = [...restOfLine.matchAll(/(\d[\d,]*\.?\d*|\.\d+)/g)].map((m) =>
         parseFloat(m[1].replace(/,/g, ''))
       );
 
-      // Filter out very small numbers that are likely stamp duty / 0 values
-      // We need at least 4 meaningful numbers: amount, NAV, price, units
-      const meaningfulNums = numMatches.filter((n) => n > 0);
+      if (numMatches.length >= 7) {
+        // Last 7 are always: Amount, NAV, Price, Units, StampDuty, IncomeDist, CapWithdrawal
+        const last7 = numMatches.slice(-7);
+        const amount = last7[0];
+        const nav = last7[1];
+        // last7[2] = Price (same as NAV, skip)
+        const units = last7[3];
 
-      if (meaningfulNums.length >= 4) {
-        const [amount, nav, , units] = meaningfulNums;
-        const description = restOfLine;
-
-        transactions.push({
-          date: parseDateDDMMYYYY(dateStr),
-          fundName: currentFundName,
-          amount,
-          fundPrice: nav,
-          numOfUnits: units,
-          type: isCredit(description) ? 'credit' : 'debit',
-        });
-      } else if (meaningfulNums.length === 3) {
-        // Sometimes stamp duty etc. may not appear; try amount, NAV, units
-        const [amount, nav, units] = meaningfulNums;
         transactions.push({
           date: parseDateDDMMYYYY(dateStr),
           fundName: currentFundName,
@@ -165,6 +163,21 @@ export function parseCdslMFTransactions(text: string): ParsedMFTransaction[] {
           numOfUnits: units,
           type: isCredit(restOfLine) ? 'credit' : 'debit',
         });
+      } else if (numMatches.length >= 4) {
+        // Fallback: fewer than 7 numbers (some trailing columns missing/blank)
+        // Use meaningful (non-zero) numbers: amount, NAV, units
+        const meaningful = numMatches.filter((n) => n > 0);
+        if (meaningful.length >= 3) {
+          const [amount, nav, , units = meaningful[2]] = meaningful;
+          transactions.push({
+            date: parseDateDDMMYYYY(dateStr),
+            fundName: currentFundName,
+            amount,
+            fundPrice: nav,
+            numOfUnits: units,
+            type: isCredit(restOfLine) ? 'credit' : 'debit',
+          });
+        }
       }
     }
   }

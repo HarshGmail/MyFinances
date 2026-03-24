@@ -382,6 +382,7 @@ function McpSection({ ingestToken }: { ingestToken: string | undefined }) {
 }
 
 function EmailSection() {
+  const { data: profile } = useUserProfileQuery();
   const { data: status, isLoading, refetch } = useEmailIntegrationStatusQuery();
   const { mutateAsync: sync, isPending: isSyncing } = useEmailSyncMutation();
   const { mutateAsync: importTxns, isPending: isImporting } = useEmailImportMutation();
@@ -393,6 +394,7 @@ function EmailSection() {
   const [preview, setPreview] = useState<EmailSyncPreview | null>(null);
   const [mfExpanded, setMfExpanded] = useState(true);
   const [goldExpanded, setGoldExpanded] = useState(true);
+  const [stocksExpanded, setStocksExpanded] = useState(true);
   const [safegoldSender, setSafegoldSender] = useState('');
   const [editingSender, setEditingSender] = useState(false);
 
@@ -431,7 +433,7 @@ function EmailSection() {
     try {
       const result = await sync();
       setPreview(result);
-      const total = result.mutualFunds.length + result.gold.length;
+      const total = result.mutualFunds.length + result.gold.length + (result.stocks?.length ?? 0);
       if (total === 0 && result.duplicatesSkipped === 0 && result.errors.length === 0) {
         toast.info('No new transactions found');
       } else {
@@ -447,7 +449,11 @@ function EmailSection() {
   const handleImport = async () => {
     if (!preview) return;
     try {
-      const result = await importTxns({ mutualFunds: preview.mutualFunds, gold: preview.gold });
+      const result = await importTxns({
+        mutualFunds: preview.mutualFunds,
+        gold: preview.gold,
+        stocks: preview.stocks ?? [],
+      });
       toast.success(`Imported ${result.total} transaction${result.total !== 1 ? 's' : ''}`);
       setPreview(null);
       await refetch();
@@ -476,7 +482,12 @@ function EmailSection() {
   }
 
   const connected = status?.connected ?? false;
-  const totalNew = preview ? preview.mutualFunds.length + preview.gold.length : 0;
+  const totalNew = preview
+    ? preview.mutualFunds.length + preview.gold.length + (preview.stocks?.length ?? 0)
+    : 0;
+  const missingPhone = !profile?.phone;
+  const missingPan = !profile?.panNumber;
+  const canSync = !missingPhone && !missingPan;
 
   return (
     <div className="space-y-6">
@@ -533,6 +544,26 @@ function EmailSection() {
           )}
         </CardContent>
       </Card>
+
+      {connected && (missingPhone || missingPan) && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 text-sm">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+          <div className="text-yellow-800 dark:text-yellow-300">
+            <p className="font-medium mb-1">Profile incomplete — sync disabled</p>
+            <p className="text-xs">
+              {[missingPhone && 'Phone number', missingPan && 'PAN number']
+                .filter(Boolean)
+                .join(' and ')}{' '}
+              {missingPhone && missingPan ? 'are' : 'is'} required to open password-protected PDFs.
+              Set {missingPhone && missingPan ? 'them' : 'it'} in{' '}
+              <a href="/profile" className="underline font-medium">
+                Profile
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      )}
 
       {connected && (
         <>
@@ -614,7 +645,7 @@ function EmailSection() {
                     <RefreshCw className="h-3 w-3" />
                     Full re-sync
                   </Button>
-                  <Button onClick={handleSync} disabled={isSyncing} className="gap-2">
+                  <Button onClick={handleSync} disabled={isSyncing || !canSync} className="gap-2">
                     <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
                     {isSyncing ? 'Syncing…' : 'Sync Now'}
                   </Button>
@@ -776,6 +807,57 @@ function EmailSection() {
                   </div>
                 )}
 
+                {/* Stocks */}
+                {preview.stocks && preview.stocks.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors text-sm font-medium"
+                      onClick={() => setStocksExpanded(!stocksExpanded)}
+                    >
+                      <span>Stock Holdings ({preview.stocks.length})</span>
+                      {stocksExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                    {stocksExpanded && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b bg-muted/30">
+                              <th className="text-left p-2 font-medium">Date</th>
+                              <th className="text-left p-2 font-medium">Stock</th>
+                              <th className="text-right p-2 font-medium">Shares</th>
+                              <th className="text-right p-2 font-medium">Price</th>
+                              <th className="text-right p-2 font-medium">Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.stocks.map((h, i) => (
+                              <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
+                                <td className="p-2 whitespace-nowrap text-muted-foreground">
+                                  {format(new Date(h.date), 'dd MMM yy')}
+                                </td>
+                                <td className="p-2 max-w-[180px] truncate" title={h.stockName}>
+                                  {h.stockName}
+                                </td>
+                                <td className="p-2 text-right">{h.numOfShares}</td>
+                                <td className="p-2 text-right">
+                                  ₹{h.marketPrice.toLocaleString('en-IN')}
+                                </td>
+                                <td className="p-2 text-right">
+                                  ₹{h.amount.toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {totalNew === 0 && (
                   <div className="text-center py-6 text-muted-foreground text-sm">
                     No new transactions to import. All found transactions are already in your
@@ -796,7 +878,8 @@ function EmailSection() {
                 <p className="font-medium text-foreground">CDSL eCAS (monthly email)</p>
                 <p>
                   Mutual fund transactions from the &ldquo;MUTUAL FUND UNITS HELD WITH MF/RTA&rdquo;
-                  section. Password: your PAN number (set in Profile).
+                  section, and equity holdings from the demat statement. Stocks already tracked in
+                  your portfolio are skipped. Password: your PAN number (set in Profile).
                 </p>
               </div>
               <div className="space-y-1">

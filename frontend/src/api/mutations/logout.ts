@@ -12,6 +12,9 @@ export function useLogoutMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: logout,
+    onSuccess: () => {
+      queryClient.clear();
+    },
   });
 
   const cancelRequest = () => {

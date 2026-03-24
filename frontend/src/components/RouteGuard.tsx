@@ -4,25 +4,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 const LAST_ROUTE_KEY = 'lastRoute';
+const PUBLIC_ROUTES = ['/', '/login', '/signup', '/privacy'];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
-  // Cache last visited route except /, /login, /signup (preserve query params)
+  // Cache last visited route except public routes (preserve query params)
   useEffect(() => {
-    if (pathname !== '/' && pathname !== '/login' && pathname !== '/signup') {
+    if (!PUBLIC_ROUTES.includes(pathname)) {
       localStorage.setItem(LAST_ROUTE_KEY, pathname + window.location.search);
     }
   }, [pathname]);
 
   useEffect(() => {
     // If not logged in, redirect to /
-    if (!isLoggedIn && pathname !== '/') {
+    if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname)) {
       router.replace('/');
     }
-    // If logged in, prevent access to / (login/signup)
+    // If logged in, prevent access to / (login/signup) but allow /privacy
     if (isLoggedIn && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
       const lastRoute = localStorage.getItem(LAST_ROUTE_KEY);
       if (lastRoute) {

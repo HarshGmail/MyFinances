@@ -180,6 +180,14 @@ export function computeAssetFYGains(
     if (assetType === 'crypto') {
       entry.flatGains = (entry.flatGains ?? 0) + lot.gain;
       entry.flatTax = (entry.flatTax ?? 0) + Math.max(0, lot.gain) * 0.3;
+    } else if (assetType === 'gold') {
+      // Digital gold (SafeGold) gains are tax-free — gains tracked but no tax computed
+      if (lot.isLtcg) {
+        entry.ltcgGains += lot.gain;
+      } else {
+        entry.stcgGains += lot.gain;
+      }
+      // stcgTax and ltcgTax remain 0 for gold
     } else {
       const rates = equityRates(lot.saleDate);
       if (lot.isLtcg) {
@@ -234,7 +242,7 @@ export function buildSummary(
 
     const equityStcgTax = s.stcgTax + m.stcgTax;
     const equityLtcgTax = s.ltcgTax + m.ltcgTax;
-    const goldLtcgTax = g.ltcgTax ?? 0;
+    const goldLtcgTax = 0; // Digital gold gains are tax-free
     const cryptoTax = c.flatTax ?? 0;
 
     summary[fy] = {
@@ -247,7 +255,7 @@ export function buildSummary(
       equityLtcgTax,
       goldLtcgTax,
       cryptoTax,
-      totalEstimatedTax: equityStcgTax + equityLtcgTax + goldLtcgTax + cryptoTax,
+      totalEstimatedTax: equityStcgTax + equityLtcgTax + cryptoTax, // gold excluded
     };
   }
 

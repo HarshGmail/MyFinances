@@ -110,3 +110,63 @@ export async function fetchPdfAttachments(
 
   return pdfBuffers;
 }
+
+/**
+ * Fetch the HTML body of emails matching a Gmail query.
+ * Used for emails that carry data in the email body (not as attachments) — e.g. CoinDCX trade confirmations.
+ */
+export async function fetchEmailBodies(
+  encryptedRefreshToken: string,
+  gmailQuery: string,
+  afterDate?: Date
+): Promise<string[]> {
+  const oauth2Client = getOAuthClient();
+  oauth2Client.setCredentials({ refresh_token: decrypt(encryptedRefreshToken) });
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+  const query = afterDate
+    ? `${gmailQuery} after:${Math.floor(afterDate.getTime() / 1000)}`
+    : gmailQuery;
+
+  const messages: { id?: string | null }[] = [];
+  let pageToken: string | undefined;
+  do {
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: query,
+      maxResults: 500,
+      pageToken,
+    });
+    messages.push(...(listRes.data.messages ?? []));
+    pageToken = listRes.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  const bodies: string[] = [];
+
+  for (const msg of messages) {
+    if (!msg.id) continue;
+    const msgRes = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+    const payload = msgRes.data.payload;
+    if (!payload) continue;
+
+    // Find the HTML part — may be top-level or nested inside multipart
+    const htmlBody = extractHtmlBody(payload);
+    if (htmlBody) bodies.push(htmlBody);
+  }
+
+  return bodies;
+}
+
+function extractHtmlBody(payload: import('googleapis').gmail_v1.Schema$MessagePart): string | null {
+  if (payload.mimeType === 'text/html' && payload.body?.data) {
+    return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+  }
+
+  for (const part of payload.parts ?? []) {
+    const result = extractHtmlBody(part);
+    if (result) return result;
+  }
+
+  return null;
+}

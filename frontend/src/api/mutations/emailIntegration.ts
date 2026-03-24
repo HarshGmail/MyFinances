@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { EmailSyncPreview, ParsedMFTransaction, ParsedGoldTransaction } from '@/api/dataInterface';
+import {
+  EmailSyncPreview,
+  ParsedMFTransaction,
+  ParsedGoldTransaction,
+  ParsedEmailStockHolding,
+} from '@/api/dataInterface';
 
 async function syncEmails(): Promise<EmailSyncPreview> {
   const response = await apiRequest({ endpoint: '/email-integration/sync', method: 'POST' });
@@ -14,7 +19,8 @@ export function useEmailSyncMutation() {
 async function importTransactions(data: {
   mutualFunds: ParsedMFTransaction[];
   gold: ParsedGoldTransaction[];
-}): Promise<{ importedMF: number; importedGold: number; total: number }> {
+  stocks: ParsedEmailStockHolding[];
+}): Promise<{ importedMF: number; importedGold: number; importedStocks: number; total: number }> {
   const response = await apiRequest({
     endpoint: '/email-integration/import',
     method: 'POST',
@@ -30,6 +36,7 @@ export function useEmailImportMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mfTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['goldTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
     },
   });
 }

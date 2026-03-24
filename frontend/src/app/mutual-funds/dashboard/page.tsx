@@ -72,21 +72,27 @@ export default function MutualFundsDashboardPage() {
   const tableData = useMemo(() => {
     if (!mutualFundsTransactionsData || !mfInfoData) return [];
     return Object.entries(grouped).map(([fundName, txs]) => {
+      const totalCreditUnits = txs
+        .filter((tx) => tx.type === 'credit')
+        .reduce((s, tx) => s + tx.numOfUnits, 0);
+      const totalCreditAmount = txs
+        .filter((tx) => tx.type === 'credit')
+        .reduce((s, tx) => s + tx.amount, 0);
+      const avgCostPerUnit = totalCreditUnits > 0 ? totalCreditAmount / totalCreditUnits : 0;
+
       const totalUnits = txs.reduce(
         (sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits : -tx.numOfUnits),
         0
       );
-      const totalInvested = txs.reduce(
-        (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
-        0
-      );
+      const remainingUnits = Math.max(0, totalUnits);
+      const totalInvested = remainingUnits * avgCostPerUnit;
 
       // Find schemeNumber for this fundName
       const info = mfInfoData.find((info) => info.fundName === fundName);
       const schemeNumber = info?.schemeNumber;
       const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
       const currentNav = navInfo ? navInfo.nav : null;
-      const currentValue = currentNav !== null ? totalUnits * currentNav : null;
+      const currentValue = currentNav !== null ? remainingUnits * currentNav : null;
       const profitLoss = currentValue !== null ? currentValue - totalInvested : null;
       const profitLossPercentage =
         profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;
@@ -126,7 +132,10 @@ export default function MutualFundsDashboardPage() {
       const schemeNumber = info?.schemeNumber;
       const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
       if (!navInfo) continue;
-      const gain = (navInfo.nav - lot.costPerUnit) * lot.units;
+      const costPerUnit = Number(lot.costPerUnit);
+      const units = Number(lot.units);
+      if (!Number.isFinite(costPerUnit) || !Number.isFinite(units)) continue;
+      const gain = (navInfo.nav - costPerUnit) * units;
       if (lot.holdingDays > 365) ltcg += gain;
       else stcg += gain;
     }
@@ -150,7 +159,10 @@ export default function MutualFundsDashboardPage() {
       const schemeNumber = info?.schemeNumber;
       const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
       if (!navInfo) continue;
-      const gain = (navInfo.nav - lot.costPerUnit) * lot.units;
+      const costPerUnit = Number(lot.costPerUnit);
+      const units = Number(lot.units);
+      if (!Number.isFinite(costPerUnit) || !Number.isFinite(units)) continue;
+      const gain = (navInfo.nav - costPerUnit) * units;
       if (!map[name]) map[name] = { stcg: 0, ltcg: 0 };
       if (lot.holdingDays > 365) map[name].ltcg += gain;
       else map[name].stcg += gain;
@@ -626,78 +638,80 @@ export default function MutualFundsDashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tableData.map((row, idx) => (
-                <TableRow key={row.fundName}>
-                  <TableCell>{idx + 1}</TableCell>
-                  <TableCell
-                    className={`font-medium cursor-pointer underline hover:text-primary transition-colors ${selectedFund === row.fundName ? 'text-primary' : ''}`}
-                    onClick={() =>
-                      setSelectedFund(selectedFund === row.fundName ? 'All' : row.fundName)
-                    }
-                  >
-                    {row.fundName}
-                  </TableCell>
-                  <TableCell>{row.totalUnits.toFixed(2)}</TableCell>
-                  <TableCell>
-                    ₹{row.totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell>
-                    {row.currentNav !== null
-                      ? `₹${row.currentNav.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    {row.currentValue !== null
-                      ? formatCurrency(Number(row.currentValue.toFixed(2)))
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    {row.currentValue !== null && row.profitLoss !== null ? (
-                      <span className={getProfitLossColor(row.profitLoss)}>
-                        {formatCurrency(Number(row.profitLoss.toFixed(2)))}
-                      </span>
-                    ) : (
-                      'N/A'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.profitLossPercentage !== null ? (
-                      <Badge variant={getProfitLossBadgeVariant(row.profitLoss)}>
-                        {row.profitLossPercentage.toFixed(2)}%
-                      </Badge>
-                    ) : (
-                      'N/A'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.fundXirr !== null ? (
-                      <Badge variant={row.fundXirr >= 0 ? 'default' : 'destructive'}>
-                        {row.fundXirr.toFixed(2)}%
-                      </Badge>
-                    ) : (
-                      'N/A'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {mfUnrealizedByFund[row.fundName] ? (
-                      <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].stcg)}>
-                        {formatCurrency(mfUnrealizedByFund[row.fundName].stcg)}
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {mfUnrealizedByFund[row.fundName] ? (
-                      <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].ltcg)}>
-                        {formatCurrency(mfUnrealizedByFund[row.fundName].ltcg)}
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {tableData
+                .filter((row) => row.totalUnits > 0)
+                .map((row, idx) => (
+                  <TableRow key={row.fundName}>
+                    <TableCell>{idx + 1}</TableCell>
+                    <TableCell
+                      className={`font-medium cursor-pointer underline hover:text-primary transition-colors ${selectedFund === row.fundName ? 'text-primary' : ''}`}
+                      onClick={() =>
+                        setSelectedFund(selectedFund === row.fundName ? 'All' : row.fundName)
+                      }
+                    >
+                      {row.fundName}
+                    </TableCell>
+                    <TableCell>{row.totalUnits.toFixed(2)}</TableCell>
+                    <TableCell>
+                      ₹{row.totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      {row.currentNav !== null
+                        ? `₹${row.currentNav.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {row.currentValue !== null
+                        ? formatCurrency(Number(row.currentValue.toFixed(2)))
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {row.currentValue !== null && row.profitLoss !== null ? (
+                        <span className={getProfitLossColor(row.profitLoss)}>
+                          {formatCurrency(Number(row.profitLoss.toFixed(2)))}
+                        </span>
+                      ) : (
+                        'N/A'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.profitLossPercentage !== null ? (
+                        <Badge variant={getProfitLossBadgeVariant(row.profitLoss)}>
+                          {row.profitLossPercentage.toFixed(2)}%
+                        </Badge>
+                      ) : (
+                        'N/A'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.fundXirr !== null ? (
+                        <Badge variant={row.fundXirr >= 0 ? 'default' : 'destructive'}>
+                          {row.fundXirr.toFixed(2)}%
+                        </Badge>
+                      ) : (
+                        'N/A'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {mfUnrealizedByFund[row.fundName] ? (
+                        <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].stcg)}>
+                          {formatCurrency(mfUnrealizedByFund[row.fundName].stcg)}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {mfUnrealizedByFund[row.fundName] ? (
+                        <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].ltcg)}>
+                          {formatCurrency(mfUnrealizedByFund[row.fundName].ltcg)}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>

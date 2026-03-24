@@ -1,31 +1,44 @@
+// pdf-parse v2.x: constructor takes { data, password, verbosity }, method is getText()
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParseModule = require('pdf-parse');
-// pdf-parse may export the function directly or nest it under .default
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pdfParse: (...args: any[]) => Promise<{ text: string }> =
-  pdfParseModule.default ?? pdfParseModule;
+const { PDFParse, PasswordException, VerbosityLevel } = require('pdf-parse');
 
 export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): Promise<string> {
-  // Try each password in sequence
   const passwordsToTry = passwords.length > 0 ? passwords : [''];
 
   for (const password of passwordsToTry) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let parser: any = null;
     try {
-      const options: Record<string, unknown> = {};
-      if (password) options.password = password;
-      const data = await pdfParse(buffer, options);
-      return data.text as string;
+      const loadParams: Record<string, unknown> = {
+        data: buffer,
+        verbosity: VerbosityLevel.ERRORS,
+      };
+      if (password) loadParams.password = password;
+
+      parser = new PDFParse(loadParams);
+      const result = await parser.getText();
+      return result.text as string;
     } catch (err: unknown) {
+      // Wrong password — try the next one
+      if (err instanceof PasswordException) {
+        continue;
+      }
       const message = err instanceof Error ? err.message : String(err);
-      // If password was wrong, try next one
       if (
         message.toLowerCase().includes('password') ||
         message.toLowerCase().includes('encrypted')
       ) {
         continue;
       }
-      // Non-password error — rethrow
       throw err;
+    } finally {
+      if (parser) {
+        try {
+          await parser.destroy();
+        } catch {
+          // ignore destroy errors
+        }
+      }
     }
   }
 
