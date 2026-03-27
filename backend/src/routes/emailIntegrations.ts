@@ -7,6 +7,7 @@ import {
   resetSync,
   updateSettings,
   syncEmails,
+  getSyncJobStatus,
   importTransactions,
 } from '../controllers/emailIntegrationsController';
 import { authenticateToken } from '../middleware';
@@ -20,6 +21,7 @@ router.delete('/disconnect', authenticateToken, disconnect);
 router.post('/reset-sync', authenticateToken, resetSync);
 router.put('/settings', authenticateToken, updateSettings);
 router.post('/sync', authenticateToken, syncEmails);
+router.get('/sync-status/:jobId', authenticateToken, getSyncJobStatus);
 router.post('/import', authenticateToken, importTransactions);
 
 export default router;

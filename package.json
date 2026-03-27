@@ -12,7 +12,8 @@
     "prettier:auto": "node scripts/prettier-auto.js",
     "prettier:frontend": "cd frontend && npm run prettier:fix",
     "prettier:backend": "cd backend && npm run prettier:fix",
-    "prettier:all": "npm run prettier:frontend && npm run prettier:backend",
+    "prettier:mcp": "cd mcp-server && npm run prettier:fix",
+    "prettier:all": "npm run prettier:frontend && npm run prettier:backend && npm run prettier:mcp",
     "deploy:check": "node scripts/deploy-check.js",
     "deploy": "node scripts/deploy.js"
   },

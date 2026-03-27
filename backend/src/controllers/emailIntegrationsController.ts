@@ -16,6 +16,7 @@ import { parseSafeGoldTransactions } from '../services/safegoldParser';
 import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
+import { isPdfServiceAvailable, submitPdfJob, waitForPdfJob } from '../services/pdfParsingClient';
 import { decrypt } from '../utils/encryption';
 import config from '../config';
 
@@ -216,51 +217,135 @@ export async function syncEmails(req: Request, res: Response) {
     const db = database.getDb();
     const userId = new ObjectId(user.userId);
 
-    // Load all linked integrations for this user
     const integrations = await db.collection('emailIntegrations').find({ userId }).toArray();
     if (integrations.length === 0) {
       res.status(400).json({ success: false, message: 'No Gmail account linked' });
       return;
     }
 
-    // Load user for PAN and phone (needed for PDF passwords)
     const userDoc = await db.collection('users').findOne({ _id: userId });
     if (!userDoc) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
     }
 
-    // Derive passwords
-    const cdslPassword = derivesCdslPassword(userDoc.panNumber);
-    const safegoldPassword = derivesSafeGoldPassword(userDoc.name, userDoc.phone);
+    // Create the job record and return its ID immediately — the actual work
+    // happens in the background so the HTTP response is never held open.
+    const jobId = new ObjectId().toHexString();
+    await db.collection('syncJobs').insertOne({
+      _id: new ObjectId(jobId),
+      userId,
+      status: 'processing',
+      createdAt: new Date(),
+    });
 
-    const errors: string[] = [];
-    const allMFTransactions: ReturnType<typeof parseCdslMFTransactions> = [];
-    const allGoldTransactions: ReturnType<typeof parseSafeGoldTransactions> = [];
-    const allStockHoldings: ParsedStockHolding[] = [];
-    const allCryptoTrades: ParsedCoinDCXTrade[] = [];
+    res.status(202).json({ success: true, data: { jobId } });
 
-    // Loop over every linked account and collect from each
+    void runSyncInBackground(jobId, userId, userDoc, integrations, db);
+  } catch (err) {
+    console.error('Sync error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+// ─── Sync Status ──────────────────────────────────────────────────────────────
+
+export async function getSyncJobStatus(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { jobId } = req.params;
+    const db = database.getDb();
+
+    const job = await db.collection('syncJobs').findOne({
+      _id: new ObjectId(jobId),
+      userId: new ObjectId(user.userId),
+    });
+
+    if (!job) {
+      res.status(404).json({ success: false, message: 'Job not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { status: job.status, result: job.result ?? null, error: job.error ?? null },
+    });
+  } catch (err) {
+    console.error('Get sync job status error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+// ─── Background sync worker ───────────────────────────────────────────────────
+
+async function runSyncInBackground(
+  jobId: string,
+  userId: ObjectId,
+  userDoc: Record<string, unknown>,
+  integrations: Record<string, unknown>[],
+  db: ReturnType<typeof database.getDb>
+) {
+  const cdslPassword = derivesCdslPassword(userDoc.panNumber as string | undefined);
+  const safegoldPassword = derivesSafeGoldPassword(
+    userDoc.name as string,
+    userDoc.phone as string | undefined
+  );
+
+  const errors: string[] = [];
+  const allMFTransactions: ReturnType<typeof parseCdslMFTransactions> = [];
+  const allGoldTransactions: ReturnType<typeof parseSafeGoldTransactions> = [];
+  const allStockHoldings: ParsedStockHolding[] = [];
+  const allCryptoTrades: ParsedCoinDCXTrade[] = [];
+  const useRustService = isPdfServiceAvailable();
+
+  try {
     for (const integration of integrations) {
-      const afterDate: Date | undefined = integration.lastSyncAt ?? undefined;
-      const accountTag = integration.email;
+      const afterDate: Date | undefined = (integration.lastSyncAt as Date | null) ?? undefined;
+      const accountTag = integration.email as string;
+      const cdslPasswords = cdslPassword ? [cdslPassword, ''] : [''];
+      const sgPasswords = safegoldPassword ? [safegoldPassword, ''] : [''];
 
-      // ── Fetch and parse CDSL emails ────────────────────────────────────────
+      // ── CDSL ──────────────────────────────────────────────────────────────
       try {
-        const cdslQuery = 'from:eCAS@cdslstatement.com has:attachment';
-        const cdslPdfs = await fetchPdfAttachments(integration.refreshToken, cdslQuery, afterDate);
+        const cdslPdfs = await fetchPdfAttachments(
+          integration.refreshToken as string,
+          'from:eCAS@cdslstatement.com has:attachment',
+          afterDate
+        );
         console.log(`[Sync:${accountTag}] Found ${cdslPdfs.length} CDSL PDF(s)`);
 
-        for (const pdf of cdslPdfs) {
-          try {
-            const passwords = cdslPassword ? [cdslPassword, ''] : [''];
-            const text = await extractTextFromPdf(pdf, passwords);
-            allMFTransactions.push(...parseCdslMFTransactions(text));
-            allStockHoldings.push(...parseCdslStockHoldings(text));
-          } catch (e) {
-            errors.push(
-              `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`
-            );
+        if (cdslPdfs.length > 0) {
+          if (useRustService) {
+            try {
+              const rustJobId = await submitPdfJob('cdsl_cas', cdslPdfs, cdslPasswords);
+              const result = await waitForPdfJob(rustJobId);
+              if (result?.parser_type === 'cdsl_cas') {
+                // TODO: map Rust MfTransaction[] to Node.js parseCdslMFTransactions format
+                // once the Rust CDSL parser is implemented
+                console.log(`[Sync:${accountTag}] Rust CDSL job done — implement mapping`);
+              }
+            } catch (e) {
+              errors.push(
+                `[${accountTag}] CDSL Rust parse error: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+          } else {
+            for (const pdf of cdslPdfs) {
+              try {
+                const text = await extractTextFromPdf(pdf, cdslPasswords);
+                allMFTransactions.push(...parseCdslMFTransactions(text));
+                allStockHoldings.push(...parseCdslStockHoldings(text));
+              } catch (e) {
+                errors.push(
+                  `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`
+                );
+              }
+            }
           }
         }
       } catch (e) {
@@ -269,25 +354,42 @@ export async function syncEmails(req: Request, res: Response) {
         );
       }
 
-      // ── Fetch and parse SafeGold statement emails ──────────────────────────
+      // ── SafeGold statement ────────────────────────────────────────────────
       try {
-        const sgSender = integration.safegoldSender ?? 'estatements@safegold.in';
+        const sgSender = (integration.safegoldSender as string) ?? 'estatements@safegold.in';
         const sgPdfs = await fetchPdfAttachments(
-          integration.refreshToken,
+          integration.refreshToken as string,
           `from:${sgSender} has:attachment`,
           afterDate
         );
         console.log(`[Sync:${accountTag}] Found ${sgPdfs.length} SafeGold PDF(s)`);
 
-        for (const pdf of sgPdfs) {
-          try {
-            const passwords = safegoldPassword ? [safegoldPassword, ''] : [''];
-            const text = await extractTextFromPdf(pdf, passwords);
-            allGoldTransactions.push(...parseSafeGoldTransactions(text));
-          } catch (e) {
-            errors.push(
-              `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`
-            );
+        if (sgPdfs.length > 0) {
+          if (useRustService) {
+            try {
+              const rustJobId = await submitPdfJob('safe_gold', sgPdfs, sgPasswords);
+              const result = await waitForPdfJob(rustJobId);
+              if (result?.parser_type === 'safe_gold') {
+                // TODO: map Rust GoldTransaction[] to Node.js parseSafeGoldTransactions format
+                // once the Rust SafeGold parser is implemented
+                console.log(`[Sync:${accountTag}] Rust SafeGold job done — implement mapping`);
+              }
+            } catch (e) {
+              errors.push(
+                `[${accountTag}] SafeGold Rust parse error: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+          } else {
+            for (const pdf of sgPdfs) {
+              try {
+                const text = await extractTextFromPdf(pdf, sgPasswords);
+                allGoldTransactions.push(...parseSafeGoldTransactions(text));
+              } catch (e) {
+                errors.push(
+                  `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`
+                );
+              }
+            }
           }
         }
       } catch (e) {
@@ -296,10 +398,10 @@ export async function syncEmails(req: Request, res: Response) {
         );
       }
 
-      // ── Fetch and parse SafeGold real-time invoice emails ──────────────────
+      // ── SafeGold invoices (stays in Node.js — not encrypted, quick parse) ─
       try {
         const sgInvoicePdfs = await fetchPdfAttachments(
-          integration.refreshToken,
+          integration.refreshToken as string,
           'from:noreply@safegold.in has:attachment',
           afterDate
         );
@@ -322,10 +424,10 @@ export async function syncEmails(req: Request, res: Response) {
         );
       }
 
-      // ── Fetch and parse CoinDCX trade emails ──────────────────────────────
+      // ── CoinDCX (email body, not PDF — always in Node.js) ─────────────────
       try {
         const cdxBodies = await fetchEmailBodies(
-          integration.refreshToken,
+          integration.refreshToken as string,
           'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
           afterDate
         );
@@ -348,39 +450,50 @@ export async function syncEmails(req: Request, res: Response) {
       }
     }
 
-    // ── Deduplicate against existing DB records ──────────────────────────────
-
-    // Normalize CDSL fund names to match existing DB fund names (for NAV lookups)
+    // ── Deduplicate and resolve names ────────────────────────────────────────
     const canonicalMF = await canonicalizeMFNames(db, userId, allMFTransactions);
     const { newMF, skippedMF } = await deduplicateMF(db, userId, canonicalMF);
     const { newGold, skippedGold } = await deduplicateGold(db, userId, allGoldTransactions);
 
-    // Deduplicate stock holdings across multiple PDFs, then canonicalize names via Yahoo Finance
     const dedupedHoldings = deduplicateHoldingsList(allStockHoldings);
     const canonicalStocks = await canonicalizeStockNames(db, userId, dedupedHoldings);
     const { newStocks, skippedStocks } = await deduplicateStocks(db, userId, canonicalStocks);
 
     const { newCrypto, skippedCrypto } = await deduplicateCrypto(db, userId, allCryptoTrades);
 
-    // Update lastSyncAt for all linked accounts
     await db
       .collection('emailIntegrations')
       .updateMany({ userId }, { $set: { lastSyncAt: new Date() } });
 
-    res.json({
-      success: true,
-      data: {
-        mutualFunds: newMF,
-        gold: newGold,
-        stocks: newStocks,
-        crypto: newCrypto,
-        duplicatesSkipped: skippedMF + skippedGold + skippedStocks + skippedCrypto,
-        errors,
-      },
-    });
+    await db.collection('syncJobs').updateOne(
+      { _id: new ObjectId(jobId) },
+      {
+        $set: {
+          status: 'done',
+          completedAt: new Date(),
+          result: {
+            mutualFunds: newMF,
+            gold: newGold,
+            stocks: newStocks,
+            crypto: newCrypto,
+            duplicatesSkipped: skippedMF + skippedGold + skippedStocks + skippedCrypto,
+            errors,
+          },
+        },
+      }
+    );
   } catch (err) {
-    console.error('Sync error:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    console.error(`[syncJob:${jobId}] Unhandled error:`, err);
+    await db.collection('syncJobs').updateOne(
+      { _id: new ObjectId(jobId) },
+      {
+        $set: {
+          status: 'failed',
+          completedAt: new Date(),
+          error: err instanceof Error ? err.message : 'Internal error',
+        },
+      }
+    );
   }
 }
 

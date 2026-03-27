@@ -1,14 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
 import {
-  EmailSyncPreview,
   ParsedMFTransaction,
   ParsedGoldTransaction,
   ParsedEmailStockHolding,
   ParsedCryptoEmailTransaction,
 } from '@/api/dataInterface';
 
-async function syncEmails(): Promise<EmailSyncPreview> {
+async function syncEmails(): Promise<{ jobId: string }> {
   const response = await apiRequest({ endpoint: '/email-integration/sync', method: 'POST' });
   return response.data;
 }

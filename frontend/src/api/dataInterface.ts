@@ -410,7 +410,6 @@ export interface SafeGoldRatesResponse {
   data: SafeGoldRate[];
 }
 
-// Salary and Payment History types
 export interface SalaryRecord {
   baseSalary: number;
   effectiveDate: string;
@@ -514,6 +513,12 @@ export interface StockTransaction {
   updatedAt?: string;
 }
 
+export interface SyncJobStatus {
+  status: 'processing' | 'done' | 'failed';
+  result: EmailSyncPreview | null;
+  error: string | null;
+}
+
 export interface TimelineRow {
   type: 'contribution' | 'interest';
   organization?: string;
@@ -559,7 +564,6 @@ export interface UserGoal {
   targetAmount?: number;
 }
 
-// Updated UserProfile interface
 export interface UserProfile {
   userName: string;
   userEmail: string;

@@ -34,6 +34,10 @@ interface Config {
 
   // AES-256-GCM encryption key (64-char hex = 32 bytes)
   ENCRYPTION_KEY?: string;
+
+  // PDF parsing microservice (Rust). When set, PDF parsing is offloaded to this service.
+  // When unset, the Node.js inline parsers are used as fallback.
+  PDF_PARSING_SERVICE_URL?: string;
 }
 
 // Validate required environment variables
@@ -62,6 +66,7 @@ const config: Config = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+  PDF_PARSING_SERVICE_URL: process.env.PDF_PARSING_SERVICE_URL,
 };
 
 export default config;

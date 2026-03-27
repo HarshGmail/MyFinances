@@ -25,7 +25,8 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
   server.registerTool(
     'add_expense_transaction',
     {
-      description: 'Log a new daily expense transaction (individual purchase or payment). If this tool fails or times out, retry it once.',
+      description:
+        'Log a new daily expense transaction (individual purchase or payment). If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         date: z.string().describe('Date in ISO format e.g. 2025-03-20'),
         name: z.string().describe('Name/description of the expense e.g. "Coffee at Starbucks"'),
@@ -37,7 +38,12 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
     async (input) => {
       const result = await client.post('/expense-transactions', input);
       return {
-        content: [{ type: 'text' as const, text: `Expense logged successfully.\n${JSON.stringify(result, null, 2)}` }],
+        content: [
+          {
+            type: 'text' as const,
+            text: `Expense logged successfully.\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
       };
     }
   );

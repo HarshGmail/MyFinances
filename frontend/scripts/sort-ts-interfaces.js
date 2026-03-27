@@ -18,24 +18,20 @@ const declarations = sourceFile
       stmt.getKind() === SyntaxKind.TypeAliasDeclaration
   );
 
-// ✅ Cache all needed info BEFORE removing anything
+// Cache declaration text using getText() (excludes leading trivia like stale file-level comments)
 const declarationTexts = declarations.map((decl) => {
   const identifier = decl.getFirstChildByKindOrThrow(SyntaxKind.Identifier);
   return {
     name: identifier.getText(),
-    text: decl.getFullText(),
-    node: decl, // Save node for later removal
+    text: decl.getText(),
   };
 });
 
 // Sort alphabetically by name
 declarationTexts.sort((a, b) => a.name.localeCompare(b.name));
 
-// Remove all old nodes
-declarationTexts.forEach((d) => d.node.remove());
-
-// Add back sorted declarations
-sourceFile.addStatements(declarationTexts.map((d) => d.text));
+// Replace the entire file with the sorted declarations — no leftover trivia or stale comments
+sourceFile.replaceWithText(declarationTexts.map((d) => d.text).join('\n\n') + '\n');
 
 // Save to file
 sourceFile.saveSync();

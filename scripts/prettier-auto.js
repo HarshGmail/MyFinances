@@ -42,7 +42,8 @@ async function runPrettierOnBoth() {
   try {
     await Promise.all([
       runPrettier('frontend'),
-      runPrettier('backend')
+      runPrettier('backend'),
+      runPrettier('mcp-server')
     ]);
     console.log(`✅ Prettier completed at ${timestamp}\n`);
   } catch (error) {

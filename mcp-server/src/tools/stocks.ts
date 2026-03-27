@@ -6,7 +6,8 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   server.registerTool(
     'get_stock_transactions',
     {
-      description: 'Fetch all stock buy and sell transactions. Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount for each transaction. If this tool fails or times out, retry it once.',
+      description:
+        'Fetch all stock buy and sell transactions. Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount for each transaction. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -31,20 +32,32 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   server.registerTool(
     'add_stock_transaction',
     {
-      description: 'Log a stock buy (credit) or sell (debit) transaction. If this tool fails or times out, retry it once.',
+      description:
+        'Log a stock buy (credit) or sell (debit) transaction. If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         type: z.enum(['credit', 'debit']).describe('"credit" = buy, "debit" = sell'),
         stockName: z.string().describe('NSE stock symbol e.g. "RELIANCE", "TCS", "INFY"'),
         date: z.string().describe('Transaction date in ISO format e.g. "2025-03-20"'),
-        marketPrice: z.number().positive().describe('Price per share at time of transaction in INR'),
+        marketPrice: z
+          .number()
+          .positive()
+          .describe('Price per share at time of transaction in INR'),
         numOfShares: z.number().positive().describe('Number of shares bought or sold'),
-        amount: z.number().nonnegative().describe('Total transaction value in INR (marketPrice × numOfShares)'),
+        amount: z
+          .number()
+          .nonnegative()
+          .describe('Total transaction value in INR (marketPrice × numOfShares)'),
       }),
     },
     async (input) => {
       const result = await client.post('/stocks/transaction', input);
       return {
-        content: [{ type: 'text' as const, text: `Stock transaction added successfully.\n${JSON.stringify(result, null, 2)}` }],
+        content: [
+          {
+            type: 'text' as const,
+            text: `Stock transaction added successfully.\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
       };
     }
   );

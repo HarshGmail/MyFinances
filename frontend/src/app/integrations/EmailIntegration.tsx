@@ -2,7 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useUserProfileQuery, useEmailIntegrationStatusQuery } from '@/api/query';
+import {
+  useUserProfileQuery,
+  useEmailIntegrationStatusQuery,
+  useSyncJobStatusQuery,
+} from '@/api/query';
 import { useEmailSyncMutation, useEmailImportMutation } from '@/api/mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,10 +53,39 @@ export default function EmailIntegration({
 }) {
   const { data: profile } = useUserProfileQuery();
   const { data: status, isLoading, refetch } = useEmailIntegrationStatusQuery();
-  const { mutateAsync: sync, isPending: isSyncing } = useEmailSyncMutation();
+  const { mutateAsync: sync, isPending: isSyncSubmitting } = useEmailSyncMutation();
   const { mutateAsync: importTxns, isPending: isImporting } = useEmailImportMutation();
 
   const [preview, setPreview] = useState<EmailSyncPreviewType | null>(null);
+  const [syncJobId, setSyncJobId] = useState<string | null>(null);
+
+  const { data: syncJobData } = useSyncJobStatusQuery(syncJobId);
+  const isSyncing = isSyncSubmitting || (!!syncJobId && syncJobData?.status === 'processing');
+
+  // When the job finishes, lift the results into preview state
+  useEffect(() => {
+    if (!syncJobData) return;
+    if (syncJobData.status === 'done' && syncJobData.result) {
+      const result = syncJobData.result;
+      setPreview(result);
+      setSyncJobId(null);
+      const total =
+        result.mutualFunds.length +
+        result.gold.length +
+        (result.stocks?.length ?? 0) +
+        (result.crypto?.length ?? 0);
+      if (total === 0 && result.duplicatesSkipped === 0 && result.errors.length === 0) {
+        toast.info('No new transactions found');
+      } else {
+        toast.success(
+          `Found ${total} new transaction${total !== 1 ? 's' : ''} (${result.duplicatesSkipped} duplicates skipped)`
+        );
+      }
+    } else if (syncJobData.status === 'failed') {
+      setSyncJobId(null);
+      toast.error(syncJobData.error ?? 'Sync failed');
+    }
+  }, [syncJobData]);
 
   const handleConnect = async () => {
     try {
@@ -72,20 +105,9 @@ export default function EmailIntegration({
 
   const handleSync = async () => {
     try {
-      const result = await sync();
-      setPreview(result);
-      const total =
-        result.mutualFunds.length +
-        result.gold.length +
-        (result.stocks?.length ?? 0) +
-        (result.crypto?.length ?? 0);
-      if (total === 0 && result.duplicatesSkipped === 0 && result.errors.length === 0) {
-        toast.info('No new transactions found');
-      } else {
-        toast.success(
-          `Found ${total} new transaction${total !== 1 ? 's' : ''} (${result.duplicatesSkipped} duplicates skipped)`
-        );
-      }
+      const { jobId } = await sync();
+      setSyncJobId(jobId);
+      toast.info('Sync started — checking for new emails…');
     } catch {
       toast.error('Sync failed');
     }

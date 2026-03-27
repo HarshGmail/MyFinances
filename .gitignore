@@ -2,3 +2,6 @@ node_modules
 .claude
 mcp-server/.env
 mcp-server/dist
+
+# Rust build output (can be several GB)
+pdf-parsing/target

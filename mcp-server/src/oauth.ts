@@ -18,7 +18,10 @@ import { createHash, randomBytes } from 'crypto';
 import { log, logError } from './logger.js';
 
 const SITE_URL = (process.env.SITE_URL ?? 'https://mcp.my-finances.site').replace(/\/$/, '');
-const FRONTEND_URL = (process.env.FRONTEND_URL ?? 'https://www.my-finances.site').replace(/\/$/, '');
+const FRONTEND_URL = (process.env.FRONTEND_URL ?? 'https://www.my-finances.site').replace(
+  /\/$/,
+  ''
+);
 
 // ─── In-memory stores (single process — fine for personal use) ───────────────
 
@@ -43,11 +46,14 @@ const pendingRequests = new Map<string, PendingRequest>();
 const pendingCodes = new Map<string, PendingCode>();
 
 // Prune expired entries every 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of pendingRequests) if (v.expiresAt < now) pendingRequests.delete(k);
-  for (const [k, v] of pendingCodes) if (v.expiresAt < now) pendingCodes.delete(k);
-}, 10 * 60 * 1000);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [k, v] of pendingRequests) if (v.expiresAt < now) pendingRequests.delete(k);
+    for (const [k, v] of pendingCodes) if (v.expiresAt < now) pendingCodes.delete(k);
+  },
+  10 * 60 * 1000
+);
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 
@@ -103,14 +109,8 @@ router.post('/oauth/register', (req: Request, res: Response) => {
 
 // GET /oauth/authorize — redirect to the frontend connect page
 router.get('/oauth/authorize', (req: Request, res: Response) => {
-  const {
-    response_type,
-    redirect_uri,
-    state,
-    code_challenge,
-    code_challenge_method,
-    resource,
-  } = req.query as Record<string, string>;
+  const { response_type, redirect_uri, state, code_challenge, code_challenge_method, resource } =
+    req.query as Record<string, string>;
 
   if (response_type !== 'code') {
     res.status(400).json({ error: 'unsupported_response_type' });
@@ -130,7 +130,10 @@ router.get('/oauth/authorize', (req: Request, res: Response) => {
     resource,
     expiresAt: Date.now() + 10 * 60 * 1000, // 10 min to complete
   });
-  log('OAuth', `Authorize started → request_id=${requestId} resource=${resource ?? 'none'} redirect_uri=${redirect_uri}`);
+  log(
+    'OAuth',
+    `Authorize started → request_id=${requestId} resource=${resource ?? 'none'} redirect_uri=${redirect_uri}`
+  );
 
   // Redirect to the frontend connect page — user is already logged in there,
   // so the page can fetch their ingest token and complete the flow automatically.
@@ -140,44 +143,41 @@ router.get('/oauth/authorize', (req: Request, res: Response) => {
 });
 
 // POST /oauth/authorize — called by the frontend connect page with the ingest token
-router.post(
-  '/oauth/authorize',
-  (req: Request, res: Response) => {
-    const { request_id, ingest_token } = req.body as Record<string, string>;
+router.post('/oauth/authorize', (req: Request, res: Response) => {
+  const { request_id, ingest_token } = req.body as Record<string, string>;
 
-    const pending = pendingRequests.get(request_id);
-    if (!pending || Date.now() > pending.expiresAt) {
-      pendingRequests.delete(request_id);
-      logError('OAuth', `Authorize submitted with expired/unknown request_id=${request_id}`);
-      res.status(400).json({ error: 'Authorization request expired. Please try again.' });
-      return;
-    }
-    if (!ingest_token?.trim()) {
-      logError('OAuth', 'Authorize submitted with empty ingest_token');
-      res.status(400).json({ error: 'Ingest token is required.' });
-      return;
-    }
-
+  const pending = pendingRequests.get(request_id);
+  if (!pending || Date.now() > pending.expiresAt) {
     pendingRequests.delete(request_id);
-
-    const code = randomBytes(32).toString('hex');
-    pendingCodes.set(code, {
-      ingestToken: ingest_token.trim(),
-      codeChallenge: pending.codeChallenge,
-      codeChallengeMethod: pending.codeChallengeMethod,
-      resource: pending.resource,
-      expiresAt: Date.now() + 5 * 60 * 1000, // code valid for 5 min
-    });
-
-    log('OAuth', `Token accepted — code issued, redirecting to Claude.ai callback`);
-
-    const redirectUrl = new URL(pending.redirectUri);
-    redirectUrl.searchParams.set('code', code);
-    if (pending.state) redirectUrl.searchParams.set('state', pending.state);
-
-    res.json({ redirect_url: redirectUrl.toString() });
+    logError('OAuth', `Authorize submitted with expired/unknown request_id=${request_id}`);
+    res.status(400).json({ error: 'Authorization request expired. Please try again.' });
+    return;
   }
-);
+  if (!ingest_token?.trim()) {
+    logError('OAuth', 'Authorize submitted with empty ingest_token');
+    res.status(400).json({ error: 'Ingest token is required.' });
+    return;
+  }
+
+  pendingRequests.delete(request_id);
+
+  const code = randomBytes(32).toString('hex');
+  pendingCodes.set(code, {
+    ingestToken: ingest_token.trim(),
+    codeChallenge: pending.codeChallenge,
+    codeChallengeMethod: pending.codeChallengeMethod,
+    resource: pending.resource,
+    expiresAt: Date.now() + 5 * 60 * 1000, // code valid for 5 min
+  });
+
+  log('OAuth', `Token accepted — code issued, redirecting to Claude.ai callback`);
+
+  const redirectUrl = new URL(pending.redirectUri);
+  redirectUrl.searchParams.set('code', code);
+  if (pending.state) redirectUrl.searchParams.set('state', pending.state);
+
+  res.json({ redirect_url: redirectUrl.toString() });
+});
 
 // POST /oauth/token — exchange code for access_token
 router.post('/oauth/token', (req: Request, res: Response) => {
@@ -196,7 +196,9 @@ router.post('/oauth/token', (req: Request, res: Response) => {
   if (!pending || Date.now() > pending.expiresAt) {
     pendingCodes.delete(code);
     logError('OAuth', `Token exchange failed — code expired or not found`);
-    res.status(400).json({ error: 'invalid_grant', error_description: 'Code expired or not found' });
+    res
+      .status(400)
+      .json({ error: 'invalid_grant', error_description: 'Code expired or not found' });
     return;
   }
 
@@ -210,7 +212,9 @@ router.post('/oauth/token', (req: Request, res: Response) => {
     const computed = createHash('sha256').update(code_verifier).digest('base64url');
     if (computed !== pending.codeChallenge) {
       logError('OAuth', 'Token exchange failed — PKCE verification mismatch');
-      res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+      res
+        .status(400)
+        .json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
   }
@@ -224,7 +228,7 @@ router.post('/oauth/token', (req: Request, res: Response) => {
 
   res.json({
     access_token: pending.ingestToken,
-    token_type: 'Bearer',   // capital B required by RFC 6750
+    token_type: 'Bearer', // capital B required by RFC 6750
     expires_in: 86400,
     resource: tokenResource,
   });
