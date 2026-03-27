@@ -1,6 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import config from '../config';
+import logger from '../utils/logger';
 
 interface CoinDCXTicker {
   market: string;
@@ -47,14 +48,14 @@ class CoinDCXService {
   // Get all ticker data (public endpoint)
   async getTickers(): Promise<CoinDCXTicker[]> {
     try {
-      console.log('Fetching CoinDCX tickers...');
+      logger.info('Fetching CoinDCX tickers...');
       const response = await axios.get(`${this.baseUrl}/exchange/ticker`, {
         timeout: 10000,
       });
-      console.log(`Successfully fetched ${response.data.length} tickers from CoinDCX`);
+      logger.info({ count: response.data.length }, 'Successfully fetched tickers from CoinDCX');
       return response.data;
     } catch (error) {
-      console.error('Error fetching CoinDCX tickers:', error);
+      logger.error({ err: error }, 'Error fetching CoinDCX tickers');
       throw new Error('Failed to fetch crypto prices from CoinDCX');
     }
   }
@@ -64,7 +65,7 @@ class CoinDCXService {
     try {
       const marketPair = this.mapCoinToMarketPair(coinName);
       if (!marketPair) {
-        console.warn(`No market pair found for coin: ${coinName}`);
+        logger.warn({ coinName }, 'No market pair found for coin');
         return null;
       }
 
@@ -73,12 +74,12 @@ class CoinDCXService {
 
       if (ticker) {
         const price = parseFloat(ticker.last_price);
-        console.log(`Current price for ${coinName} (${marketPair}): ₹${price}`);
+        logger.info({ coinName, marketPair, price }, 'Current price fetched');
         return price;
       }
       return null;
     } catch (error) {
-      console.error(`Error getting current price for ${coinName}:`, error);
+      logger.error({ err: error, coinName }, 'Error getting current price for coin');
       return null;
     }
   }
@@ -103,12 +104,12 @@ class CoinDCXService {
         prices[coinName] = ticker ? parseFloat(ticker.last_price) : null;
 
         if (!ticker) {
-          console.warn(`No ticker found for market pair: ${marketPair}`);
+          logger.warn({ marketPair }, 'No ticker found for market pair');
         }
       }
       return prices;
     } catch (error) {
-      console.error('Error getting current prices:', error);
+      logger.error({ err: error }, 'Error getting current prices');
       return {};
     }
   }
@@ -119,7 +120,7 @@ class CoinDCXService {
       const timeStamp = Math.floor(Date.now());
 
       if (!this.apiKey || !this.secretKey) {
-        console.error('CoinDCX API credentials not configured');
+        logger.error('CoinDCX API credentials not configured');
         return null;
       }
 
@@ -141,22 +142,22 @@ class CoinDCXService {
         body: body,
       };
 
-      console.log('Making authenticated request to CoinDCX...');
+      logger.info('Making authenticated request to CoinDCX...');
       const response = await axios.post(options.url, options.body, {
         headers: options.headers,
         timeout: 10000,
       });
 
-      console.log('CoinDCX user balances response:', response.data);
+      logger.info({ data: response.data }, 'CoinDCX user balances response');
       return response.data;
     } catch (error) {
-      console.error('Error fetching CoinDCX user balances:', error);
+      logger.error({ err: error }, 'Error fetching CoinDCX user balances');
       if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', {
+        logger.error({
           status: error.response?.status,
           statusText: error.response?.statusText,
           data: error.response?.data,
-        });
+        }, 'Axios error details');
       }
       return null;
     }
@@ -188,7 +189,7 @@ class CoinDCXService {
       }
       return [];
     } catch (error) {
-      console.error('Error fetching coin candles from CoinDCX:', error);
+      logger.error({ err: error }, 'Error fetching coin candles from CoinDCX');
       return [];
     }
   }
@@ -223,7 +224,7 @@ class CoinDCXService {
         });
         results[symbol] = candles;
       } catch (err) {
-        console.error(`Failed to fetch candles for ${symbol}:`, err);
+        logger.error({ err, symbol }, 'Failed to fetch candles for symbol');
         results[symbol] = [];
       }
 
@@ -238,10 +239,10 @@ class CoinDCXService {
   async testConnection(): Promise<boolean> {
     try {
       const tickers = await this.getTickers();
-      console.log(`CoinDCX service test successful. Found ${tickers.length} tickers.`);
+      logger.info({ count: tickers.length }, 'CoinDCX service test successful');
       return true;
     } catch (error) {
-      console.error('CoinDCX service test failed:', error);
+      logger.error({ err: error }, 'CoinDCX service test failed');
       return false;
     }
   }

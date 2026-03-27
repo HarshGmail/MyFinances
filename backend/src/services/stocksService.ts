@@ -5,6 +5,7 @@ import puppeteer from 'puppeteer-core';
 import chromium from 'chrome-aws-lambda';
 import YahooFinance from 'yahoo-finance2';
 import { ChartResult } from '../utils/types';
+import logger from '../utils/logger';
 
 const yahooFinance = new YahooFinance();
 
@@ -34,7 +35,7 @@ export class StocksService {
         results.push([symbol, transformed]);
       } catch (err: unknown) {
         const error = err as Error;
-        console.error('Yahoo API error:', error.message);
+        logger.error({ err: error }, 'Yahoo API error');
         results.push([symbol, null]);
       }
 
@@ -101,7 +102,7 @@ export class StocksService {
           .get(url)
           .then((res) => res.data)
           .catch((err) => {
-            console.error(`Error fetching ${url}:`, err.message);
+            logger.error({ err, url }, 'Error fetching URL');
             return null;
           })
       )
@@ -141,7 +142,7 @@ export class StocksService {
       );
 
       const stockUrl = `https://finance.yahoo.com/quote/${yfSymbol}/financials`;
-      console.log(`Navigating to: ${stockUrl}`);
+      logger.info({ url: stockUrl }, 'Navigating to URL');
       await page.goto(stockUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
       const jsonData = await page.evaluate(() => {
@@ -158,20 +159,20 @@ export class StocksService {
           return JSON.parse(match[1]);
         } catch (err: unknown) {
           const error = err as Error;
-          console.log(error.message);
+          logger.info(error.message);
           return null;
         }
       });
 
       if (!jsonData) {
-        console.warn('⚠️ Failed to extract financials from page script.');
+        logger.warn('Failed to extract financials from page script');
         return null;
       }
 
       const result: QuoteSummaryResult = jsonData.context?.dispatcher?.stores?.QuoteSummaryStore;
       return result ?? null;
     } catch (err) {
-      console.error('❌ Puppeteer error:', err);
+      logger.error({ err }, 'Puppeteer error');
       return null;
     } finally {
       await browser.close();

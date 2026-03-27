@@ -15,6 +15,7 @@ use axum::{
 };
 use tokio::sync::mpsc;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
@@ -66,12 +67,18 @@ async fn health() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
+    // Non-blocking writer offloads stdout I/O to a background thread so async
+    // tasks are never stalled waiting for the terminal/log sink to flush.
+    // The _guard must be held for the lifetime of main — dropping it flushes
+    // any buffered log lines before the process exits.
+    let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "pdf_parsing=debug,tower_http=info".into()),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
         .init();
 
     // Channel capacity of 100 — jobs queue up here if the worker is busy.
@@ -85,6 +92,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/jobs", post(submit_job))
         .route("/jobs/:job_id", get(get_job))
+        .layer(TraceLayer::new_for_http()) // logs every request + response + latency
         .layer(CorsLayer::permissive())
         .with_state(state);
 

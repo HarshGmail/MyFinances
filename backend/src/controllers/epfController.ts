@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { epfSchema } from '../schemas/epf';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 export async function addEpfAccount(req: Request, res: Response) {
   try {
@@ -30,7 +31,7 @@ export async function addEpfAccount(req: Request, res: Response) {
 
     res.status(201).json({ success: true, message: 'EPF account created', id: result.insertedId });
   } catch (error) {
-    console.error('Add EPF account error:', error);
+    logger.error({ err: error }, 'Add EPF account error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -49,7 +50,7 @@ export async function getEpfAccounts(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: epfAccounts });
   } catch (error) {
-    console.error('Fetch EPF accounts error:', error);
+    logger.error({ err: error }, 'Fetch EPF accounts error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -218,7 +219,7 @@ export async function getEpfTimeline(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: summary });
   } catch (error) {
-    console.error('Calculate EPF timeline error:', error);
+    logger.error({ err: error }, 'Calculate EPF timeline error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -236,7 +237,7 @@ export async function deleteAllUserEpfAccounts(req: Request, res: Response) {
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all EPF accounts error:', error);
+    logger.error({ err: error }, 'Delete all EPF accounts error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

@@ -19,6 +19,20 @@ import { StocksService } from '../services/stocksService';
 import { isPdfServiceAvailable, submitPdfJob, waitForPdfJob } from '../services/pdfParsingClient';
 import { decrypt } from '../utils/encryption';
 import config from '../config';
+import logger from '../utils/logger';
+
+// ─── Wake PDF Parser ──────────────────────────────────────────────────────────
+// Fires a health-check at the Rust service in the background so its cold start
+// happens while the user is reading the integrations page, not when they sync.
+
+export async function wakePdfParser(_req: Request, res: Response) {
+  if (isPdfServiceAvailable()) {
+    void axios.get(`${config.PDF_PARSING_SERVICE_URL}/health`).catch(() => {
+      // Intentionally swallowed — this is best-effort pre-warming only
+    });
+  }
+  res.status(200).json({ success: true });
+}
 
 // ─── OAuth Connect ────────────────────────────────────────────────────────────
 
@@ -78,7 +92,7 @@ export async function oauthCallback(req: Request, res: Response) {
 
     res.redirect(`${getFrontendUrl()}/integrations?emailConnected=true`);
   } catch (err: unknown) {
-    console.error('OAuth callback error:', err);
+    logger.error({ err }, 'OAuth callback error');
     const msg = encodeURIComponent(err instanceof Error ? err.message : 'oauth_failed');
     res.redirect(`${getFrontendUrl()}/integrations?emailError=${msg}`);
   }
@@ -117,7 +131,7 @@ export async function getStatus(req: Request, res: Response) {
       },
     });
   } catch (err) {
-    console.error('Get email integration status error:', err);
+    logger.error({ err }, 'Get email integration status error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -144,7 +158,7 @@ export async function resetSync(req: Request, res: Response) {
       .updateOne({ userId: new ObjectId(user.userId), email }, { $set: { lastSyncAt: null } });
     res.json({ success: true, message: 'Sync history cleared — next sync will fetch all emails' });
   } catch (err) {
-    console.error('Reset sync error:', err);
+    logger.error({ err }, 'Reset sync error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -171,7 +185,7 @@ export async function disconnect(req: Request, res: Response) {
       .deleteOne({ userId: new ObjectId(user.userId), email });
     res.json({ success: true, message: 'Gmail account removed' });
   } catch (err) {
-    console.error('Disconnect error:', err);
+    logger.error({ err }, 'Disconnect error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -199,7 +213,7 @@ export async function updateSettings(req: Request, res: Response) {
     }
     res.json({ success: true });
   } catch (err) {
-    console.error('Update settings error:', err);
+    logger.error({ err }, 'Update settings error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -243,7 +257,7 @@ export async function syncEmails(req: Request, res: Response) {
 
     void runSyncInBackground(jobId, userId, userDoc, integrations, db);
   } catch (err) {
-    console.error('Sync error:', err);
+    logger.error({ err }, 'Sync error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -276,7 +290,7 @@ export async function getSyncJobStatus(req: Request, res: Response) {
       data: { status: job.status, result: job.result ?? null, error: job.error ?? null },
     });
   } catch (err) {
-    console.error('Get sync job status error:', err);
+    logger.error({ err }, 'Get sync job status error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -317,7 +331,7 @@ async function runSyncInBackground(
           'from:eCAS@cdslstatement.com has:attachment',
           afterDate
         );
-        console.log(`[Sync:${accountTag}] Found ${cdslPdfs.length} CDSL PDF(s)`);
+        logger.info(`[Sync:${accountTag}] Found ${cdslPdfs.length} CDSL PDF(s)`);
 
         if (cdslPdfs.length > 0) {
           if (useRustService) {
@@ -327,7 +341,7 @@ async function runSyncInBackground(
               if (result?.parser_type === 'cdsl_cas') {
                 // TODO: map Rust MfTransaction[] to Node.js parseCdslMFTransactions format
                 // once the Rust CDSL parser is implemented
-                console.log(`[Sync:${accountTag}] Rust CDSL job done — implement mapping`);
+                logger.info(`[Sync:${accountTag}] Rust CDSL job done — implement mapping`);
               }
             } catch (e) {
               errors.push(
@@ -362,7 +376,7 @@ async function runSyncInBackground(
           `from:${sgSender} has:attachment`,
           afterDate
         );
-        console.log(`[Sync:${accountTag}] Found ${sgPdfs.length} SafeGold PDF(s)`);
+        logger.info(`[Sync:${accountTag}] Found ${sgPdfs.length} SafeGold PDF(s)`);
 
         if (sgPdfs.length > 0) {
           if (useRustService) {
@@ -372,7 +386,7 @@ async function runSyncInBackground(
               if (result?.parser_type === 'safe_gold') {
                 // TODO: map Rust GoldTransaction[] to Node.js parseSafeGoldTransactions format
                 // once the Rust SafeGold parser is implemented
-                console.log(`[Sync:${accountTag}] Rust SafeGold job done — implement mapping`);
+                logger.info(`[Sync:${accountTag}] Rust SafeGold job done — implement mapping`);
               }
             } catch (e) {
               errors.push(
@@ -405,7 +419,7 @@ async function runSyncInBackground(
           'from:noreply@safegold.in has:attachment',
           afterDate
         );
-        console.log(`[Sync:${accountTag}] Found ${sgInvoicePdfs.length} SafeGold invoice PDF(s)`);
+        logger.info(`[Sync:${accountTag}] Found ${sgInvoicePdfs.length} SafeGold invoice PDF(s)`);
 
         for (const pdf of sgInvoicePdfs) {
           try {
@@ -431,7 +445,7 @@ async function runSyncInBackground(
           'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
           afterDate
         );
-        console.log(`[Sync:${accountTag}] Found ${cdxBodies.length} CoinDCX trade email(s)`);
+        logger.info(`[Sync:${accountTag}] Found ${cdxBodies.length} CoinDCX trade email(s)`);
 
         for (const body of cdxBodies) {
           try {
@@ -483,7 +497,7 @@ async function runSyncInBackground(
       }
     );
   } catch (err) {
-    console.error(`[syncJob:${jobId}] Unhandled error:`, err);
+    logger.error({ err }, `[syncJob:${jobId}] Unhandled error`);
     await db.collection('syncJobs').updateOne(
       { _id: new ObjectId(jobId) },
       {
@@ -602,7 +616,7 @@ export async function importTransactions(req: Request, res: Response) {
       },
     });
   } catch (err) {
-    console.error('Import error:', err);
+    logger.error({ err }, 'Import error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -743,7 +757,7 @@ async function canonicalizeMFNames(
 
       if (bestScore >= 0.6) {
         if (bestName !== tx.fundName) {
-          console.log(
+          logger.info(
             `[Email Import] Fund name mapped (local): "${tx.fundName}" → "${bestName}" (score: ${bestScore.toFixed(2)})`
           );
         }
@@ -753,7 +767,7 @@ async function canonicalizeMFNames(
       // 2. Brand new fund — look up correct name from MFAPI so NAV fetches work
       const mfapiMatch = await lookupMFAPIScheme(tx.fundName);
       if (mfapiMatch) {
-        console.log(
+        logger.info(
           `[Email Import] Fund name mapped (MFAPI): "${tx.fundName}" → "${mfapiMatch.schemeName}"`
         );
 
@@ -770,7 +784,7 @@ async function canonicalizeMFNames(
             platform: 'CDSL',
             date: new Date(),
           });
-          console.log(
+          logger.info(
             `[Email Import] Auto-created mutualFundsInfo for "${mfapiMatch.schemeName}" (scheme: ${mfapiMatch.schemeCode})`
           );
         }
@@ -779,7 +793,7 @@ async function canonicalizeMFNames(
       }
 
       // 3. No match anywhere — keep CDSL name as fallback
-      console.log(`[Email Import] No MFAPI match for "${tx.fundName}" — keeping CDSL name`);
+      logger.info(`[Email Import] No MFAPI match for "${tx.fundName}" — keeping CDSL name`);
       return tx;
     })
   );
@@ -987,7 +1001,7 @@ async function canonicalizeStockNames(
         symbol = searchResults[0].symbol; // e.g. "MSTCLTD.NS"
       }
     } catch {
-      console.log(`[Email Import] Yahoo Finance search failed for "${holding.companyName}"`);
+      logger.info(`[Email Import] Yahoo Finance search failed for "${holding.companyName}"`);
     }
 
     const resolvedName = symbol ?? holding.companyName;
@@ -995,12 +1009,12 @@ async function canonicalizeStockNames(
 
     // Skip stocks the user already tracks (any existing transaction for that symbol)
     if (existingSet.has(resolvedKey)) {
-      console.log(`[Email Import] Stock "${resolvedName}" already in DB — skipping`);
+      logger.info(`[Email Import] Stock "${resolvedName}" already in DB — skipping`);
       continue;
     }
 
     if (symbol && symbol !== holding.companyName) {
-      console.log(`[Email Import] Stock name mapped: "${holding.companyName}" → "${symbol}"`);
+      logger.info(`[Email Import] Stock name mapped: "${holding.companyName}" → "${symbol}"`);
     }
 
     results.push({

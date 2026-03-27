@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { userGoalSchema } from '../schemas/userGoals';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 // Add a new goal
 export async function addGoal(req: Request, res: Response) {
@@ -25,7 +26,7 @@ export async function addGoal(req: Request, res: Response) {
     const result = await collection.insertOne(goal);
     res.status(201).json({ success: true, message: 'Goal added', id: result.insertedId });
   } catch (error) {
-    console.error('Add goal error:', error);
+    logger.error({ err: error }, 'Add goal error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -43,7 +44,7 @@ export async function getGoals(req: Request, res: Response) {
     const goals = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: goals });
   } catch (error) {
-    console.error('Fetch goals error:', error);
+    logger.error({ err: error }, 'Fetch goals error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -74,7 +75,7 @@ export async function updateGoal(req: Request, res: Response) {
     }
     res.status(200).json({ success: true, message: 'Goal updated' });
   } catch (error) {
-    console.error('Update goal error:', error);
+    logger.error({ err: error }, 'Update goal error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -104,7 +105,7 @@ export async function deleteGoal(req: Request, res: Response) {
     }
     res.status(200).json({ success: true, message: 'Goal deleted' });
   } catch (error) {
-    console.error('Delete goal error:', error);
+    logger.error({ err: error }, 'Delete goal error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

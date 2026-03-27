@@ -5,6 +5,7 @@ import { mutualFundInfoSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
 import { getCached, getCachedToday, setCache } from '../utils/priceCache';
+import logger from '../utils/logger';
 
 export interface MutualFundNavHistoryData {
   date: string;
@@ -45,7 +46,7 @@ export async function addMutualFundInfo(req: Request, res: Response) {
     const result = await collection.insertOne(mutualFundInfo);
     res.status(201).json({ success: true, message: 'Mutual Fund added', id: result.insertedId });
   } catch (error) {
-    console.error('Add mutual fund error:', error);
+    logger.error({ err: error }, 'Add mutual fund error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -62,7 +63,7 @@ export async function getMutualFundInfo(req: Request, res: Response) {
     const mutualFundsInfo = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: mutualFundsInfo });
   } catch (error) {
-    console.error('Fetching mutual fund error:', error);
+    logger.error({ err: error }, 'Fetching mutual fund error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -109,11 +110,11 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
         if (data) await setCache(key, data);
         return { schemeNumber: schemeNumber.toString(), data };
       } catch (error) {
-        console.error(`Error fetching NAV history for scheme ${schemeNumber}:`, error);
+        logger.error({ err: error, schemeNumber }, 'Error fetching NAV history for scheme');
         // Stale cache is better than nothing
         const stale = await getCached<MutualFundNavHistoryItem>(key);
         if (stale) {
-          console.log(`Serving stale cache for scheme ${schemeNumber}`);
+          logger.info({ schemeNumber }, 'Serving stale cache for scheme');
           return { schemeNumber: schemeNumber.toString(), data: stale };
         }
         return { schemeNumber: schemeNumber.toString(), data: null, error: 'Failed to fetch data' };
@@ -133,7 +134,7 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
       data: navHistoryMap,
     });
   } catch (error) {
-    console.error('Error fetching NAV history from mfapi.in:', error);
+    logger.error({ err: error }, 'Error fetching NAV history from mfapi.in');
     res.status(500).json({ success: false, message: 'Failed to fetch NAV history' });
   }
 }
@@ -168,7 +169,7 @@ export async function searchMutualFundsByName(req: Request, res: Response) {
     // Optionally, sort by closeness (e.g., Levenshtein distance) for better ranking
     res.status(200).json({ success: true, data: matches });
   } catch (error) {
-    console.error('Error searching mutual funds by name:', error);
+    logger.error({ err: error }, 'Error searching mutual funds by name');
     res.status(500).json({ success: false, message: 'Failed to search mutual funds' });
   }
 }

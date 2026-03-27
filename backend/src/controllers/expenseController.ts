@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { expenseSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 export async function addExpense(req: Request, res: Response) {
   try {
@@ -28,7 +29,7 @@ export async function addExpense(req: Request, res: Response) {
 
     res.status(201).json({ success: true, message: 'New expense added', id: result.insertedId });
   } catch (error) {
-    console.error('Add expense error:', error);
+    logger.error({ err: error }, 'Add expense error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -47,7 +48,7 @@ export async function getExpenses(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: expenses });
   } catch (error) {
-    console.error('Fetch expenses error:', error);
+    logger.error({ err: error }, 'Fetch expenses error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -82,7 +83,7 @@ export async function getExpenseById(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: expense });
   } catch (error) {
-    console.error('Fetch expense by ID error:', error);
+    logger.error({ err: error }, 'Fetch expense by ID error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -124,7 +125,7 @@ export async function updateExpense(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Expense updated successfully' });
   } catch (error) {
-    console.error('Update expense error:', error);
+    logger.error({ err: error }, 'Update expense error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -159,7 +160,7 @@ export async function deleteExpense(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Expense deleted successfully' });
   } catch (error) {
-    console.error('Delete expense error:', error);
+    logger.error({ err: error }, 'Delete expense error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -186,7 +187,7 @@ export async function getExpensesByTag(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: expenses });
   } catch (error) {
-    console.error('Fetch expenses by tag error:', error);
+    logger.error({ err: error }, 'Fetch expenses by tag error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -284,7 +285,7 @@ export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
-    console.error('Monthly investment summary error:', error);
+    logger.error({ err: error }, 'Monthly investment summary error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -311,7 +312,7 @@ export async function getExpensesByFrequency(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: expenses });
   } catch (error) {
-    console.error('Fetch expenses by frequency error:', error);
+    logger.error({ err: error }, 'Fetch expenses by frequency error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -329,7 +330,7 @@ export async function deleteAllUserExpenses(req: Request, res: Response) {
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all expenses error:', error);
+    logger.error({ err: error }, 'Delete all expenses error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

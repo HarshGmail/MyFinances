@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { mutualFundSchema } from '../schemas/mutual-funds';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 export async function addMutualFundTransaction(req: Request, res: Response) {
   try {
@@ -22,7 +23,7 @@ export async function addMutualFundTransaction(req: Request, res: Response) {
     const result = await collection.insertOne(transaction);
     res.status(201).json({ success: true, message: 'Transaction added', id: result.insertedId });
   } catch (error) {
-    console.error('Add mutual fund transaction error:', error);
+    logger.error({ err: error }, 'Add mutual fund transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -39,7 +40,7 @@ export async function getMutualFundTransactions(req: Request, res: Response) {
     const transactions = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Fetch mutual fund transactions error:', error);
+    logger.error({ err: error }, 'Fetch mutual fund transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -57,7 +58,7 @@ export async function deleteAllUserMutualFundTransactions(req: Request, res: Res
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all mutual fund transactions error:', error);
+    logger.error({ err: error }, 'Delete all mutual fund transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

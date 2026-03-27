@@ -9,6 +9,7 @@ import {
   syncEmails,
   getSyncJobStatus,
   importTransactions,
+  wakePdfParser,
 } from '../controllers/emailIntegrationsController';
 import { authenticateToken } from '../middleware';
 
@@ -17,6 +18,7 @@ const router = Router();
 router.get('/oauth/connect', authenticateToken, oauthConnect);
 router.get('/oauth/callback', oauthCallback); // public — Google redirects here
 router.get('/status', authenticateToken, getStatus);
+router.get('/wake', authenticateToken, wakePdfParser);
 router.delete('/disconnect', authenticateToken, disconnect);
 router.post('/reset-sync', authenticateToken, resetSync);
 router.put('/settings', authenticateToken, updateSettings);

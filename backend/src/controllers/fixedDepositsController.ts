@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { fixedDepositSchema } from '../schemas/fixedDeposits';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 export async function addFixedDeposit(req: Request, res: Response) {
   try {
@@ -25,7 +26,7 @@ export async function addFixedDeposit(req: Request, res: Response) {
       .status(201)
       .json({ success: true, message: 'new Fixed Deposit added', id: result.insertedId });
   } catch (error) {
-    console.error('Add Fixed Deposit error:', error);
+    logger.error({ err: error }, 'Add Fixed Deposit error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -42,7 +43,7 @@ export async function getFixedDeposits(req: Request, res: Response) {
     const transactions = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Fetch fixed deposits error:', error);
+    logger.error({ err: error }, 'Fetch fixed deposits error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -60,7 +61,7 @@ export async function deleteAllUserFixedDeposits(req: Request, res: Response) {
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all fixed deposits error:', error);
+    logger.error({ err: error }, 'Delete all fixed deposits error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

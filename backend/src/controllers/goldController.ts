@@ -4,6 +4,7 @@ import database from '../database';
 import { digitalGoldSchema } from '../schemas/digitalGold';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import axios from 'axios';
+import logger from '../utils/logger';
 
 export async function addGoldTransaction(req: Request, res: Response) {
   try {
@@ -27,7 +28,7 @@ export async function addGoldTransaction(req: Request, res: Response) {
     const result = await collection.insertOne(transaction);
     res.status(201).json({ success: true, message: 'Transaction added', id: result.insertedId });
   } catch (error) {
-    console.error('Add gold transaction error:', error);
+    logger.error({ err: error }, 'Add gold transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -45,7 +46,7 @@ export async function getGoldTransactions(req: Request, res: Response) {
     const transactions = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Fetch gold transactions error:', error);
+    logger.error({ err: error }, 'Fetch gold transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -86,7 +87,7 @@ export async function updateGoldTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction updated' });
   } catch (error) {
-    console.error('Update gold transaction error:', error);
+    logger.error({ err: error }, 'Update gold transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -119,7 +120,7 @@ export async function deleteGoldTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction deleted' });
   } catch (error) {
-    console.error('Delete gold transaction error:', error);
+    logger.error({ err: error }, 'Delete gold transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -137,7 +138,7 @@ export async function deleteAllUserGoldTransactions(req: Request, res: Response)
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all gold transactions error:', error);
+    logger.error({ err: error }, 'Delete all gold transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -269,7 +270,7 @@ export async function getSafeGoldRates(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching gold rates:', error);
+    logger.error({ err: error }, 'Error fetching gold rates');
     res.status(500).json({ success: false, message: 'Failed to fetch gold rates' });
   }
 }

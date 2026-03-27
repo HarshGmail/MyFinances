@@ -16,6 +16,7 @@ import {
 import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
 import { encrypt, decrypt } from '../utils/encryption';
 import config from '../config';
+import logger from '../utils/logger';
 
 export async function signup(req: Request, res: Response) {
   try {
@@ -75,7 +76,7 @@ export async function signup(req: Request, res: Response) {
     });
   } catch (err: unknown) {
     const error = err as Error;
-    console.error('Signup error:', error);
+    logger.error({ err: error }, 'Signup error');
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -145,7 +146,7 @@ export async function login(req: Request, res: Response) {
     });
   } catch (err: unknown) {
     const error = err as Error;
-    console.error('Login error:', error);
+    logger.error({ err: error }, 'Login error');
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -162,7 +163,7 @@ export function logout(req: Request, res: Response) {
       message: 'Logout successful',
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error({ err: error }, 'Logout error');
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -246,7 +247,7 @@ export async function userProfile(req: Request, res: Response) {
       },
     });
   } catch (err) {
-    console.error('User profile fetch error:', err);
+    logger.error({ err }, 'User profile fetch error');
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve user profile',
@@ -415,7 +416,7 @@ export async function updateUserProfile(req: Request, res: Response) {
       },
     });
   } catch (err: unknown) {
-    console.error('User profile update error:', err);
+    logger.error({ err }, 'User profile update error');
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -440,7 +441,7 @@ export async function regenerateIngestToken(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: { ingestToken } });
   } catch (err) {
-    console.error('Regenerate ingest token error:', err);
+    logger.error({ err }, 'Regenerate ingest token error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -465,7 +466,7 @@ export async function ingestTokenExchange(req: Request, res: Response) {
     );
     res.json({ success: true, token });
   } catch (err) {
-    console.error('Ingest token exchange error:', err);
+    logger.error({ err }, 'Ingest token exchange error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

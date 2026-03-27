@@ -1,4 +1,5 @@
 import database from '../database';
+import logger from './logger';
 
 const COLLECTION = 'priceCache';
 
@@ -32,6 +33,6 @@ export async function setCache(key: string, data: unknown): Promise<void> {
       .collection(COLLECTION)
       .updateOne({ key }, { $set: { key, data, cachedAt: new Date() } }, { upsert: true });
   } catch (err) {
-    console.error('Cache write error:', err);
+    logger.error({ err }, 'Cache write error');
   }
 }

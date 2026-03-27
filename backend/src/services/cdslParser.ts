@@ -51,13 +51,15 @@ function stripSchemeCode(line: string): string {
   return line.replace(/^[A-Z0-9]+\s*-\s*/, '').trim();
 }
 
+import logger from '../utils/logger';
+
 export function parseCdslMFTransactions(text: string): ParsedMFTransaction[] {
   const transactions: ParsedMFTransaction[] = [];
 
   // Find the MF transactions section
   const sectionStartIdx = text.indexOf('MUTUAL FUND UNITS HELD WITH MF/RTA');
   if (sectionStartIdx === -1) {
-    console.log('[CDSL Parser] MF section not found in text');
+    logger.info('[CDSL Parser] MF section not found in text');
     return transactions;
   }
 
@@ -182,6 +184,6 @@ export function parseCdslMFTransactions(text: string): ParsedMFTransaction[] {
     }
   }
 
-  console.log(`[CDSL Parser] Extracted ${transactions.length} MF transactions`);
+  logger.info({ count: transactions.length }, '[CDSL Parser] Extracted MF transactions');
   return transactions;
 }

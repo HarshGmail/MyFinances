@@ -8,6 +8,7 @@ import {
   useSyncJobStatusQuery,
 } from '@/api/query';
 import { useEmailSyncMutation, useEmailImportMutation } from '@/api/mutations';
+import { apiRequest } from '@/api/configs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -58,6 +59,11 @@ export default function EmailIntegration({
 
   const [preview, setPreview] = useState<EmailSyncPreviewType | null>(null);
   const [syncJobId, setSyncJobId] = useState<string | null>(null);
+
+  // Pre-warm the Rust PDF parsing service on mount — fire and forget
+  useEffect(() => {
+    void apiRequest({ endpoint: '/email-integration/wake', method: 'GET' }).catch(() => {});
+  }, []);
 
   const { data: syncJobData } = useSyncJobStatusQuery(syncJobId);
   const isSyncing = isSyncSubmitting || (!!syncJobId && syncJobData?.status === 'processing');

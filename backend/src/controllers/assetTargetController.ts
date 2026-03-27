@@ -8,6 +8,7 @@ import {
   createAssetTarget,
 } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 function parseObjectId(id: string) {
   try {
@@ -57,7 +58,7 @@ export async function addAssetTarget(req: Request, res: Response) {
       },
     });
   } catch (err: unknown) {
-    console.error('addAssetTarget error:', err);
+    logger.error({ err }, 'addAssetTarget error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -88,7 +89,7 @@ export async function getAssetTargetById(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: doc });
   } catch (err) {
-    console.error('getAssetTargetById error:', err);
+    logger.error({ err }, 'getAssetTargetById error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -123,7 +124,7 @@ export async function getAssetTargetsByAssetId(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: results });
   } catch (err) {
-    console.error('getAssetTargetsByAssetId error:', err);
+    logger.error({ err }, 'getAssetTargetsByAssetId error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -170,7 +171,7 @@ export async function getAssetTargetsByAsset(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: results });
   } catch (err) {
-    console.error('getAssetTargetsByAsset error:', err);
+    logger.error({ err }, 'getAssetTargetsByAsset error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -194,7 +195,7 @@ export async function listUserAssetTargets(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: results });
   } catch (err) {
-    console.error('listUserAssetTargets error:', err);
+    logger.error({ err }, 'listUserAssetTargets error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -245,7 +246,7 @@ export async function updateAssetTargetById(req: Request, res: Response) {
     const updatedDoc = await col.findOne({ _id: oid });
     res.status(200).json({ success: true, message: 'Asset target updated', data: updatedDoc });
   } catch (err) {
-    console.error('updateAssetTargetById error:', err);
+    logger.error({ err }, 'updateAssetTargetById error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -282,7 +283,7 @@ export async function removeAssetTarget(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Asset target removed' });
   } catch (err) {
-    console.error('removeAssetTarget error:', err);
+    logger.error({ err }, 'removeAssetTarget error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

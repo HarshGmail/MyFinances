@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { runFifo, computeAssetFYGains, buildSummary, getIndianFY } from '../utils/capitalGains';
+import logger from '../utils/logger';
 
 export async function getCapitalGains(req: Request, res: Response) {
   try {
@@ -129,7 +130,7 @@ export async function getCapitalGains(req: Request, res: Response) {
       },
     });
   } catch (error) {
-    console.error('Capital gains calculation error:', error);
+    logger.error({ err: error }, 'Capital gains calculation error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

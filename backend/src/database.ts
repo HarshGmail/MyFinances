@@ -1,5 +1,6 @@
 import { MongoClient, Db } from 'mongodb';
 import config from './config';
+import logger from './utils/logger';
 
 class Database {
   private client: MongoClient | null = null;
@@ -12,13 +13,13 @@ class Database {
 
       this.db = this.client.db();
 
-      console.log('✅ Connected to MongoDB successfully');
+      logger.info('Connected to MongoDB successfully');
 
       // Test the connection
       await this.db.admin().ping();
-      console.log('✅ Database ping successful');
+      logger.info('Database ping successful');
     } catch (error) {
-      console.error('❌ Failed to connect to MongoDB:', error);
+      logger.error({ err: error }, 'Failed to connect to MongoDB');
       throw error;
     }
   }
@@ -27,10 +28,10 @@ class Database {
     try {
       if (this.client) {
         await this.client.close();
-        console.log('✅ Disconnected from MongoDB');
+        logger.info('Disconnected from MongoDB');
       }
     } catch (error) {
-      console.error('❌ Error disconnecting from MongoDB:', error);
+      logger.error({ err: error }, 'Error disconnecting from MongoDB');
       throw error;
     }
   }

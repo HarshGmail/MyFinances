@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from './logger';
 
 const SITE_URL = (process.env.SITE_URL ?? 'https://mcp.my-finances.site').replace(/\/$/, '');
 
@@ -13,9 +14,9 @@ declare global {
 export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization'];
 
-  // Log every incoming auth attempt so we can see exactly what Claude.ai sends
-  console.log(
-    `[AUTH] ${req.method} ${req.path} | authorization="${authHeader ?? 'MISSING'}" | session="${req.headers['mcp-session-id'] ?? 'none'}"`
+  logger.debug(
+    { method: req.method, path: req.path, authorization: authHeader ?? 'MISSING', session: req.headers['mcp-session-id'] ?? 'none' },
+    'incoming auth attempt'
   );
 
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {

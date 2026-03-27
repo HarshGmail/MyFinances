@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import database from '../database';
 import { expenseTransactionSchema } from '../schemas/expenseTransaction';
 import { getUserFromRequest } from '../utils/jwtHelpers';
+import logger from '../utils/logger';
 
 export async function addExpenseTransaction(req: Request, res: Response) {
   try {
@@ -34,7 +35,7 @@ export async function addExpenseTransaction(req: Request, res: Response) {
       .status(201)
       .json({ success: true, message: 'Expense transaction added', id: result.insertedId });
   } catch (error) {
-    console.error('Add expense transaction error:', error);
+    logger.error({ err: error }, 'Add expense transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -65,7 +66,7 @@ export async function getExpenseTransactions(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Get expense transactions error:', error);
+    logger.error({ err: error }, 'Get expense transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -107,7 +108,7 @@ export async function updateExpenseTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction updated successfully' });
   } catch (error) {
-    console.error('Update expense transaction error:', error);
+    logger.error({ err: error }, 'Update expense transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -139,7 +140,7 @@ export async function deleteExpenseTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction deleted successfully' });
   } catch (error) {
-    console.error('Delete expense transaction error:', error);
+    logger.error({ err: error }, 'Delete expense transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -159,7 +160,7 @@ export async function getExpenseTransactionNames(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: names });
   } catch (error) {
-    console.error('Get expense transaction names error:', error);
+    logger.error({ err: error }, 'Get expense transaction names error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -177,7 +178,7 @@ export async function deleteAllUserExpenseTransactions(req: Request, res: Respon
       .deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all expense transactions error:', error);
+    logger.error({ err: error }, 'Delete all expense transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

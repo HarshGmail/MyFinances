@@ -6,6 +6,7 @@ import { getUserFromRequest } from '../utils/jwtHelpers';
 import coindcxService from '../services/coindcxService';
 import axios from 'axios';
 import { getCached, setCache } from '../utils/priceCache';
+import logger from '../utils/logger';
 
 export async function addCryptoTransaction(req: Request, res: Response) {
   try {
@@ -29,7 +30,7 @@ export async function addCryptoTransaction(req: Request, res: Response) {
     const result = await collection.insertOne(transaction);
     res.status(201).json({ success: true, message: 'Transaction added', id: result.insertedId });
   } catch (error) {
-    console.error('Add crypto transaction error:', error);
+    logger.error({ err: error }, 'Add crypto transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -47,7 +48,7 @@ export async function getCryptoTransactions(req: Request, res: Response) {
     const transactions = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Fetch crypto transactions error:', error);
+    logger.error({ err: error }, 'Fetch crypto transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -84,7 +85,7 @@ export async function updateCryptoTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction updated successfully' });
   } catch (error) {
-    console.error('Update crypto transaction error:', error);
+    logger.error({ err: error }, 'Update crypto transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -117,7 +118,7 @@ export async function deleteCryptoTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction deleted' });
   } catch (error) {
-    console.error('Delete crypto transaction error:', error);
+    logger.error({ err: error }, 'Delete crypto transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -133,7 +134,7 @@ export async function deleteAllUserCryptoTransactions(req: Request, res: Respons
     const result = await db.collection('crypto').deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all crypto transactions error:', error);
+    logger.error({ err: error }, 'Delete all crypto transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -148,7 +149,7 @@ export async function fetchUserBalance(req: Request, res: Response) {
     });
   } catch (err: unknown) {
     const error = err as Error;
-    console.log('Error while fetching user balance from coin dcx', error.message);
+    logger.error({ err: error }, 'Error while fetching user balance from coin dcx');
     res.status(500).json({
       success: false,
       message: 'Error fetching user balances',
@@ -166,7 +167,7 @@ export async function fetchMultipleCoinBalances(req: Request, res: Response) {
     });
   } catch (err: unknown) {
     const error = err as Error;
-    console.log('Error while fetching coin prices from coin dcx', error.message);
+    logger.error({ err: error }, 'Error while fetching coin prices from coin dcx');
     res.status(500).json({
       success: false,
       message: 'Error fetching user balances',
@@ -190,7 +191,7 @@ export async function getCoinCandles(req: Request, res: Response) {
     });
     res.status(200).json({ success: true, data: candles });
   } catch (error) {
-    console.error('Error in getCoinCandles:', error);
+    logger.error({ err: error }, 'Error in getCoinCandles');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -226,7 +227,7 @@ export async function getMultipleCoinCandles(req: Request, res: Response) {
           await setCache(cacheKey, candles);
         }
       } catch (err) {
-        console.error(`Live candle fetch failed for ${symbol}, trying cache:`, err);
+        logger.error({ err, symbol }, 'Live candle fetch failed, trying cache');
         const cached = await getCached<unknown[]>(cacheKey);
         results[symbol] = cached ?? [];
       }
@@ -239,7 +240,7 @@ export async function getMultipleCoinCandles(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: results });
   } catch (error) {
-    console.error('Error in getMultipleCoinCandles:', error);
+    logger.error({ err: error }, 'Error in getMultipleCoinCandles');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -281,7 +282,7 @@ export async function searchCryptoCoinsByName(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: matches });
   } catch (error) {
-    console.error('Error searching crypto coins by name:', error);
+    logger.error({ err: error }, 'Error searching crypto coins by name');
     res.status(500).json({ success: false, message: 'Failed to search coins' });
   }
 }

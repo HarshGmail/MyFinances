@@ -6,6 +6,7 @@ import { getUserFromRequest } from '../utils/jwtHelpers';
 import { StocksService } from '../services/stocksService';
 import { StockData } from '../utils/types';
 import { getCached, setCache } from '../utils/priceCache';
+import logger from '../utils/logger';
 
 export async function addStockTransaction(req: Request, res: Response) {
   try {
@@ -25,7 +26,7 @@ export async function addStockTransaction(req: Request, res: Response) {
     const result = await collection.insertOne(transaction);
     res.status(201).json({ success: true, message: 'Transaction added', id: result.insertedId });
   } catch (error) {
-    console.error('Add stock transaction error:', error);
+    logger.error({ err: error }, 'Add stock transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -42,7 +43,7 @@ export async function getStockTransactions(req: Request, res: Response) {
     const transactions = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
-    console.error('Fetch stock transactions error:', error);
+    logger.error({ err: error }, 'Fetch stock transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -79,7 +80,7 @@ export async function updateStockTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction updated successfully' });
   } catch (error) {
-    console.error('Update stock transaction error:', error);
+    logger.error({ err: error }, 'Update stock transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -112,7 +113,7 @@ export async function deleteStockTransaction(req: Request, res: Response) {
 
     res.status(200).json({ success: true, message: 'Transaction deleted' });
   } catch (error) {
-    console.error('Delete stock transaction error:', error);
+    logger.error({ err: error }, 'Delete stock transaction error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -128,7 +129,7 @@ export async function deleteAllUserStockTransactions(req: Request, res: Response
     const result = await db.collection('stocks').deleteMany({ userId: new ObjectId(user.userId) });
     res.status(200).json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Delete all stock transactions error:', error);
+    logger.error({ err: error }, 'Delete all stock transactions error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -163,7 +164,7 @@ export async function getNSEQuote(req: Request, res: Response) {
       } else {
         const cached = await getCached<StockData>(cacheKey);
         if (cached) {
-          console.log(`Serving cached stock data for ${symbol}`);
+          logger.info({ symbol }, 'Serving cached stock data');
           dataMap[symbol] = cached;
         } else {
           dataMap[symbol] = null;
@@ -173,7 +174,7 @@ export async function getNSEQuote(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: dataMap });
   } catch (error) {
-    console.error('Fetch NSE quote error:', error);
+    logger.error({ err: error }, 'Fetch NSE quote error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -191,7 +192,7 @@ export async function searchStocksByName(req: Request, res: Response) {
     const results = await StocksService.searchStocks(query);
     res.status(200).json({ success: true, data: results });
   } catch (err) {
-    console.error('Error searching stocks by name:', err);
+    logger.error({ err }, 'Error searching stocks by name');
     res.status(500).json({ message: 'Failed to search stocks' });
   }
 }
@@ -336,7 +337,7 @@ export async function getStocksPortfolio(req: Request, res: Response) {
       },
     });
   } catch (error) {
-    console.error('Fetch stocks portfolio error:', error);
+    logger.error({ err: error }, 'Fetch stocks portfolio error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -355,7 +356,7 @@ export async function getFullStockProfile(req: Request, res: Response) {
     const data = await StocksService.getFullStockProfile(symbol, range, interval);
     res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching full stock profile:', error);
+    logger.error({ err: error }, 'Error fetching full stock profile');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import database from '../database';
+import logger from '../utils/logger';
 
 function parseUpiSms(smsText: string): { amount: number | null; merchant: string } {
   const text = smsText.trim();
@@ -93,7 +94,7 @@ export async function ingestUpiTransaction(req: Request, res: Response) {
       data: { id: result.insertedId, amount, merchant },
     });
   } catch (error) {
-    console.error('UPI ingest error:', error);
+    logger.error({ err: error }, 'UPI ingest error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

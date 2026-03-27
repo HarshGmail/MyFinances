@@ -54,14 +54,15 @@ function parseCurrencyNum(raw: string): number {
   return parseFloat(raw.replace(/,/g, ''));
 }
 
+import logger from '../utils/logger';
+
 export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[] {
   const transactions: ParsedGoldTransaction[] = [];
 
   // Find the transaction statement section (case-insensitive)
   const idx = text.search(/transaction statement/i);
   if (idx === -1) {
-    console.log('[SafeGold Parser] "Transaction Statement" not found in text');
-    console.log('[SafeGold Parser] First 300 chars:', text.slice(0, 300).replace(/\n/g, '|'));
+    logger.info({ preview: text.slice(0, 300).replace(/\n/g, '|') }, '[SafeGold Parser] "Transaction Statement" not found in text');
     return transactions;
   }
 
@@ -105,14 +106,12 @@ export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[]
   }
   flush();
 
-  console.log(`[SafeGold Parser] Built ${blocks.length} transaction block(s)`);
+  logger.info({ count: blocks.length }, '[SafeGold Parser] Built transaction blocks');
 
   // Count how many blocks actually contain purchased/sold for debugging
   const purchaseBlocks = blocks.filter((b) => /purchased/i.test(b.text));
   const soldBlocks = blocks.filter((b) => /\bsold\b/i.test(b.text));
-  console.log(
-    `[SafeGold Parser] Blocks with 'Purchased': ${purchaseBlocks.length}, 'Sold': ${soldBlocks.length}`
-  );
+  logger.info({ purchased: purchaseBlocks.length, sold: soldBlocks.length }, "[SafeGold Parser] Blocks with 'Purchased' and 'Sold'");
 
   for (const block of blocks) {
     const t = block.text;
@@ -143,7 +142,7 @@ export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[]
           platform: 'SafeGold',
         });
       } else {
-        console.log('[SafeGold Parser] Could not parse purchase block:', t.slice(0, 120));
+        logger.info({ block: t.slice(0, 120) }, '[SafeGold Parser] Could not parse purchase block');
       }
       continue;
     }
@@ -167,11 +166,11 @@ export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[]
           platform: 'SafeGold',
         });
       } else {
-        console.log('[SafeGold Parser] Could not parse sale block:', t.slice(0, 120));
+        logger.info({ block: t.slice(0, 120) }, '[SafeGold Parser] Could not parse sale block');
       }
     }
   }
 
-  console.log(`[SafeGold Parser] Extracted ${transactions.length} gold transactions`);
+  logger.info({ count: transactions.length }, '[SafeGold Parser] Extracted gold transactions');
   return transactions;
 }

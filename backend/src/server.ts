@@ -29,6 +29,7 @@ import {
   emailIntegrationsRouter,
 } from './routes';
 import { requestLogger } from './middleware';
+import logger from './utils/logger';
 
 const app = express();
 const port = config.PORT;
@@ -98,24 +99,24 @@ async function startServer() {
 
     // Start the server
     app.listen(port, '0.0.0.0', () => {
-      console.log(`🚀 Server running at http://localhost:${port}`);
-      console.log(`📚 Swagger docs at http://localhost:${port}/api-docs`);
+      logger.info(`Server running at http://localhost:${port}`);
+      logger.info(`Swagger docs at http://localhost:${port}/api-docs`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down server...');
+  logger.info('Shutting down server (SIGINT)');
   await database.disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down server...');
+  logger.info('Shutting down server (SIGTERM)');
   await database.disconnect();
   process.exit(0);
 });
