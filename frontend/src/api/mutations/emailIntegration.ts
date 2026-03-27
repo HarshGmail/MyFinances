@@ -5,6 +5,7 @@ import {
   ParsedMFTransaction,
   ParsedGoldTransaction,
   ParsedEmailStockHolding,
+  ParsedCryptoEmailTransaction,
 } from '@/api/dataInterface';
 
 async function syncEmails(): Promise<EmailSyncPreview> {
@@ -20,7 +21,14 @@ async function importTransactions(data: {
   mutualFunds: ParsedMFTransaction[];
   gold: ParsedGoldTransaction[];
   stocks: ParsedEmailStockHolding[];
-}): Promise<{ importedMF: number; importedGold: number; importedStocks: number; total: number }> {
+  crypto: ParsedCryptoEmailTransaction[];
+}): Promise<{
+  importedMF: number;
+  importedGold: number;
+  importedStocks: number;
+  importedCrypto: number;
+  total: number;
+}> {
   const response = await apiRequest({
     endpoint: '/email-integration/import',
     method: 'POST',
@@ -37,12 +45,13 @@ export function useEmailImportMutation() {
       queryClient.invalidateQueries({ queryKey: ['mfTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['goldTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['cryptoTransactions'] });
     },
   });
 }
 
-async function resetEmailSync() {
-  return apiRequest({ endpoint: '/email-integration/reset-sync', method: 'POST' });
+async function resetEmailSync(email: string) {
+  return apiRequest({ endpoint: '/email-integration/reset-sync', method: 'POST', body: { email } });
 }
 
 export function useEmailResetSyncMutation() {
@@ -55,8 +64,11 @@ export function useEmailResetSyncMutation() {
   });
 }
 
-async function disconnectEmail() {
-  return apiRequest({ endpoint: '/email-integration/disconnect', method: 'DELETE' });
+async function disconnectEmail(email: string) {
+  return apiRequest({
+    endpoint: `/email-integration/disconnect?email=${encodeURIComponent(email)}`,
+    method: 'DELETE',
+  });
 }
 
 export function useEmailDisconnectMutation() {
@@ -69,7 +81,7 @@ export function useEmailDisconnectMutation() {
   });
 }
 
-async function updateEmailSettings(data: { safegoldSender: string }) {
+async function updateEmailSettings(data: { email: string; safegoldSender: string }) {
   return apiRequest({ endpoint: '/email-integration/settings', method: 'PUT', body: data });
 }
 

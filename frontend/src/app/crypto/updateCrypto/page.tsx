@@ -8,17 +8,15 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -26,16 +24,9 @@ import {
   useAddCryptoTransactionMutation,
   useUpdateCryptoTransactionMutation,
 } from '@/api/mutations';
-import { useSearchCryptoQuery, useCryptoTransactionsQuery } from '@/api/query';
-import { debounce } from 'lodash';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+import { useCryptoTransactionsQuery } from '@/api/query';
+import { NumericFormField } from './NumericFormField';
+import { CoinSearchField } from './CoinSearchField';
 
 const formSchema = z.object({
   type: z.enum(['credit', 'debit'], { required_error: 'Type is required' }),
@@ -81,10 +72,15 @@ function CryptoUpdateCryptoPageInner() {
     },
   });
 
-  // Keep a copy of the original tx values for Reset (edit mode)
   const [originalTx, setOriginalTx] = useState<FormValues | null>(null);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [coinNameInput, setCoinNameInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const router = useRouter();
+  const { mutate: addTx, isPending: adding } = useAddCryptoTransactionMutation();
+  const { mutate: updateTx, isPending: updating } = useUpdateCryptoTransactionMutation();
+  const isPending = adding || updating;
 
-  // Prefill from transaction when editing (takes priority over localStorage)
   useEffect(() => {
     if (!isEditing || !cryptoTransactions) return;
     const tx = cryptoTransactions.find((t) => t._id === editId);
@@ -100,30 +96,13 @@ function CryptoUpdateCryptoPageInner() {
       };
       form.reset(values);
       setOriginalTx(values);
-      // Also set the coin search input to current coin so suggestions line up
       setCoinNameInput(values.coinName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, editId, cryptoTransactions]);
 
-  const [dateOpen, setDateOpen] = useState(false);
-  const [coinNameInput, setCoinNameInput] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const router = useRouter();
-  const { mutate: addTx, isPending: adding } = useAddCryptoTransactionMutation();
-  const { mutate: updateTx, isPending: updating } = useUpdateCryptoTransactionMutation();
-  const isPending = adding || updating;
-
-  // Search crypto query with debounced input (this keeps coinSymbol in sync when user changes coin)
-  const { data: coinSuggestions } = useSearchCryptoQuery(coinNameInput);
-  const debouncedSetCoinNameInput = useMemo(
-    () => debounce((val: string) => setCoinNameInput(val), 1000),
-    []
-  );
-
-  // Load cached values only when NOT editing (searchParams must win)
   useEffect(() => {
-    if (isEditing) return; // <-- prefer searchParams/tx prefill over cache
+    if (isEditing) return;
     const cached = localStorage.getItem(CACHE_KEY);
     if (!cached) return;
     try {
@@ -137,29 +116,18 @@ function CryptoUpdateCryptoPageInner() {
           form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
         }
       });
-      // Also set search box to cached coin name so suggestions make sense
       const cachedCoinName = (parsed as Partial<FormValues>).coinName;
       if (cachedCoinName) setCoinNameInput(cachedCoinName);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
-  // Save form values to cache on change (both modes; harmless in edit mode)
   useEffect(() => {
     const subscription = form.watch((values) => {
       localStorage.setItem(CACHE_KEY, JSON.stringify(values));
     });
     return () => subscription.unsubscribe();
   }, [form]);
-
-  // Number input helpers (unchanged)
-
-  const getNumberDisplayValue = (value: unknown): string => {
-    if (value === '' || value === undefined || value === null) return '';
-    if (typeof value === 'string') return value;
-    if (value === 0) return '';
-    return value.toString();
-  };
 
   function onSubmit(values: FormValues) {
     if (isEditing) {
@@ -193,7 +161,6 @@ function CryptoUpdateCryptoPageInner() {
     }
   }
 
-  // Reset handler
   const onReset = () => {
     if (isEditing && originalTx) {
       form.reset(originalTx);
@@ -227,7 +194,7 @@ function CryptoUpdateCryptoPageInner() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"
           >
-            {/* Type of Transaction */}
+            {/* Type */}
             <FormLabel className="self-center">Type of Transaction</FormLabel>
             <FormField
               control={form.control}
@@ -288,206 +255,38 @@ function CryptoUpdateCryptoPageInner() {
               )}
             />
 
-            {/* Coin Price */}
-            <FormLabel className="self-center">Coin Price</FormLabel>
-            <FormField
+            <NumericFormField
               control={form.control}
               name="coinPrice"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <Input
-                      type="text"
-                      step="0.00000001"
-                      min="0"
-                      placeholder="Enter coin price (e.g., 50000.25)"
-                      value={field.value}
-                      onFocus={() => {
-                        if (field.value === 0) field.onChange('');
-                      }}
-                      onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                        else if (typeof field.value === 'string') {
-                          const numVal = parseFloat(field.value);
-                          field.onChange(isNaN(numVal) ? 0 : numVal);
-                        }
-                      }}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const isValid = /^\d*\.?\d*$/.test(value);
-                        if (isValid) {
-                          field.onChange(value);
-                        }
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              label="Coin Price"
+              placeholder="Enter coin price (e.g., 50000.25)"
+              step="0.00000001"
             />
-
-            {/* Quantity */}
-            <FormLabel className="self-center">Quantity</FormLabel>
-            <FormField
+            <NumericFormField
               control={form.control}
               name="quantity"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <Input
-                      type="text"
-                      step="0.00000001"
-                      min="0"
-                      placeholder="Enter quantity (e.g., 1.5678)"
-                      value={getNumberDisplayValue(field.value)}
-                      onFocus={() => {
-                        if (field.value === 0) field.onChange('');
-                      }}
-                      onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                        else if (typeof field.value === 'string') {
-                          const numVal = parseFloat(field.value);
-                          field.onChange(isNaN(numVal) ? 0 : numVal);
-                        }
-                      }}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const isValid = /^\d*\.?\d*$/.test(value);
-                        if (isValid) {
-                          field.onChange(value);
-                        }
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              label="Quantity"
+              placeholder="Enter quantity (e.g., 1.5678)"
+              step="0.00000001"
             />
-
-            {/* Amount */}
-            <FormLabel className="self-center">Amount</FormLabel>
-            <FormField
+            <NumericFormField
               control={form.control}
               name="amount"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <Input
-                      type="text"
-                      step="0.01"
-                      min="0"
-                      placeholder="Enter amount (e.g., 1250.75)"
-                      value={getNumberDisplayValue(field.value)}
-                      onFocus={() => {
-                        if (field.value === 0) field.onChange('');
-                      }}
-                      onBlur={() => {
-                        if (field.value === undefined) field.onChange(0);
-                        else if (typeof field.value === 'string') {
-                          const numVal = parseFloat(field.value);
-                          field.onChange(isNaN(numVal) ? 0 : numVal);
-                        }
-                      }}
-                      onChange={(e) => {
-                        {
-                          const value = e.target.value;
-                          const isValid = /^\d*\.?\d*$/.test(value);
-                          if (isValid) {
-                            field.onChange(value);
-                          }
-                        }
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              label="Amount"
+              placeholder="Enter amount (e.g., 1250.75)"
             />
 
-            {/* Coin Name + Suggestions (keeps coinSymbol synced) */}
-            <FormLabel className="self-center">Coin Name</FormLabel>
-            <FormField
+            <CoinSearchField
               control={form.control}
-              name="coinName"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        placeholder="Search and select coin"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          debouncedSetCoinNameInput(e.target.value);
-                          setShowSuggestions(true);
-                          // reset symbol until a suggestion is chosen
-                          form.setValue('coinSymbol', '');
-                        }}
-                        onFocus={() => setShowSuggestions(true)}
-                        autoComplete="off"
-                      />
-
-                      {showSuggestions && coinNameInput.length >= 2 && (
-                        <div className="absolute z-20 mt-1 w-full">
-                          <Command className="border rounded-md bg-white dark:bg-neutral-900 shadow max-h-[250px] overflow-y-auto">
-                            <CommandInput
-                              value={coinNameInput}
-                              onValueChange={(val) => {
-                                setCoinNameInput(val);
-                                debouncedSetCoinNameInput(val);
-                              }}
-                              placeholder="Search cryptocurrencies..."
-                            />
-                            <CommandList>
-                              {coinSuggestions?.length ? (
-                                <CommandGroup heading="Cryptocurrencies">
-                                  {coinSuggestions
-                                    .sort((a, b) => a.rank - b.rank)
-                                    .map((coin) => (
-                                      <CommandItem
-                                        key={coin.id}
-                                        value={coin.name.toLowerCase()}
-                                        onSelect={() => {
-                                          form.setValue('coinName', coin.name);
-                                          form.setValue('coinSymbol', coin.symbol);
-                                          setCoinNameInput(coin.name);
-                                          setShowSuggestions(false);
-                                        }}
-                                        className="flex justify-between items-center"
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs text-muted-foreground">
-                                            #{coin.rank}
-                                          </span>
-                                          <span>{coin.name}</span>
-                                        </div>
-                                        <span className="text-sm text-muted-foreground uppercase">
-                                          {coin.symbol}
-                                        </span>
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                              ) : (
-                                <CommandEmpty>No cryptocurrencies found</CommandEmpty>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </div>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormDescription>
-                    Search and select from available cryptocurrencies
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              setValue={form.setValue}
+              coinNameInput={coinNameInput}
+              setCoinNameInput={setCoinNameInput}
+              showSuggestions={showSuggestions}
+              setShowSuggestions={setShowSuggestions}
             />
 
-            {/* Hidden coinSymbol field */}
             <input type="hidden" {...form.register('coinSymbol')} />
 
-            {/* Submit + Reset row */}
             <div className="md:col-span-2 col-span-1">
               {isEditing ? (
                 <div className="flex gap-3">

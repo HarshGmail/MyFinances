@@ -107,15 +107,14 @@ export interface CurrentTradingPeriod {
 
 export interface EmailIntegrationStatus {
   connected: boolean;
-  email?: string;
-  lastSyncAt?: string | null;
-  safegoldSender?: string;
+  accounts: LinkedEmailAccount[];
 }
 
 export interface EmailSyncPreview {
   mutualFunds: ParsedMFTransaction[];
   gold: ParsedGoldTransaction[];
   stocks: ParsedEmailStockHolding[];
+  crypto: ParsedCryptoEmailTransaction[];
   duplicatesSkipped: number;
   errors: string[];
 }
@@ -248,6 +247,12 @@ export interface InflationResult {
   average?: number;
 }
 
+export interface LinkedEmailAccount {
+  email: string;
+  lastSyncAt?: string | null;
+  safegoldSender?: string;
+}
+
 export interface MonthlyInvestmentSummaryItem {
   monthKey: string; // 'YYYY-MM'
   investments: {
@@ -324,6 +329,17 @@ export interface MutualFundTransaction {
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ParsedCryptoEmailTransaction {
+  coinSymbol: string;
+  coinName: string;
+  quantity: number;
+  coinPrice: number;
+  amount: number;
+  fees: number;
+  date: string;
+  type: 'credit' | 'debit';
 }
 
 export interface ParsedEmailStockHolding {

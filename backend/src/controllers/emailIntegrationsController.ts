@@ -56,14 +56,18 @@ export async function oauthCallback(req: Request, res: Response) {
     const { encryptedRefreshToken, email } = await exchangeCode(code);
 
     const db = database.getDb();
+    // Upsert keyed on (userId, email) so multiple Gmail accounts can be linked.
+    // Preserve existing lastSyncAt and safegoldSender on re-auth — only reset them on first connect.
     await db.collection('emailIntegrations').updateOne(
-      { userId: new ObjectId(userId) },
+      { userId: new ObjectId(userId), email },
       {
         $set: {
           userId: new ObjectId(userId),
           email,
           refreshToken: encryptedRefreshToken,
           linkedAt: new Date(),
+        },
+        $setOnInsert: {
           lastSyncAt: null,
           safegoldSender: 'estatements@safegold.in',
         },
@@ -90,12 +94,13 @@ export async function getStatus(req: Request, res: Response) {
     }
 
     const db = database.getDb();
-    const integration = await db.collection('emailIntegrations').findOne({
-      userId: new ObjectId(user.userId),
-    });
+    const integrations = await db
+      .collection('emailIntegrations')
+      .find({ userId: new ObjectId(user.userId) })
+      .toArray();
 
-    if (!integration) {
-      res.json({ success: true, data: { connected: false } });
+    if (integrations.length === 0) {
+      res.json({ success: true, data: { connected: false, accounts: [] } });
       return;
     }
 
@@ -103,9 +108,11 @@ export async function getStatus(req: Request, res: Response) {
       success: true,
       data: {
         connected: true,
-        email: integration.email,
-        lastSyncAt: integration.lastSyncAt,
-        safegoldSender: integration.safegoldSender ?? 'estatements@safegold.in',
+        accounts: integrations.map((i) => ({
+          email: i.email,
+          lastSyncAt: i.lastSyncAt,
+          safegoldSender: i.safegoldSender ?? 'estatements@safegold.in',
+        })),
       },
     });
   } catch (err) {
@@ -124,10 +131,16 @@ export async function resetSync(req: Request, res: Response) {
       return;
     }
 
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ success: false, message: 'email is required' });
+      return;
+    }
+
     const db = database.getDb();
     await db
       .collection('emailIntegrations')
-      .updateOne({ userId: new ObjectId(user.userId) }, { $set: { lastSyncAt: null } });
+      .updateOne({ userId: new ObjectId(user.userId), email }, { $set: { lastSyncAt: null } });
     res.json({ success: true, message: 'Sync history cleared — next sync will fetch all emails' });
   } catch (err) {
     console.error('Reset sync error:', err);
@@ -145,9 +158,17 @@ export async function disconnect(req: Request, res: Response) {
       return;
     }
 
+    const email = req.query.email as string | undefined;
+    if (!email) {
+      res.status(400).json({ success: false, message: 'email query param is required' });
+      return;
+    }
+
     const db = database.getDb();
-    await db.collection('emailIntegrations').deleteOne({ userId: new ObjectId(user.userId) });
-    res.json({ success: true, message: 'Gmail integration removed' });
+    await db
+      .collection('emailIntegrations')
+      .deleteOne({ userId: new ObjectId(user.userId), email });
+    res.json({ success: true, message: 'Gmail account removed' });
   } catch (err) {
     console.error('Disconnect error:', err);
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -164,12 +185,16 @@ export async function updateSettings(req: Request, res: Response) {
       return;
     }
 
-    const { safegoldSender } = req.body;
+    const { email, safegoldSender } = req.body;
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ success: false, message: 'email is required' });
+      return;
+    }
     if (safegoldSender && typeof safegoldSender === 'string') {
       const db = database.getDb();
       await db
         .collection('emailIntegrations')
-        .updateOne({ userId: new ObjectId(user.userId) }, { $set: { safegoldSender } });
+        .updateOne({ userId: new ObjectId(user.userId), email }, { $set: { safegoldSender } });
     }
     res.json({ success: true });
   } catch (err) {
@@ -189,18 +214,17 @@ export async function syncEmails(req: Request, res: Response) {
     }
 
     const db = database.getDb();
+    const userId = new ObjectId(user.userId);
 
-    // Load integration
-    const integration = await db.collection('emailIntegrations').findOne({
-      userId: new ObjectId(user.userId),
-    });
-    if (!integration) {
+    // Load all linked integrations for this user
+    const integrations = await db.collection('emailIntegrations').find({ userId }).toArray();
+    if (integrations.length === 0) {
       res.status(400).json({ success: false, message: 'No Gmail account linked' });
       return;
     }
 
     // Load user for PAN and phone (needed for PDF passwords)
-    const userDoc = await db.collection('users').findOne({ _id: new ObjectId(user.userId) });
+    const userDoc = await db.collection('users').findOne({ _id: userId });
     if (!userDoc) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
@@ -216,104 +240,115 @@ export async function syncEmails(req: Request, res: Response) {
     const allStockHoldings: ParsedStockHolding[] = [];
     const allCryptoTrades: ParsedCoinDCXTrade[] = [];
 
-    // Use lastSyncAt for incremental sync (skip already-seen emails)
-    const afterDate: Date | undefined = integration.lastSyncAt ?? undefined;
+    // Loop over every linked account and collect from each
+    for (const integration of integrations) {
+      const afterDate: Date | undefined = integration.lastSyncAt ?? undefined;
+      const accountTag = integration.email;
 
-    // ── Fetch and parse CDSL emails ──────────────────────────────────────────
-    try {
-      const cdslQuery = 'from:eCAS@cdslstatement.com has:attachment';
-      const cdslPdfs = await fetchPdfAttachments(integration.refreshToken, cdslQuery, afterDate);
-      console.log(`[Sync] Found ${cdslPdfs.length} CDSL PDF(s)`);
+      // ── Fetch and parse CDSL emails ────────────────────────────────────────
+      try {
+        const cdslQuery = 'from:eCAS@cdslstatement.com has:attachment';
+        const cdslPdfs = await fetchPdfAttachments(integration.refreshToken, cdslQuery, afterDate);
+        console.log(`[Sync:${accountTag}] Found ${cdslPdfs.length} CDSL PDF(s)`);
 
-      for (const pdf of cdslPdfs) {
-        try {
-          const passwords = cdslPassword ? [cdslPassword, ''] : [''];
-          const text = await extractTextFromPdf(pdf, passwords);
-          const txns = parseCdslMFTransactions(text);
-          allMFTransactions.push(...txns);
-          const holdings = parseCdslStockHoldings(text);
-          allStockHoldings.push(...holdings);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`CDSL PDF parse error: ${msg}`);
+        for (const pdf of cdslPdfs) {
+          try {
+            const passwords = cdslPassword ? [cdslPassword, ''] : [''];
+            const text = await extractTextFromPdf(pdf, passwords);
+            allMFTransactions.push(...parseCdslMFTransactions(text));
+            allStockHoldings.push(...parseCdslStockHoldings(text));
+          } catch (e) {
+            errors.push(
+              `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`
+            );
+          }
         }
+      } catch (e) {
+        errors.push(
+          `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`CDSL email fetch error: ${msg}`);
-    }
 
-    // ── Fetch and parse SafeGold emails ─────────────────────────────────────
-    try {
-      const sgSender = integration.safegoldSender ?? 'estatements@safegold.in';
-      const sgQuery = `from:${sgSender} has:attachment`;
-      const sgPdfs = await fetchPdfAttachments(integration.refreshToken, sgQuery, afterDate);
-      console.log(`[Sync] Found ${sgPdfs.length} SafeGold PDF(s)`);
+      // ── Fetch and parse SafeGold statement emails ──────────────────────────
+      try {
+        const sgSender = integration.safegoldSender ?? 'estatements@safegold.in';
+        const sgPdfs = await fetchPdfAttachments(
+          integration.refreshToken,
+          `from:${sgSender} has:attachment`,
+          afterDate
+        );
+        console.log(`[Sync:${accountTag}] Found ${sgPdfs.length} SafeGold PDF(s)`);
 
-      for (const pdf of sgPdfs) {
-        try {
-          const passwords = safegoldPassword ? [safegoldPassword, ''] : [''];
-          const text = await extractTextFromPdf(pdf, passwords);
-          const txns = parseSafeGoldTransactions(text);
-          allGoldTransactions.push(...txns);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`SafeGold PDF parse error: ${msg}`);
+        for (const pdf of sgPdfs) {
+          try {
+            const passwords = safegoldPassword ? [safegoldPassword, ''] : [''];
+            const text = await extractTextFromPdf(pdf, passwords);
+            allGoldTransactions.push(...parseSafeGoldTransactions(text));
+          } catch (e) {
+            errors.push(
+              `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`
+            );
+          }
         }
+      } catch (e) {
+        errors.push(
+          `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`SafeGold email fetch error: ${msg}`);
-    }
 
-    // ── Fetch and parse SafeGold real-time invoice emails ────────────────────
-    try {
-      const sgInvoiceQuery = 'from:noreply@safegold.in has:attachment';
-      const sgInvoicePdfs = await fetchPdfAttachments(
-        integration.refreshToken,
-        sgInvoiceQuery,
-        afterDate
-      );
-      console.log(`[Sync] Found ${sgInvoicePdfs.length} SafeGold invoice PDF(s)`);
+      // ── Fetch and parse SafeGold real-time invoice emails ──────────────────
+      try {
+        const sgInvoicePdfs = await fetchPdfAttachments(
+          integration.refreshToken,
+          'from:noreply@safegold.in has:attachment',
+          afterDate
+        );
+        console.log(`[Sync:${accountTag}] Found ${sgInvoicePdfs.length} SafeGold invoice PDF(s)`);
 
-      for (const pdf of sgInvoicePdfs) {
-        try {
-          // Invoice PDFs are not password-protected
-          const text = await extractTextFromPdf(pdf, []);
-          const tx = parseSafeGoldInvoice(text);
-          if (tx) allGoldTransactions.push(tx);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`SafeGold invoice PDF parse error: ${msg}`);
+        for (const pdf of sgInvoicePdfs) {
+          try {
+            const text = await extractTextFromPdf(pdf, []);
+            const tx = parseSafeGoldInvoice(text);
+            if (tx) allGoldTransactions.push(tx);
+          } catch (e) {
+            errors.push(
+              `[${accountTag}] SafeGold invoice parse error: ${e instanceof Error ? e.message : String(e)}`
+            );
+          }
         }
+      } catch (e) {
+        errors.push(
+          `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`SafeGold invoice email fetch error: ${msg}`);
-    }
 
-    // ── Fetch and parse CoinDCX trade emails ─────────────────────────────────
-    try {
-      const cdxQuery = 'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"';
-      const cdxBodies = await fetchEmailBodies(integration.refreshToken, cdxQuery, afterDate);
-      console.log(`[Sync] Found ${cdxBodies.length} CoinDCX trade email(s)`);
+      // ── Fetch and parse CoinDCX trade emails ──────────────────────────────
+      try {
+        const cdxBodies = await fetchEmailBodies(
+          integration.refreshToken,
+          'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
+          afterDate
+        );
+        console.log(`[Sync:${accountTag}] Found ${cdxBodies.length} CoinDCX trade email(s)`);
 
-      for (const body of cdxBodies) {
-        try {
-          const trade = parseCoinDCXTradeEmail(body);
-          if (trade) allCryptoTrades.push(trade);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`CoinDCX email parse error: ${msg}`);
+        for (const body of cdxBodies) {
+          try {
+            const trade = parseCoinDCXTradeEmail(body);
+            if (trade) allCryptoTrades.push(trade);
+          } catch (e) {
+            errors.push(
+              `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`
+            );
+          }
         }
+      } catch (e) {
+        errors.push(
+          `[${accountTag}] CoinDCX fetch error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`CoinDCX email fetch error: ${msg}`);
     }
 
     // ── Deduplicate against existing DB records ──────────────────────────────
-    const userId = new ObjectId(user.userId);
 
     // Normalize CDSL fund names to match existing DB fund names (for NAV lookups)
     const canonicalMF = await canonicalizeMFNames(db, userId, allMFTransactions);
@@ -327,10 +362,10 @@ export async function syncEmails(req: Request, res: Response) {
 
     const { newCrypto, skippedCrypto } = await deduplicateCrypto(db, userId, allCryptoTrades);
 
-    // Update lastSyncAt
+    // Update lastSyncAt for all linked accounts
     await db
       .collection('emailIntegrations')
-      .updateOne({ userId }, { $set: { lastSyncAt: new Date() } });
+      .updateMany({ userId }, { $set: { lastSyncAt: new Date() } });
 
     res.json({
       success: true,
