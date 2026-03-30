@@ -153,11 +153,14 @@ class CoinDCXService {
     } catch (error) {
       logger.error({ err: error }, 'Error fetching CoinDCX user balances');
       if (axios.isAxiosError(error)) {
-        logger.error({
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-        }, 'Axios error details');
+        logger.error(
+          {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+          },
+          'Axios error details'
+        );
       }
       return null;
     }

@@ -342,6 +342,21 @@ export async function getStocksPortfolio(req: Request, res: Response) {
   }
 }
 
+export async function getStockFinancials(req: Request, res: Response) {
+  try {
+    const { symbol } = req.query;
+    if (!symbol || typeof symbol !== 'string') {
+      res.status(400).json({ success: false, message: 'symbol is required' });
+      return;
+    }
+    const data = await StocksService.fetchFinancials(symbol);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching stock financials');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getFullStockProfile(req: Request, res: Response) {
   try {
     const { symbol } = req.query;

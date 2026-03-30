@@ -22,14 +22,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { getTimeframes, getPastDate } from '@/utils/chartHelpers';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProfitLossColor } from '@/utils/text';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Toggle } from '@/components/ui/toggle';
+import Link from 'next/link';
 import { StockTransaction } from '@/api/dataInterface';
 
 export default function StocksPortfolioPage() {
@@ -41,8 +34,6 @@ export default function StocksPortfolioPage() {
   const timeframeStart = getPastDate(selectedTimeframe.days);
 
   const chartRef = useRef<HTMLDivElement>(null);
-  const [selectedStock, setSelectedStock] = useState('All');
-  const [showTxPlotLines, setShowTxPlotLines] = useState(false);
 
   const { data: portfolioData, isLoading, error } = useStocksPortfolioQuery();
   const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
@@ -60,123 +51,46 @@ export default function StocksPortfolioPage() {
   };
   const stockTransactions: StockTransaction[] = portfolioData?.transactions ?? [];
 
-  const txPlotLines = useMemo<Highcharts.XAxisPlotLinesOptions[]>(() => {
-    if (!stockTransactions.length || selectedStock === 'All') return [];
-
-    const inr = new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    });
-
-    return stockTransactions
-      .filter((tx) => tx.stockName === selectedStock)
-      .map((tx) => {
-        const tMs = Date.parse(tx.date);
-        if (Number.isNaN(tMs) || tMs < timeframeStart) return null;
-
-        const isCredit = tx.type === 'credit';
-        const color = isCredit ? '#16a34a' : '#dc2626';
-        const shares =
-          typeof tx.numOfShares === 'number' ? ` • ${tx.numOfShares.toFixed(2)} sh` : '';
-
-        return {
-          value: tMs,
-          color,
-          width: 1,
-          dashStyle: 'ShortDash',
-          zIndex: 5,
-          label: {
-            text: `${isCredit ? '+' : '-'} ${inr.format(tx.amount)}${shares}`,
-            align: 'left',
-            verticalAlign: 'top',
-            x: 2,
-            y: 12,
-            style: {
-              color: isDark ? '#d1d5db' : '#374151',
-              fontSize: '10px',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-            },
-          },
-        } as Highcharts.XAxisPlotLinesOptions;
-      })
-      .filter(Boolean) as Highcharts.XAxisPlotLinesOptions[];
-  }, [stockTransactions, selectedStock, timeframeStart, isDark]);
-
+  // Single combined series: sum all stocks' holding value at each timestamp
   const chartData = useMemo(() => {
     if (!processedPortfolioData.length || !Object.keys(priceData).length) return null;
 
-    const colors = [
-      '#FF6B6B',
-      '#4ECDC4',
-      '#45B7D1',
-      '#FFA07A',
-      '#98D8C8',
-      '#F7DC6F',
-      '#BB8FCE',
-      '#85C1E9',
-      '#F8C471',
-      '#82E0AA',
-    ];
+    const combined = new Map<number, number>();
 
-    const stockSeries: unknown[] = [];
-
-    processedPortfolioData.forEach((stock, index) => {
+    processedPortfolioData.forEach((stock) => {
       const stockPriceData = priceData[stock.stockName];
       if (!stockPriceData?.chart?.result?.[0]) return;
 
       const timestamps: number[] = stockPriceData.chart.result[0].timestamp || [];
       const closes = stockPriceData.chart.result[0].indicators?.quote?.[0]?.close || [];
 
-      if (!timestamps.length || !closes.length) return;
-
-      const seriesData = timestamps
-        .map((timestamp, idx) => {
-          const closePrice = closes[idx];
-          const timeMs = timestamp * 1000;
-          if (!closePrice || timeMs < timeframeStart) return null;
-          return [timeMs, closePrice * stock.numOfShares];
-        })
-        .filter(Boolean);
-
-      if (seriesData.length > 0) {
-        stockSeries.push({
-          name: stock.stockName,
-          data: seriesData,
-          color: colors[index % colors.length],
-          lineWidth: 2,
-          marker: { enabled: false, states: { hover: { enabled: true, radius: 4 } } },
-        });
-      }
+      timestamps.forEach((ts, idx) => {
+        const closePrice = closes[idx];
+        const timeMs = ts * 1000;
+        if (!closePrice || timeMs < timeframeStart) return;
+        combined.set(timeMs, (combined.get(timeMs) ?? 0) + closePrice * stock.numOfShares);
+      });
     });
 
-    return stockSeries;
+    if (combined.size === 0) return null;
+
+    const seriesData = Array.from(combined.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([timeMs, value]) => [timeMs, value]);
+
+    return [
+      {
+        name: 'Portfolio Value',
+        data: seriesData,
+        color: '#4ECDC4',
+        lineWidth: 2,
+        marker: { enabled: false, states: { hover: { enabled: true, radius: 4 } } },
+      },
+    ];
   }, [processedPortfolioData, priceData, timeframeStart]);
 
   const chartOptions = useMemo(() => {
     if (!chartData) return null;
-
-    const yAxisPlotLines: Highcharts.YAxisPlotLinesOptions[] = [];
-    if (selectedStock !== 'All') {
-      const stockRow = processedPortfolioData.find((s) => s.stockName === selectedStock);
-      if (stockRow && stockRow.numOfShares > 0) {
-        const avgPrice = stockRow.investedAmount / stockRow.numOfShares;
-        yAxisPlotLines.push({
-          value: avgPrice * stockRow.numOfShares,
-          color: '#3B82F6',
-          dashStyle: 'Dash',
-          width: 2,
-          zIndex: 5,
-          label: {
-            text: `Avg Price: ₹${avgPrice.toFixed(2)}`,
-            align: 'right',
-            x: -10,
-            style: { color: '#3B82F6', fontWeight: 'bold' },
-          },
-        });
-      }
-    }
 
     return {
       chart: {
@@ -186,16 +100,15 @@ export default function StocksPortfolioPage() {
         style: { fontFamily: 'inherit' },
       },
       title: {
-        text: 'Portfolio Performance Over Time',
+        text: 'Total Portfolio Value',
         style: { fontSize: '18px', fontWeight: 'bold', color: isDark ? '#fff' : '#374151' },
       },
       subtitle: {
-        text: 'Individual Stock Holdings Value',
+        text: 'All holdings combined, daily',
         style: { color: isDark ? '#d1d5db' : '#6b7280' },
       },
       xAxis: {
         type: 'datetime',
-        plotLines: showTxPlotLines && selectedStock !== 'All' ? txPlotLines : [],
         title: { text: 'Date', style: { color: isDark ? '#fff' : '#374151' } },
         labels: { style: { color: isDark ? '#d1d5db' : '#6b7280' } },
         gridLineWidth: 1,
@@ -212,7 +125,6 @@ export default function StocksPortfolioPage() {
         },
         gridLineWidth: 1,
         gridLineColor: isDark ? '#374151' : '#e5e7eb',
-        plotLines: yAxisPlotLines,
       },
       tooltip: {
         shared: true,
@@ -234,45 +146,18 @@ export default function StocksPortfolioPage() {
           return tooltip;
         },
       },
-      legend: {
-        enabled: true,
-        align: 'center',
-        verticalAlign: 'bottom',
-        layout: 'horizontal',
-        itemStyle: { fontSize: '12px', color: isDark ? '#d1d5db' : '#6b7280' },
-        itemHoverStyle: { color: isDark ? '#fff' : '#374151' },
-      },
+      legend: { enabled: false },
       plotOptions: {
         line: {
           animation: { duration: 1000 },
           marker: { enabled: false, states: { hover: { enabled: true, radius: 4 } } },
           states: { hover: { lineWidth: 3 } },
         },
-        series: { events: { legendItemClick: function () {} } },
       },
-      series:
-        selectedStock === 'All'
-          ? chartData
-          : chartData.filter(
-              (s) =>
-                typeof s === 'object' &&
-                s !== null &&
-                'name' in s &&
-                (s as { name: string }).name === selectedStock
-            ),
+      series: chartData,
       credits: { enabled: false },
-      responsive: {
-        rules: [
-          {
-            condition: { maxWidth: 500 },
-            chartOptions: {
-              legend: { layout: 'horizontal', align: 'center', verticalAlign: 'bottom' },
-            },
-          },
-        ],
-      },
     };
-  }, [chartData, isDark, processedPortfolioData, selectedStock, showTxPlotLines, txPlotLines]);
+  }, [chartData, isDark]);
 
   const overallXirr = useMemo(() => {
     if (!stockTransactions.length || portfolioTotals.totalCurrentValue === 0) return null;
@@ -328,15 +213,8 @@ export default function StocksPortfolioPage() {
   }, [cgData, processedPortfolioData]);
 
   const chartKey = useMemo(
-    () =>
-      [
-        selectedStock,
-        timeframe,
-        showTxPlotLines ? 'on' : 'off',
-        txPlotLines.length,
-        timeframeStart,
-      ].join('|'),
-    [selectedStock, timeframe, showTxPlotLines, txPlotLines.length, timeframeStart]
+    () => [timeframe, timeframeStart].join('|'),
+    [timeframe, timeframeStart]
   );
 
   if (isLoading) {
@@ -433,17 +311,6 @@ export default function StocksPortfolioPage() {
       {chartData && chartOptions && (
         <div className="relative mb-6" ref={chartRef}>
           <div className="absolute right-6 top-3 z-10 flex items-center gap-2">
-            {selectedStock !== 'All' && (
-              <Toggle
-                pressed={showTxPlotLines}
-                onPressedChange={setShowTxPlotLines}
-                className="h-7 px-2 rounded-md border border-gray-400 text-gray-400
-               data-[state=on]:bg-gray-400 data-[state=on]:text-black
-               data-[state=on]:border-gray-400"
-              >
-                Transactions
-              </Toggle>
-            )}
             <Tabs value={timeframe} onValueChange={setTimeframe}>
               <TabsList className="bg-transparent p-0 h-auto gap-1">
                 {TIMEFRAMES.map((tf) => (
@@ -459,22 +326,6 @@ export default function StocksPortfolioPage() {
                 ))}
               </TabsList>
             </Tabs>
-          </div>
-
-          <div className="absolute left-6 top-3 z-10">
-            <Select value={selectedStock} onValueChange={setSelectedStock}>
-              <SelectTrigger className="w-[160px] border border-black text-black dark:border-white dark:text-white dark:bg-transparent">
-                <SelectValue placeholder="Select stock" />
-              </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-900 text-black dark:text-white border border-black dark:border-white">
-                <SelectItem value="All">All</SelectItem>
-                {processedPortfolioData.map((stock) => (
-                  <SelectItem key={stock.stockName} value={stock.stockName}>
-                    {stock.stockName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="bg-transparent rounded-lg border border-border p-4">
@@ -523,18 +374,16 @@ export default function StocksPortfolioPage() {
                   }
                 }
                 return (
-                  <TableRow
-                    key={row.stockName}
-                    className={`cursor-pointer hover:bg-muted transition ${
-                      selectedStock === row.stockName ? 'bg-muted' : ''
-                    }`}
-                    onClick={() => {
-                      setSelectedStock(row.stockName || 'All');
-                      chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                  >
+                  <TableRow key={row.stockName} className="hover:bg-muted transition">
                     <TableCell>{idx + 1}</TableCell>
-                    <TableCell className="underline">{row.stockName || '-'}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/stocks/detail/${encodeURIComponent(row.stockName)}`}
+                        className="underline hover:text-primary font-medium"
+                      >
+                        {row.stockName || '-'}
+                      </Link>
+                    </TableCell>
                     <TableCell>{row.numOfShares}</TableCell>
                     <TableCell>{row.avgPrice}</TableCell>
                     <TableCell>₹{row.investedAmount.toFixed(2)}</TableCell>

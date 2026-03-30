@@ -114,13 +114,14 @@ export default function LinkedAccountsList({
               <div className="flex items-center gap-1.5">
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => handleResetSync(account.email)}
                   disabled={isResettingSync || isSyncing}
-                  className="gap-1 text-muted-foreground text-xs h-7"
+                  title="Clear sync history — next sync will re-fetch all emails from the beginning"
+                  className="gap-1 text-xs h-7"
                 >
-                  <RefreshCw className="h-3 w-3" />
-                  Reset
+                  <RefreshCw className={`h-3 w-3 ${isResettingSync ? 'animate-spin' : ''}`} />
+                  Full Re-sync
                 </Button>
                 <Button
                   size="sm"

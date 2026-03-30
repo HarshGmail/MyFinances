@@ -62,7 +62,10 @@ export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[]
   // Find the transaction statement section (case-insensitive)
   const idx = text.search(/transaction statement/i);
   if (idx === -1) {
-    logger.info({ preview: text.slice(0, 300).replace(/\n/g, '|') }, '[SafeGold Parser] "Transaction Statement" not found in text');
+    logger.info(
+      { preview: text.slice(0, 300).replace(/\n/g, '|') },
+      '[SafeGold Parser] "Transaction Statement" not found in text'
+    );
     return transactions;
   }
 
@@ -111,7 +114,10 @@ export function parseSafeGoldTransactions(text: string): ParsedGoldTransaction[]
   // Count how many blocks actually contain purchased/sold for debugging
   const purchaseBlocks = blocks.filter((b) => /purchased/i.test(b.text));
   const soldBlocks = blocks.filter((b) => /\bsold\b/i.test(b.text));
-  logger.info({ purchased: purchaseBlocks.length, sold: soldBlocks.length }, "[SafeGold Parser] Blocks with 'Purchased' and 'Sold'");
+  logger.info(
+    { purchased: purchaseBlocks.length, sold: soldBlocks.length },
+    "[SafeGold Parser] Blocks with 'Purchased' and 'Sold'"
+  );
 
   for (const block of blocks) {
     const t = block.text;

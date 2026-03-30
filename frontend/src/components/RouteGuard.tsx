@@ -12,6 +12,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Cache last visited route except public routes (preserve query params)
+  // Invalid routes are automatically cleared by /not-found.tsx, so no validation needed here
   useEffect(() => {
     if (!PUBLIC_ROUTES.includes(pathname)) {
       localStorage.setItem(LAST_ROUTE_KEY, pathname + window.location.search);

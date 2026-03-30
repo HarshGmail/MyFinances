@@ -51,7 +51,20 @@ frontend/src/
 │   ├── home/page.tsx         Master dashboard (all assets combined)
 │   ├── stocks/
 │   │   ├── page.tsx          Stocks landing
-│   │   ├── portfolio/        Portfolio with charts + XIRR
+│   │   ├── detail/
+│   │   │   ├── page.tsx      Search landing — company switcher with portfolio quick-pick
+│   │   │   └── [symbol]/
+│   │   │       ├── page.tsx  Main orchestrator (~50 lines, routes to child components)
+│   │   │       ├── CompanySearchBar.tsx  Search input with suggestions + portfolio quick-picks
+│   │   │       ├── CompanyHeader.tsx     Company name, current price, change badge
+│   │   │       ├── PriceChart.tsx        Highcharts line chart (1D/1W/1M/3M/1Y intervals)
+│   │   │       ├── SnapshotVerdict.tsx   Colored verdict pills (Revenue Growth, Earnings Growth, Operating Margin)
+│   │   │       ├── FundamentalsGrid.tsx  2-column grid of metric cards with verdicts
+│   │   │       ├── MetricEducationDrawer.tsx  Right-side drawer with live calculations
+│   │   │       ├── StockNotFound.tsx     404 error page for invalid symbols
+│   │   │       ├── metricDefinitions.ts  20 metrics with educational content
+│   │   │       └── verdicts.ts           Verdict logic + live calculation builders
+│   │   ├── portfolio/        Combined portfolio value chart + stock name Links
 │   │   ├── transactions/     Transaction history table
 │   │   ├── search/           Yahoo Finance stock search
 │   │   └── updateStock/      Edit stock transaction
@@ -80,11 +93,15 @@ frontend/src/
 │   ├── configs/
 │   │   ├── api.ts            apiRequest() — base fetch wrapper (handles 401 → redirect to /)
 │   │   └── baseUrl.ts        API_BASE_URL from env
-│   ├── query/                One file per domain, exports useXxxQuery hooks
-│   │   └── emailIntegration.ts  useEmailIntegrationStatusQuery
-│   ├── mutations/            One file per domain, exports useXxxMutation hooks
-│   │   └── emailIntegration.ts  useEmailSyncMutation, useEmailImportMutation, useEmailDisconnectMutation, useEmailUpdateSettingsMutation, useEmailResetSyncMutation
-│   └── dataInterface.ts      ALL TypeScript interfaces for API data
+│   ├── query/
+│   │   ├── stocks.ts         useStockFinancialsQuery, useStockFullProfile, useStocksPortfolioQuery
+│   │   └── emailIntegration.ts  useEmailIntegrationStatusQuery, etc.
+│   ├── mutations/
+│   │   ├── stocks.ts         Stock transaction mutations
+│   │   └── emailIntegration.ts  useEmailSyncMutation, useEmailResetSyncMutation, etc.
+│   └── dataInterface.ts      ALL TypeScript interfaces:
+│       ├── StockFinancials — price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend
+│       └── Others: CryptoTransaction, MutualFundInfo, ExpenseTransaction, etc.
 ├── components/
 │   ├── custom/
 │   │   ├── SummaryStatCard.tsx
@@ -115,7 +132,11 @@ backend/src/
 ├── routes/               One file per domain, imports controller + authenticateToken
 ├── controllers/          Route handlers — call services or DB directly
 ├── services/
-│   ├── stocksService.ts       Yahoo Finance calls (includes 300ms delay between requests)
+│   ├── stocksService.ts       Yahoo Finance calls:
+│   │   ├── fetchQuotesSummary(symbols)  Returns price data + key stats
+│   │   ├── searchStocks(query)  Yahoo Finance search
+│   │   ├── fetchFinancials(symbol)  Returns price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend
+│   │   └── (includes 300ms delay between requests to avoid rate limiting)
 │   ├── stockServiceHelper.ts  NSE quote formatting
 │   ├── coindcxService.ts      CoinDCX API
 │   ├── inflationService.ts    Inflation data
@@ -137,7 +158,7 @@ backend/src/
 | Prefix | Domain |
 |---|---|
 | `/api/auth` | Login, signup |
-| `/api/stocks` | Stock transactions + NSE quotes + Yahoo Finance search |
+| `/api/stocks` | Stock transactions + NSE quotes + Yahoo Finance search + financials |
 | `/api/gold` | Gold transactions + SafeGold rates |
 | `/api/crypto` | Crypto transactions + CoinDCX prices + candle data |
 | `/api/mutual-funds` | MF transactions |
@@ -209,11 +230,48 @@ Fetches ALL asset types in parallel, then dependent price queries fire:
 - Round 2 (after grouping): `useNseQuoteQuery(stockNames)`, `useMfapiNavHistoryBatchQuery(schemeNumbers)`, `useCryptoCoinPricesQuery(validCoins)`, `useSafeGoldRatesQuery(dateRange)`
 - XIRR runs in useMemo after all data is available
 
+### Stock Portfolio page (`stocks/portfolio/page.tsx`) — combined value chart
+
+**Chart change:** Replaced multi-line per-stock chart with single combined total portfolio value line.
+- Sums all stocks' holding values at each shared timestamp
+- Single series showing total portfolio net value over time
+- Removed per-stock selector dropdown
+- Interval controls: Day, Week, Month, 1M, 3M, 1Y, YTD, All
+- Toggle: Show/hide transaction plot lines
+
+**Stock name linking:** Stock names in the portfolio table are now `<Link>` elements navigating to `/stocks/detail/[encodeURIComponent(symbol)]`. Clicking a stock name opens the detail page for that company.
+
 ### Expenses page (`expenses/page.tsx`) — important nuance
 
 Makes **8 parallel API calls** on load — including ALL asset transaction types (stocks, gold, crypto, MF, RD) just to compute "total invested per month" in `useDashboardData.ts`. This is a cross-domain aggregation that would be more efficient as a backend endpoint, but works fine in practice because TanStack Query caches those calls if the user has visited other pages.
 
 **Known data accuracy issue in `useDashboardData.ts`:** The recurring `expenses` list (from `/api/expenses`) is applied uniformly across all 12 historical months with frequency normalization (daily×30, weekly×4, yearly÷12). It does not account for expenses added or removed mid-period — so a new expense retroactively appears in all past months.
+
+### Stock Detail Page (`stocks/detail/[symbol]/`)
+
+Comprehensive deep-dive page for individual stock analysis. Structured as a thin orchestrator (`page.tsx`, ~50 lines) routing to focused child components.
+
+**Component breakdown:**
+- `CompanySearchBar.tsx` — Pre-filled search input; on focus shows portfolio stocks; on typing 3+ chars fires global search via `useSearchStockByNameQuery()`
+- `CompanyHeader.tsx` — Company name, current price with trending icon, percent change with color coding, "Not in portfolio" badge if applicable
+- `PriceChart.tsx` — Highcharts line chart with interval selector (1D/1W/1M/3M/1Y). For 1D: filters to market hours (09:00–16:00) + latest trading day only. X-axis formatter applies IST offset (5.5 hours) for correct timezone display.
+- `SnapshotVerdict.tsx` — Colored verdict pills for Revenue Growth, Earnings Growth, Operating Margin. Clickable pills open drawer with live calculations.
+- `FundamentalsGrid.tsx` — 2-column grid (1-col mobile) of metric cards. Each card: label (clickable), value, small verdict line. Click opens `MetricEducationDrawer` with full educational content + live calculations.
+- `MetricEducationDrawer.tsx` — Right-side Sheet drawer with: (1) metric title, (2) What is it?, (3) How calculated (formula + live calculation box), (4) What tells us, (5) Good Range, (6) Quick Tips
+- `StockNotFound.tsx` — Friendly 404 for invalid stock symbols or API failures
+
+**Live Calculations feature:**
+Drawer displays actual API data + formula + result for 14+ metrics:
+- P/E ratios (Trailing & Forward)
+- Book ratios (P/B, PEG)
+- Margins (Gross, Operating, Net)
+- Returns (ROE, ROA)
+- Growth (Revenue YoY, Earnings YoY)
+- Leverage (Debt/Equity, Current Ratio)
+
+Example: "Current Stock Price: ₹2,500.00 ÷ EPS: ₹96.15 = **26.0**"
+
+**20 metric definitions** in `metricDefinitions.ts` cover: P/E, Forward P/E, Market Cap, EPS, Forward EPS, PEG, P/B, Beta, 52W High/Low, Dividend Yield, ROE, ROA, Operating/Gross/Net Margins, Debt/Equity, Current Ratio, Revenue Growth, Earnings Growth, Free Cash Flow, Total Cash, Total Debt.
 
 ---
 
@@ -229,7 +287,10 @@ Makes **8 parallel API calls** on load — including ALL asset transaction types
 | Monthly investment aggregation (expenses dashboard) | Frontend useMemo (`useDashboardData.ts`) | Filters all transaction arrays by date range |
 | Savings rate, discretionary spending | Frontend useMemo | Derived from salary history + investments + expenses |
 | Chart series construction | Frontend useMemo | Highcharts options built in useMemo, theme-aware |
+| Metric verdicts (stock detail) | Frontend function | `getVerdict(metric, value)` in `verdicts.ts` — qualitative interpretation of metric values |
+| Live calculations (stock detail) | Frontend function | `getMetricCalculation(metricLabel, financials)` in `verdicts.ts` — computes + formats calculation data for drawer |
 | NSE quote fetching | Backend service | `stocksService.ts` calls Yahoo Finance, 300ms delay between requests |
+| Stock financials (detail page) | Backend service | `stocksService.fetchFinancials(symbol)` fetches price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend independently |
 | CoinDCX price fetching | Backend service | `coindcxService.ts` |
 | SafeGold rate fetching | Backend controller | Calls SafeGold API |
 
@@ -325,3 +386,11 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 14. **Email import deduplication** — before inserting a parsed transaction, a ±1 day window check is performed on the date combined with other matching fields (symbol/fund name/amount). Duplicates within that window are silently skipped.
 
 15. **Encryption key env var** — `ENCRYPTION_KEY` must be a 64-character hex string (representing 32 bytes). Used by `backend/src/utils/encryption.ts` for AES-256-GCM. Required alongside `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` for email integration to function.
+
+16. **Stock detail page component composition** — The orchestrator page.tsx is kept intentionally thin (~50 lines). Data fetching (`useStockFinancialsQuery`) happens in page.tsx, but all rendering logic (verdicts, calculations, layout) is delegated to focused child components. Each component owns its own interaction state (e.g., `selectedMetric` in `FundamentalsGrid`). This pattern makes the page maintainable and allows reuse of components.
+
+17. **Verdict logic is pure functions** — `getVerdict(metric, value)` and `getMetricCalculation(metricLabel, financials)` are pure functions in `verdicts.ts`. They compute textual interpretation and calculation data from API values. No side effects, no state. This makes them testable and reusable across components (e.g., both FundamentalsGrid and SnapshotVerdict can call them).
+
+18. **Live calculations are flexible** — `MetricCalculation` interface supports any type of calculation via generic `label1/value1/label2/value2/result/formula` fields. This allows the same drawer component to display P/E (two inputs, one result), margin calcs (single result), growth comparisons, ratios, etc. Adding new metrics only requires adding a case to `getMetricCalculation()` — drawer component doesn't change.
+
+19. **Stock detail chart uses IST timezone offset** — The 1D intraday chart applies a 5.5-hour offset in the x-axis formatter to convert UTC timestamps to IST (Indian Standard Time). For 1D charts, data is also filtered to market hours (09:00–16:00) + latest trading day only, eliminating the overnight gap and cleanly showing only active trading session data.

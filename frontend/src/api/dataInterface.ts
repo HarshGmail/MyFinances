@@ -425,6 +425,65 @@ export interface StockData {
   chart: Chart;
 }
 
+export interface StockFinancials {
+  price?: {
+    shortName?: string;
+    longName?: string;
+    regularMarketPrice?: number;
+    regularMarketChange?: number;
+    regularMarketChangePercent?: number;
+    regularMarketVolume?: number;
+    marketCap?: number;
+    marketState?: string;
+    currency?: string;
+    exchangeName?: string;
+  };
+  summaryDetail?: {
+    trailingPE?: number;
+    forwardPE?: number;
+    dividendYield?: number;
+    dividendRate?: number;
+    fiftyTwoWeekHigh?: number;
+    fiftyTwoWeekLow?: number;
+    beta?: number;
+    averageVolume?: number;
+    priceToSalesTrailing12Months?: number;
+  };
+  defaultKeyStatistics?: {
+    trailingEps?: number;
+    forwardEps?: number;
+    pegRatio?: number;
+    priceToBook?: number;
+    enterpriseValue?: number;
+    enterpriseToRevenue?: number;
+    enterpriseToEbitda?: number;
+    shortRatio?: number;
+  };
+  financialData?: {
+    returnOnEquity?: number;
+    returnOnAssets?: number;
+    grossMargins?: number;
+    operatingMargins?: number;
+    profitMargins?: number;
+    debtToEquity?: number;
+    currentRatio?: number;
+    revenueGrowth?: number;
+    earningsGrowth?: number;
+    freeCashflow?: number;
+    totalCash?: number;
+    totalDebt?: number;
+    totalRevenue?: number;
+    revenuePerShare?: number;
+  };
+  earningsTrend?: {
+    trend?: Array<{
+      period?: string;
+      growth?: { raw?: number };
+      revenueEstimate?: { growth?: { raw?: number } };
+    }>;
+  };
+}
+
 export interface StockMeta {
   currency: string;
   symbol: string;

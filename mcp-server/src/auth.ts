@@ -15,7 +15,12 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
   const authHeader = req.headers['authorization'];
 
   logger.debug(
-    { method: req.method, path: req.path, authorization: authHeader ?? 'MISSING', session: req.headers['mcp-session-id'] ?? 'none' },
+    {
+      method: req.method,
+      path: req.path,
+      authorization: authHeader ?? 'MISSING',
+      session: req.headers['mcp-session-id'] ?? 'none',
+    },
     'incoming auth attempt'
   );
 

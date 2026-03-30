@@ -5,6 +5,7 @@ import {
   getNSEQuote,
   searchStocksByName,
   getFullStockProfile,
+  getStockFinancials,
   updateStockTransaction,
   deleteStockTransaction,
   deleteAllUserStockTransactions,
@@ -31,6 +32,9 @@ router.get('/nse-quote', getNSEQuote);
 
 // GET /stocks/stock-profile?symbol=SYMBOL&range=time period&interval=time interval
 router.get('/stock-profile', getFullStockProfile);
+
+// GET /stocks/financials?symbol=SYMBOL - quoteSummary metrics (P/E, margins, etc.)
+router.get('/financials', getStockFinancials);
 
 // GET /stocks/portfolio - Grouped portfolio with live prices, summary and raw transactions
 router.get('/portfolio', getStocksPortfolio);

@@ -4,6 +4,7 @@ import {
   StockSearchResponse,
   StockTransaction,
   StocksPortfolioResponse,
+  StockFinancials,
 } from '@/api/dataInterface';
 
 export function useStockTransactionsQuery() {
@@ -63,7 +64,7 @@ export function useStocksPortfolioQuery() {
   });
 }
 
-export function useStockFullProfile(symbol: string, range?: '1y', interval?: '1d') {
+export function useStockFullProfile(symbol: string, range?: string, interval?: string) {
   return useQuery({
     queryKey: ['stock-full-profile', symbol, range, interval],
     queryFn: async () => {
@@ -72,5 +73,21 @@ export function useStockFullProfile(symbol: string, range?: '1y', interval?: '1d
       });
       return response.data;
     },
+    enabled: !!symbol,
+  });
+}
+
+export function useStockFinancialsQuery(symbol: string) {
+  return useQuery<StockFinancials>({
+    queryKey: ['stock-financials', symbol],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: `/stocks/financials?symbol=${encodeURIComponent(symbol)}`,
+        method: 'GET',
+      });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!symbol,
   });
 }

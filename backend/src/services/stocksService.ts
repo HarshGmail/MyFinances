@@ -116,6 +116,31 @@ export class StocksService {
       chartData,
     };
   }
+  static async fetchFinancials(symbol: string) {
+    const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
+    const modules = [
+      'summaryDetail',
+      'defaultKeyStatistics',
+      'financialData',
+      'price',
+      'earningsTrend',
+    ] as const;
+
+    // Fetch each module independently so a single failure doesn't block the rest
+    const results: Record<string, unknown> = {};
+    await Promise.all(
+      modules.map(async (mod) => {
+        try {
+          const data = await yahooFinance.quoteSummary(yfSymbol, { modules: [mod] });
+          results[mod] = (data as Record<string, unknown>)[mod] ?? null;
+        } catch {
+          results[mod] = null;
+        }
+      })
+    );
+    return results;
+  }
+
   static async fetchQuoteSummaryViaBrowser(symbol: string): Promise<QuoteSummaryResult | null> {
     const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
     const isProduction = process.env.NODE_ENV === 'production';
