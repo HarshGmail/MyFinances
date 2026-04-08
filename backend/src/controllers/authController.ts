@@ -685,3 +685,45 @@ export async function resetPassword(req: Request, res: Response) {
     });
   }
 }
+
+export async function demoLogin(req: Request, res: Response) {
+  try {
+    const DEMO_EMAIL = 'testuser@gmail.com';
+    const db = database.getDb();
+    const usersCollection = db.collection('users');
+
+    const demoUser = await usersCollection.findOne({ email: DEMO_EMAIL });
+
+    if (!demoUser) {
+      logger.error({ email: DEMO_EMAIL }, 'Demo user not found');
+      res.status(503).json({
+        success: false,
+        message: 'Demo account not available',
+      });
+      return;
+    }
+
+    // Authenticate user (generate token and set cookie)
+    authenticateUser(res, {
+      name: demoUser.name,
+      email: demoUser.email,
+      id: demoUser._id.toString(),
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Demo login successful',
+      data: {
+        email: demoUser.email,
+        name: demoUser.name,
+        isDemo: true,
+      },
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Demo login error');
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+}

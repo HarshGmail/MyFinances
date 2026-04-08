@@ -28,7 +28,7 @@ import {
   capitalGainsRouter,
   emailIntegrationsRouter,
 } from './routes';
-import { requestLogger } from './middleware';
+import { requestLogger, blockDemoMutations } from './middleware';
 import logger from './utils/logger';
 
 const app = express();
@@ -57,6 +57,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
+app.use(blockDemoMutations); // Block mutations for demo users
 
 // Load swagger.json
 const swaggerDocument = JSON.parse(fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8'));

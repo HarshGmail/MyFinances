@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 const LAST_ROUTE_KEY = 'lastRoute';
-const PUBLIC_ROUTES = ['/', '/login', '/signup', '/privacy'];
+const PUBLIC_ROUTES = ['/', '/login', '/signup', '/privacy', '/forgot-password', '/reset-password'];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth();
@@ -25,7 +25,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       router.replace('/');
     }
     // If logged in, prevent access to / (login/signup) but allow /privacy
-    if (isLoggedIn && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
+    if (
+      isLoggedIn &&
+      (pathname === '/' ||
+        pathname === '/login' ||
+        pathname === '/signup' ||
+        pathname === '/forgot-password' ||
+        pathname === '/reset-password')
+    ) {
       const lastRoute = localStorage.getItem(LAST_ROUTE_KEY);
       if (lastRoute) {
         router.replace(lastRoute);

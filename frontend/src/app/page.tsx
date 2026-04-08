@@ -2,8 +2,12 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { SignupForm, LoginForm, SectionTabs, BackendWarmup } from '@/components';
 import { Button } from '@/components/ui/button';
+import { useDemoLoginMutation } from '@/api/mutations';
+import { useAppStore } from '@/store/useAppStore';
+import { toast } from 'sonner';
 import {
   TrendingUp,
   BarChart3,
@@ -16,6 +20,7 @@ import {
   Target,
   ChevronRight,
   Star,
+  PlayCircle,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -75,6 +80,9 @@ const SCREENSHOTS = [
 export default function Auth() {
   const [showAuth, setShowAuth] = useState(false);
   const authRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const setUser = useAppStore((state) => state.setUser);
+  const { mutate: demoLogin, isPending: isDemoLoading } = useDemoLoginMutation();
 
   const openAuth = () => {
     setShowAuth(true);
@@ -82,6 +90,24 @@ export default function Auth() {
     setTimeout(() => {
       authRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 50);
+  };
+
+  const handleDemoLogin = () => {
+    demoLogin(undefined, {
+      onSuccess: (data: {
+        success: boolean;
+        data: { email: string; name: string; isDemo: boolean };
+      }) => {
+        const userData = { name: data.data.name, email: data.data.email, isDemo: data.data.isDemo };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        toast.success('Demo loaded! Explore with sample data.');
+        router.push('/home');
+      },
+      onError: (error: unknown) => {
+        toast.error('Demo account not available. Please sign up instead.');
+      },
+    });
   };
 
   return (
@@ -110,13 +136,23 @@ export default function Auth() {
           SafeGold emails. Built for Indian investors.
         </p>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-center">
           <Button size="lg" className="gap-2 px-8" onClick={openAuth}>
             Get Started Free
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button size="lg" variant="outline" onClick={openAuth}>
             Sign In
+          </Button>
+          <Button
+            size="lg"
+            variant="ghost"
+            className="gap-2"
+            onClick={handleDemoLogin}
+            disabled={isDemoLoading}
+          >
+            <PlayCircle className="h-4 w-4" />
+            {isDemoLoading ? 'Loading Demo...' : 'View Demo'}
           </Button>
         </div>
 

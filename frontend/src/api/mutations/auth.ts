@@ -64,3 +64,27 @@ export function useResetPasswordMutation() {
     mutationFn: resetPassword,
   });
 }
+
+// Demo Login
+
+interface DemoLoginResponse {
+  success: boolean;
+  data: {
+    email: string;
+    name: string;
+    isDemo: boolean;
+  };
+}
+
+async function demoLogin() {
+  return apiRequest<DemoLoginResponse>({
+    endpoint: '/auth/demo-login',
+    method: 'POST',
+  });
+}
+
+export function useDemoLoginMutation() {
+  return useMutation({
+    mutationFn: demoLogin,
+  });
+}

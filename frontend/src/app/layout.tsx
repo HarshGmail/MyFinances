@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { Navbar, RouteGuard, Toaster, ThemeSyncer } from '@/components';
+import { Navbar, RouteGuard, Toaster, ThemeSyncer, DemoBanner } from '@/components';
 import Providers from './providers';
 import { AuthProvider } from '@/context/AuthContext';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -34,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ThemeSyncer />
               <div className="flex flex-col min-h-screen">
                 <Navbar />
+                <DemoBanner />
                 <div className="flex-1 overflow-auto pb-4">{children}</div>
                 <SpeedInsights />
                 <Analytics />

@@ -10,6 +10,7 @@ import {
   changePassword,
   forgotPassword,
   resetPassword,
+  demoLogin,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -17,6 +18,7 @@ const router = Router();
 
 router.post('/signup', signup);
 router.post('/login', login);
+router.post('/demo-login', demoLogin);
 router.post('/logout', logout);
 router.get('/profile', authenticateToken, userProfile);
 router.put('/profile', authenticateToken, updateUserProfile);

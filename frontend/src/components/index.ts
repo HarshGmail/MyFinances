@@ -3,6 +3,7 @@ export { LoginForm } from './LoginForm';
 export { Navbar } from './Navbar';
 export { RouteGuard } from './RouteGuard';
 export { ThemeSyncer } from './ThemeSyncer';
+export { DemoBanner } from './DemoBanner';
 
 export * from './ui/button';
 export * from './ui/form';

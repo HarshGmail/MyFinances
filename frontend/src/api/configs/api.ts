@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { API_BASE_URL } from './baseUrl';
+import { toast } from 'sonner';
 
 interface ApiFetchOptions extends RequestInit {
   endpoint: string;
@@ -33,6 +34,10 @@ export async function apiRequest<T = any>({
         const text = await response.text();
         errorObj = { message: text, status: response.status };
       } catch {}
+    }
+    // Handle 403 Forbidden: demo mode read-only
+    if (response.status === 403 && errorObj?.message === 'Demo data is read-only') {
+      toast.error('Demo data is read-only');
     }
     // Handle 401 Unauthorized: remove user from localStorage and reload
     if (response.status === 401) {

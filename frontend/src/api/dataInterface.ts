@@ -609,6 +609,7 @@ export interface UpdateExpenseTransactionPayload {
 export interface User {
   name: string | null;
   email: string | null;
+  isDemo?: boolean;
 }
 
 export interface UserGoal {
