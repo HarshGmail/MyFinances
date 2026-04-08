@@ -38,6 +38,12 @@ interface Config {
   // PDF parsing microservice (Rust). When set, PDF parsing is offloaded to this service.
   // When unset, the Node.js inline parsers are used as fallback.
   PDF_PARSING_SERVICE_URL?: string;
+
+  // Resend API key for sending password reset emails
+  RESEND_API_KEY?: string;
+
+  // Frontend URL for password reset links (defaults to prod)
+  FRONTEND_URL?: string;
 }
 
 // Validate required environment variables
@@ -67,6 +73,8 @@ const config: Config = {
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   PDF_PARSING_SERVICE_URL: process.env.PDF_PARSING_SERVICE_URL,
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  FRONTEND_URL: process.env.FRONTEND_URL || 'https://www.my-finances.site',
 };
 
 export default config;

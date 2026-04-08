@@ -1,4 +1,5 @@
 export * from './assetTarget';
+export * from './auth';
 export * from './crypto';
 export * from './epf';
 export * from './expenses';

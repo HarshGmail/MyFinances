@@ -97,6 +97,12 @@ async function startServer() {
     // Connect to MongoDB
     await database.connect();
 
+    // Create TTL index for password reset tokens (auto-delete after expiry)
+    await database
+      .getDb()
+      .collection('passwordResetTokens')
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
     // Start the server
     app.listen(port, '0.0.0.0', () => {
       logger.info(`Server running at http://localhost:${port}`);

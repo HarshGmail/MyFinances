@@ -15,6 +15,7 @@ import {
 } from '../schemas';
 import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
 import { encrypt, decrypt } from '../utils/encryption';
+import { sendPasswordResetEmail } from '../utils/emailService';
 import config from '../config';
 import logger from '../utils/logger';
 
@@ -468,5 +469,219 @@ export async function ingestTokenExchange(req: Request, res: Response) {
   } catch (err) {
     logger.error({ err }, 'Ingest token exchange error');
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function changePassword(req: Request, res: Response) {
+  try {
+    const userPayload = getUserFromRequest(req);
+    if (!userPayload) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate inputs
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters',
+      });
+      return;
+    }
+
+    const db = database.getDb();
+    const usersCollection = db.collection('users');
+
+    const user = await usersCollection.findOne({ _id: new ObjectId(userPayload.userId) });
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+      return;
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password
+    await usersCollection.updateOne(
+      { _id: new ObjectId(userPayload.userId) },
+      { $set: { password: hashedPassword, updatedAt: new Date() } }
+    );
+
+    logger.info({ userId: userPayload.userId }, 'Password changed successfully');
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Change password error');
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+      return;
+    }
+
+    const db = database.getDb();
+    const usersCollection = db.collection('users');
+
+    const user = await usersCollection.findOne({ email: (email as string).toLowerCase() });
+
+    // Always respond with 200 to avoid leaking email existence
+    if (!user) {
+      res.status(200).json({
+        success: true,
+        message: 'If an account exists with this email, a reset link has been sent',
+      });
+      return;
+    }
+
+    // Generate reset token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    const resetTokensCollection = db.collection('passwordResetTokens');
+    await resetTokensCollection.insertOne({
+      userId: user._id,
+      tokenHash,
+      expiresAt,
+      createdAt: new Date(),
+    });
+
+    // Build reset URL
+    const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${rawToken}`;
+
+    // Send email
+    await sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+    logger.info({ email: user.email }, 'Password reset email sent');
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, a reset link has been sent',
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Forgot password error');
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Token and new password are required',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+      return;
+    }
+
+    const db = database.getDb();
+    const resetTokensCollection = db.collection('passwordResetTokens');
+
+    // Hash the token to match stored hash
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token as string)
+      .digest('hex');
+
+    // Find token in DB
+    const resetTokenDoc = await resetTokensCollection.findOne({ tokenHash });
+
+    if (!resetTokenDoc) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset link',
+      });
+      return;
+    }
+
+    // Check if token is expired
+    if (new Date() > resetTokenDoc.expiresAt) {
+      await resetTokensCollection.deleteOne({ _id: resetTokenDoc._id });
+      res.status(400).json({
+        success: false,
+        message: 'Reset link has expired',
+      });
+      return;
+    }
+
+    // Fetch user
+    const usersCollection = db.collection('users');
+    const user = await usersCollection.findOne({ _id: resetTokenDoc.userId });
+
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await usersCollection.updateOne(
+      { _id: resetTokenDoc.userId },
+      { $set: { password: hashedPassword, updatedAt: new Date() } }
+    );
+
+    // Delete token immediately
+    await resetTokensCollection.deleteOne({ _id: resetTokenDoc._id });
+
+    logger.info({ userId: resetTokenDoc.userId }, 'Password reset successfully');
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Reset password error');
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
   }
 }

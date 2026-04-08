@@ -11,6 +11,7 @@ import { useUserProfileQuery } from '@/api/query';
 import { useUpdateUserProfileMutation, UpdateUserProfile } from '@/api/mutations';
 import { EditableField } from './EditableField';
 import { PanField } from './PanField';
+import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { SalaryHistoryCard } from './SalaryHistoryCard';
 import { PaymentHistoryCard } from './PaymentHistoryCard';
 import { DataManagementCard } from './DataManagementCard';
@@ -162,6 +163,24 @@ export default function ProfilePage() {
                 onUpdate={handleUpdate}
                 isUpdating={isUpdating}
               />
+            </CardContent>
+          </Card>
+
+          {/* Security */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Security
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">Manage your account security settings</p>
+            </CardHeader>
+            <CardContent className="flex justify-between items-center p-4">
+              <div>
+                <div className="text-sm font-medium">Password</div>
+                <p className="text-sm text-muted-foreground">Last changed long ago</p>
+              </div>
+              <ChangePasswordDialog />
             </CardContent>
           </Card>
 
