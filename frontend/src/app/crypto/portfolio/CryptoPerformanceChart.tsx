@@ -102,7 +102,6 @@ export default function CryptoPerformanceChart({
     return {
       name: `${selectedCoin} Avg Price`,
       type: 'line' as const,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data:
         chartData
           ?.find((s: any) => s.name === selectedCoin)
@@ -211,7 +210,7 @@ export default function CryptoPerformanceChart({
           // @ts-expect-error highcharts
           let tooltip = `<b style="color:${isDark ? '#fff' : '#374151'}">${Highcharts.dateFormat('%e %b %Y', this.x as number)}</b><br/>`;
           // @ts-expect-error highcharts
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           (this.points ?? []).forEach((point: any) => {
             if (selectedCoin === 'All') {
               tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y, 2)}</b><br/>`;

@@ -21,7 +21,7 @@ interface UseTrackerDataParams {
 }
 
 export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataParams) {
-  const txs = expenseTransactions || [];
+  const txs = useMemo(() => expenseTransactions || [], [expenseTransactions]);
   const textColor = theme === 'dark' ? '#fff' : '#18181b';
 
   const stats = useMemo(() => {

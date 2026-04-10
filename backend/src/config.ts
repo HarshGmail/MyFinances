@@ -42,6 +42,9 @@ interface Config {
   // Resend API key for sending password reset emails
   RESEND_API_KEY?: string;
 
+  // Resend webhook secret for verifying email.received webhooks
+  RESEND_WEBHOOK_SECRET?: string;
+
   // Frontend URL for password reset links (defaults to prod)
   FRONTEND_URL?: string;
 }
@@ -74,6 +77,7 @@ const config: Config = {
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   PDF_PARSING_SERVICE_URL: process.env.PDF_PARSING_SERVICE_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
+  RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://www.my-finances.site',
 };
 

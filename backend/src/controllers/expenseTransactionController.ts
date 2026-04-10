@@ -182,3 +182,27 @@ export async function deleteAllUserExpenseTransactions(req: Request, res: Respon
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+export async function syncUpiEmailsEndpoint(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    // Placeholder: This endpoint is called when the user opens the tracker tab
+    // In the future, if we need to fetch pending emails from Resend, this is where we'd do it
+    // For now, emails come via webhooks, so this is just a confirmation endpoint
+    // We can use this to check if there are any unsynced emails from the past 24h
+
+    res.status(200).json({
+      success: true,
+      message: 'UPI email sync triggered',
+      note: 'Emails are synced via webhooks. This endpoint confirms the sync.',
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Sync UPI emails error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}

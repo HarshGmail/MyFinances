@@ -64,7 +64,6 @@ export default function CryptoPortfolioTable({
       },
       tooltip: {
         useHTML: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: function (this: any) {
           const isDark = document.documentElement.classList.contains('dark');
           const tc = isDark ? '#fff' : '#18181b',

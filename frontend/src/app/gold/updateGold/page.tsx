@@ -109,7 +109,9 @@ function GoldUpdateGoldPageInner() {
           form.setValue(key as keyof FormValues, v as FormValues[keyof FormValues]);
         }
       });
-    } catch {}
+    } catch {
+      // Ignore cache parsing errors
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 

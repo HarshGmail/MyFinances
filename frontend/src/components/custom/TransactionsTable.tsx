@@ -25,7 +25,6 @@ export interface Column {
 }
 
 export interface Row {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -141,7 +140,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     closeDrawer();
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatValue = (value: any, type: string = 'string', units?: string) => {
     if (value === null || value === undefined) return '-';
 

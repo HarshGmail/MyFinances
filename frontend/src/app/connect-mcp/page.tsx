@@ -2,6 +2,7 @@
 
 import { useUserProfileQuery } from '@/api/query';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState, Suspense } from 'react';
 import { Bot, CheckCircle2, AlertCircle, Loader2, Wallet } from 'lucide-react';
 
@@ -177,12 +178,12 @@ function ConnectMcpContent() {
                   </button>
                 )}
                 {errorMsg.includes('logged in') && (
-                  <a
+                  <Link
                     href="/"
-                    className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                    className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors block text-center"
                   >
                     Log in
-                  </a>
+                  </Link>
                 )}
               </div>
             </>

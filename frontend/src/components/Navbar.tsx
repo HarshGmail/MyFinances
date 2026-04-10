@@ -24,6 +24,7 @@ import {
   Calculator,
   PictureInPicture2,
   Plug,
+  Search
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useLogoutMutation } from '@/api/mutations';
@@ -124,6 +125,11 @@ export function Navbar() {
           title: 'Transactions',
           icon: <Receipt className="w-4 h-4" />,
           path: '/stocks/transactions',
+        },
+        {
+          title: 'Search',
+          icon: <Search className="w-4 h-4" />,
+          path: '/stocks/detail',
         },
       ],
     },
@@ -301,6 +307,17 @@ export function Navbar() {
                           >
                             <Receipt className="w-4 h-4" />
                             Transactions
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href="/stocks/detail"
+                            className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                          >
+                            <Search className="w-4 h-4" />
+                            Search
                           </Link>
                         </NavigationMenuLink>
                       </li>

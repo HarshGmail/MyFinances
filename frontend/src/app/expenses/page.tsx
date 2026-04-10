@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   useExpensesQuery,
   useUserProfileQuery,
@@ -8,6 +8,7 @@ import {
   useExpenseTransactionsQuery,
   useExpenseTransactionNamesQuery,
 } from '@/api/query';
+import { useUpiEmailSyncMutation } from '@/api/mutations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +25,7 @@ export default function ExpensesPage() {
   const { theme } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [trackerDrawerOpen, setTrackerDrawerOpen] = useState(false);
+  const { mutate: syncUpiEmails } = useUpiEmailSyncMutation();
 
   const { data: user, isLoading: userLoading } = useUserProfileQuery();
   const { data: expenses, isLoading: expensesLoading } = useExpensesQuery();
@@ -34,6 +36,13 @@ export default function ExpensesPage() {
   const { data: expenseNames } = useExpenseTransactionNamesQuery();
 
   const isLoading = userLoading || expensesLoading || summaryLoading;
+
+  // Sync UPI emails when tracker tab opens
+  useEffect(() => {
+    if (activeTab === 'tracker') {
+      syncUpiEmails();
+    }
+  }, [activeTab, syncUpiEmails]);
 
   const dashboard = useDashboardData({
     user,

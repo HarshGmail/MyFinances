@@ -202,7 +202,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
     }
 
-    const currentValue = totalGold * currentGoldRate * 0.97; // 3% SafeGold sell deduction
+    const currentValue = totalGold * currentGoldRate;
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 

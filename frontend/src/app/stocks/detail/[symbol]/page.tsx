@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { useStockFinancialsQuery, useStocksPortfolioQuery } from '@/api/query/stocks';
 import CompanySearchBar from './CompanySearchBar';
 import CompanyHeader from './CompanyHeader';

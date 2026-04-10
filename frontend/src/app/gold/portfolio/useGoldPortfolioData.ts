@@ -42,7 +42,7 @@ export function useGoldPortfolioData() {
     );
     const lastRate = parseFloat(filteredRates[filteredRates.length - 1].rate);
     const avgPrice = totalGold > 0 ? totalInvested / totalGold : 0;
-    const currentValue = totalGold * lastRate * 0.97;
+    const currentValue = totalGold * lastRate;
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 

@@ -104,7 +104,6 @@ export default function GoldInvestmentChart({
       },
       tooltip: {
         useHTML: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: function (this: any): string {
           const month: MonthGroup = months[this.point.index];
           const gain =

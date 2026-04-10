@@ -79,7 +79,6 @@ function StocksUpdateStockPageInner() {
   // Prefill when editing (wins over cache)
   useEffect(() => {
     if (!isEditing || !stockTransactions) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = stockTransactions.find((t: any) => t._id === editId);
     if (tx) {
       const values: FormValues = {
@@ -140,7 +139,9 @@ function StocksUpdateStockPageInner() {
       });
       if (parsed.selectedStock) setSelectedStock(parsed.selectedStock);
       if (parsed.stockName) setStockNameInput(parsed.stockName);
-    } catch {}
+    } catch {
+      // Ignore cache parsing errors
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 

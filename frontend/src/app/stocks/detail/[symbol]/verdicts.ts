@@ -107,7 +107,8 @@ export function getMetricCalculation(
   metricLabel: string,
   financials: StockFinancials
 ): MetricCalculation | null {
-  const { summaryDetail: sd, defaultKeyStatistics: dks, financialData: fd, price: p } = financials;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { summaryDetail: _sd, defaultKeyStatistics: dks, financialData: fd, price: p } = financials;
 
   // Helper formatters
   const fmt = (v: number | undefined) => (v !== undefined ? v.toFixed(2) : null);

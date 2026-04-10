@@ -118,7 +118,9 @@ function CryptoUpdateCryptoPageInner() {
       });
       const cachedCoinName = (parsed as Partial<FormValues>).coinName;
       if (cachedCoinName) setCoinNameInput(cachedCoinName);
-    } catch {}
+    } catch {
+      // Ignore cache parsing errors
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 

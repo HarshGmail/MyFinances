@@ -57,7 +57,6 @@ export default function GoldPriceChart({
       yAxis: {
         title: { text: 'Price (₹)', style: { color: theme === 'dark' ? '#FFF' : '#18181b' } },
         labels: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter: function (this: any): string {
             return '₹' + this.value;
           },

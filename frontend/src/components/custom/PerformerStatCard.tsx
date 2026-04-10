@@ -46,7 +46,6 @@ export function PerformerStatCard({
     legend: { enabled: false },
     tooltip: {
       useHTML: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formatter: function (this: any) {
         let dateStr = '';
         if (typeof this.x === 'number' && !isNaN(this.x)) {

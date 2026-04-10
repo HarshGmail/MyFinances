@@ -60,8 +60,14 @@ export function useHomePortfolioData() {
   const { data: fdData, isLoading: fdLoading } = useFixedDepositsQuery();
   const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
 
-  const stockPortfolioData = stocksPortfolioData?.portfolio ?? [];
-  const stockTransactions = stocksPortfolioData?.transactions;
+  const stockPortfolioData = useMemo(
+    () => stocksPortfolioData?.portfolio ?? [],
+    [stocksPortfolioData?.portfolio]
+  );
+  const stockTransactions = useMemo(
+    () => stocksPortfolioData?.transactions,
+    [stocksPortfolioData?.transactions]
+  );
 
   // ===== MUTUAL FUNDS =====
   const schemeNumbers = useMemo(() => {
@@ -110,7 +116,7 @@ export function useHomePortfolioData() {
     if (goldRatesData?.data?.length) {
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
     }
-    const currentValue = totalGold * currentGoldRate * 0.97;
+    const currentValue = totalGold * currentGoldRate;
     const profitLoss = currentValue - totalInvested;
     return [
       {

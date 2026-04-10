@@ -113,7 +113,7 @@ export function parseCoinDCXTradeEmail(html: string): ParsedCoinDCXTrade | null 
   }
 
   // ── Average Price ─────────────────────────────────────────────────────────
-  const priceMatch = text.match(/Average\s+Price\s*[:\-]?\s*([\d,]+\.?\d*)/i);
+  const priceMatch = text.match(/Average\s+Price\s*[-:]?\s*([\d,]+\.?\d*)/i);
   if (!priceMatch) {
     console.log('[CoinDCX Parser] Could not find Average Price in email');
     return null;
@@ -121,7 +121,7 @@ export function parseCoinDCXTradeEmail(html: string): ParsedCoinDCXTrade | null 
   const coinPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
 
   // ── Quantity from "Order Value: 0.0231 ETH" ───────────────────────────────
-  const qtyMatch = text.match(/Order\s+Value\s*[:\-]?\s*([\d.]+)\s*[A-Z]+/i);
+  const qtyMatch = text.match(/Order\s+Value\s*[-:]?\s*([\d.]+)\s*[A-Z]+/i);
   if (!qtyMatch) {
     console.log('[CoinDCX Parser] Could not find Order Value in email');
     return null;
@@ -129,12 +129,12 @@ export function parseCoinDCXTradeEmail(html: string): ParsedCoinDCXTrade | null 
   const quantity = parseFloat(qtyMatch[1]);
 
   // ── Fees ──────────────────────────────────────────────────────────────────
-  const feesMatch = text.match(/Total\s+Fees\s*[:\-]?\s*([\d.]+)\s*INR/i);
+  const feesMatch = text.match(/Total\s+Fees\s*[-:]?\s*([\d.]+)\s*INR/i);
   const fees = feesMatch ? parseFloat(feesMatch[1]) : 0;
 
   // ── Date ─────────────────────────────────────────────────────────────────
   // "Date: 30 Jun 2025 01:36:43 +0000"
-  const dateMatch = text.match(/Date\s*[:\-]?\s*(\d{1,2}\s+\w+\s+\d{4}\s+[\d:]+\s*[+-]\d{4})/i);
+  const dateMatch = text.match(/Date\s*[-:]?\s*(\d{1,2}\s+\w+\s+\d{4}\s+[\d:]+\s*[+-]\d{4})/i);
   if (!dateMatch) {
     console.log('[CoinDCX Parser] Could not find Date in email');
     return null;

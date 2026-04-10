@@ -6,6 +6,7 @@ import {
   deleteExpenseTransaction,
   deleteAllUserExpenseTransactions,
   getExpenseTransactionNames,
+  syncUpiEmailsEndpoint,
 } from '../controllers/expenseTransactionController';
 import { authenticateToken } from '../middleware';
 
@@ -16,6 +17,7 @@ router.use(authenticateToken);
 router.post('/', addExpenseTransaction);
 router.get('/', getExpenseTransactions);
 router.get('/names', getExpenseTransactionNames);
+router.get('/sync/upi-emails', syncUpiEmailsEndpoint);
 router.put('/:id', updateExpenseTransaction);
 router.delete('/all', deleteAllUserExpenseTransactions);
 router.delete('/:id', deleteExpenseTransaction);

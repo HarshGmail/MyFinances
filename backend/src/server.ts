@@ -27,6 +27,7 @@ import {
   chatgptRouter,
   capitalGainsRouter,
   emailIntegrationsRouter,
+  webhooksRouter,
 } from './routes';
 import { requestLogger, blockDemoMutations } from './middleware';
 import logger from './utils/logger';
@@ -80,6 +81,7 @@ app.use('/api/inflation', inflationRouter);
 app.use('/api/expenses', expenseRouter);
 app.use('/api/expense-transactions', expenseTransactionsRouter);
 app.use('/api/ingest', ingestRouter);
+app.use('/api/webhooks', webhooksRouter);
 app.use('/api/chatgpt', chatgptRouter);
 app.use('/api/capital-gains', capitalGainsRouter);
 app.use('/api/email-integration', emailIntegrationsRouter);

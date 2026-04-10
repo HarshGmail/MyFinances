@@ -73,7 +73,8 @@ export function useDashboardData({
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
     const monthlyData: MonthlyData[] = months.map((month) => {
-      const monthStart = startOfMonth(month);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
       const monthStr = format(month, 'MMM yyyy');
       const monthKey = format(month, 'yyyy-MM');

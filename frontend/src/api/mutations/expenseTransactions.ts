@@ -55,3 +55,21 @@ export function useDeleteExpenseTransactionMutation() {
     },
   });
 }
+
+async function syncUpiEmails() {
+  return apiRequest({
+    endpoint: '/expense-transactions/sync/upi-emails',
+    method: 'GET',
+  });
+}
+
+export function useUpiEmailSyncMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: syncUpiEmails,
+    onSuccess: () => {
+      // Invalidate expense transactions to refetch after sync
+      queryClient.invalidateQueries({ queryKey: ['expenseTransactions'] });
+    },
+  });
+}

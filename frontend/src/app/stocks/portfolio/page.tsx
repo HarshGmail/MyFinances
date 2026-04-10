@@ -39,17 +39,27 @@ export default function StocksPortfolioPage() {
   const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   // All data comes from the single portfolio query — no dependent waterfall
-  const processedPortfolioData = portfolioData?.portfolio ?? [];
-  const priceData = portfolioData?.priceData ?? {};
-  const portfolioTotals = portfolioData?.summary ?? {
-    totalInvested: 0,
-    totalCurrentValue: 0,
-    totalProfitLoss: 0,
-    totalProfitLossPercentage: 0,
-    totalOneDayChange: 0,
-    totalOneDayChangePercentage: 0,
-  };
-  const stockTransactions: StockTransaction[] = portfolioData?.transactions ?? [];
+  const processedPortfolioData = useMemo(
+    () => portfolioData?.portfolio ?? [],
+    [portfolioData?.portfolio]
+  );
+  const priceData = useMemo(() => portfolioData?.priceData ?? {}, [portfolioData?.priceData]);
+  const portfolioTotals = useMemo(
+    () =>
+      portfolioData?.summary ?? {
+        totalInvested: 0,
+        totalCurrentValue: 0,
+        totalProfitLoss: 0,
+        totalProfitLossPercentage: 0,
+        totalOneDayChange: 0,
+        totalOneDayChangePercentage: 0,
+      },
+    [portfolioData?.summary]
+  );
+  const stockTransactions: StockTransaction[] = useMemo(
+    () => portfolioData?.transactions ?? [],
+    [portfolioData?.transactions]
+  );
 
   // Single combined series: sum all stocks' holding value at each timestamp
   const chartData = useMemo(() => {
@@ -139,7 +149,6 @@ export default function StocksPortfolioPage() {
           // @ts-expect-error highcharts
           let tooltip: string = `<b style="color: ${isDark ? '#fff' : '#374151'}">${Highcharts.dateFormat('%e %b %Y', this.x as number)}</b><br/>`;
           // @ts-expect-error highcharts
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (this.points ?? []).forEach((point: any) => {
             tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>₹${Highcharts.numberFormat(point.y as number, 2)}</b><br/>`;
           });

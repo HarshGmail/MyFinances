@@ -535,11 +535,12 @@ export default function Goals() {
           aVal = a.remainingAmount;
           bVal = b.remainingAmount;
           break;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { High: 3, Medium: 2, Low: 1 };
           aVal = priorityOrder[a.priority];
           bVal = priorityOrder[b.priority];
           break;
+        }
         default:
           return 0;
       }

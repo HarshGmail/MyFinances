@@ -21,9 +21,7 @@ import {
 import { useSearchCryptoQuery } from '@/api/query';
 
 interface CoinSearchFieldProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: UseFormSetValue<any>;
   coinNameInput: string;
   setCoinNameInput: (val: string) => void;

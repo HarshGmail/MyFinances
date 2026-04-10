@@ -142,7 +142,7 @@ export default function PriceChart({ symbol }: Props) {
       series: [{ name: 'Price', data, color: seriesColor, lineWidth: 2 }],
       credits: { enabled: false },
     };
-  }, [chartProfileData, isDark]);
+  }, [chartProfileData, isDark, selectedInterval]);
 
   return (
     <Card>

@@ -144,7 +144,7 @@ export async function deleteAllUserGoldTransactions(req: Request, res: Response)
 }
 
 const TROY_OZ_TO_GRAM = 31.1035;
-const SAFEGOLD_MARKUP = 1.0783;
+const SAFEGOLD_MARKUP = 1.09;
 const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0' };
 
 // Fetches gold (USD/oz) + USD/INR from Yahoo Finance for a date range,
@@ -152,7 +152,6 @@ const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0' };
 async function fetchAndCacheFromYahoo(
   fromDate: string,
   toDate: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cacheCollection: any,
   cachedMap: Map<string, string>
 ) {

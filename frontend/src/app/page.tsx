@@ -104,7 +104,7 @@ export default function Auth() {
         toast.success('Demo loaded! Explore with sample data.');
         router.push('/home');
       },
-      onError: (error: unknown) => {
+      onError: (_error: unknown) => {
         toast.error('Demo account not available. Please sign up instead.');
       },
     });

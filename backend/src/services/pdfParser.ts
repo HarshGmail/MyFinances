@@ -6,7 +6,6 @@ export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): P
   const passwordsToTry = passwords.length > 0 ? passwords : [''];
 
   for (const password of passwordsToTry) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let parser: any = null;
     try {
       const loadParams: Record<string, unknown> = {

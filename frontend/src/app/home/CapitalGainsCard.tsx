@@ -1,7 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/utils/numbers';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function CapitalGainsCard({ cgData }: { cgData: any }) {
   const fy = cgData.summary?.currentFY ?? '';
   const s = cgData.summary?.byFY?.[fy];

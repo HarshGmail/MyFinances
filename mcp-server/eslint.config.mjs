@@ -5,7 +5,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist', 'node_modules', '.git', 'build'],
+    ignores: ['dist', 'node_modules', '.git', 'build', '*.config.mjs', '*.config.js'],
   },
   {
     files: ['**/*.{js,ts,mjs,mts}'],
@@ -14,8 +14,6 @@ export default [
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
-        project: './tsconfig.json',
-        tsconfigRootDir: process.cwd(),
       },
       globals: {
         ...globals.node,
@@ -29,6 +27,7 @@ export default [
       ...tsPlugin.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-namespace': 'warn',
       'no-empty': 'warn',
       'no-undef': 'off',
     },

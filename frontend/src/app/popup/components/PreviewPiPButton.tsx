@@ -16,7 +16,6 @@ type Props = {
 declare global {
   interface Window {
     documentPictureInPicture?: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       requestWindow: (options?: any) => Promise<Window>;
     };
   }
@@ -81,7 +80,9 @@ export const PreviewPiPButton: React.FC<Props> = ({
     return () => {
       try {
         pipWin?.close();
-      } catch {}
+      } catch {
+        // Window may already be closed
+      }
     };
   }, [pipWin]);
 

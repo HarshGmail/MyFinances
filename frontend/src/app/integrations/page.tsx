@@ -2,9 +2,7 @@
 
 import { useState } from 'react';
 import { useUserProfileQuery } from '@/api/query';
-import { useRegenerateIngestTokenMutation } from '@/api/mutations';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Smartphone, Bot, Mail, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import UpiIntegration from './UpiIntegration';
@@ -39,38 +37,7 @@ type TabId = (typeof INTEGRATIONS)[number]['id'];
 
 export default function IntegrationsPage() {
   const [selected, setSelected] = useState<TabId>('upi');
-  const { data: profile, isLoading, refetch } = useUserProfileQuery();
-  const { mutateAsync: regenerateToken, isPending: isRegenerating } =
-    useRegenerateIngestTokenMutation();
-
-  const handleRegenerate = async () => {
-    try {
-      await regenerateToken();
-      toast.success('Token regenerated successfully');
-      await refetch();
-    } catch {
-      toast.error('Failed to regenerate token');
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <Skeleton className="h-8 w-48 mb-6" />
-        <div className="flex gap-6">
-          <div className="w-56 space-y-2">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-          <div className="flex-1 space-y-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { data: profile, isLoading } = useUserProfileQuery();
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -116,11 +83,7 @@ export default function IntegrationsPage() {
 
         <div className="flex-1 min-w-0">
           {selected === 'upi' && (
-            <UpiIntegration
-              ingestToken={profile?.ingestToken}
-              onRegenerate={handleRegenerate}
-              isRegenerating={isRegenerating}
-            />
+            <UpiIntegration ingestToken={profile?.ingestToken} isLoadingToken={isLoading} />
           )}
           {selected === 'mcp' && <McpIntegration ingestToken={profile?.ingestToken} />}
           {selected === 'email' && (

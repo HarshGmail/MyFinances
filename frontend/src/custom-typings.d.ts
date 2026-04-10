@@ -16,7 +16,6 @@ declare module 'newton-raphson-method' {
   type NewtonOptions = {
     tolerance?: number;
     maxIterations?: number;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
   function newton(

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { API_BASE_URL } from './baseUrl';
 import { toast } from 'sonner';
 
@@ -33,7 +32,9 @@ export async function apiRequest<T = any>({
       try {
         const text = await response.text();
         errorObj = { message: text, status: response.status };
-      } catch {}
+      } catch {
+        // Ignore text parsing errors
+      }
     }
     // Handle 403 Forbidden: demo mode read-only
     if (response.status === 403 && errorObj?.message === 'Demo data is read-only') {

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export function buildAIInsightPrompt(input: {
   userName: string;
   asOf: Date;

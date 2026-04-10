@@ -19,11 +19,12 @@ export function getTimeframes(uptoLabel?: string) {
 
 type ReturnTypeOption = 'timestamp' | 'iso' | 'date' | 'ymd';
 
-export function getPastDate(daysAgo: number): number;
-export function getPastDate(daysAgo: number, returnType: 'timestamp'): number;
-export function getPastDate(daysAgo: number, returnType: 'iso'): string;
-export function getPastDate(daysAgo: number, returnType: 'date'): Date;
-export function getPastDate(daysAgo: number, returnType: 'ymd'): string;
+/* eslint-disable no-redeclare */
+export function getPastDate(_daysAgo: number): number;
+export function getPastDate(_daysAgo: number, _returnType: 'timestamp'): number;
+export function getPastDate(_daysAgo: number, _returnType: 'iso'): string;
+export function getPastDate(_daysAgo: number, _returnType: 'date'): Date;
+export function getPastDate(_daysAgo: number, _returnType: 'ymd'): string;
 
 export function getPastDate(
   daysAgo: number,
@@ -50,3 +51,4 @@ export function getPastDate(
       return d.getTime();
   }
 }
+/* eslint-enable no-redeclare */
