@@ -68,7 +68,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
 
           {/* Stocks - Hidden on tablets */}
           <NavigationMenuItem className="hidden xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/stocks/portfolio')}>
+            <NavigationMenuTrigger onClick={() => router.push('/stocks')}>
               <TrendingUp className="w-4 h-4 mr-2" />
               Stocks
             </NavigationMenuTrigger>
@@ -79,7 +79,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
 
           {/* Gold - Hidden on tablets */}
           <NavigationMenuItem className="hidden xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/gold/portfolio')}>
+            <NavigationMenuTrigger onClick={() => router.push('/gold')}>
               <Coins className="w-4 h-4 mr-2" />
               Gold
             </NavigationMenuTrigger>
@@ -90,7 +90,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
 
           {/* Mutual Funds - Hidden on smaller desktops */}
           <NavigationMenuItem className="hidden 2xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/mutual-funds/dashboard')}>
+            <NavigationMenuTrigger onClick={() => router.push('/mutual-funds')}>
               <PieChart className="w-4 h-4 mr-2" />
               Mutual Funds
             </NavigationMenuTrigger>
@@ -275,6 +275,7 @@ const STOCKS_ITEMS = [
 
 const GOLD_ITEMS = [
   { title: 'Portfolio', icon: <Briefcase className="w-4 h-4" />, path: '/gold/portfolio' },
+  { title: 'Analyzer', icon: <Search className="w-4 h-4" />, path: '/gold/analyzer' },
   {
     title: 'Update Gold Balance',
     icon: <RefreshCw className="w-4 h-4" />,

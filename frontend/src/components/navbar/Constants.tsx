@@ -49,9 +49,10 @@ export const MOBILE_MENU_ITEMS = [
   {
     title: 'Gold',
     icon: <Coins className="w-4 h-4" />,
-    path: '/gold/portfolio',
+    path: '/gold',
     subItems: [
       { title: 'Portfolio', icon: <Briefcase className="w-4 h-4" />, path: '/gold/portfolio' },
+      { title: 'Analyzer', icon: <Search className="w-4 h-4" />, path: '/gold/analyzer' },
       { title: 'Update Gold', icon: <RefreshCw className="w-4 h-4" />, path: '/gold/updateGold' },
       { title: 'Transactions', icon: <Receipt className="w-4 h-4" />, path: '/gold/transactions' },
     ],

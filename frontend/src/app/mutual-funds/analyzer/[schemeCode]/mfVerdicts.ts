@@ -48,7 +48,13 @@ function cagr(startValue: number, endValue: number, years: number): number | nul
 
 function getDateNYearsAgo(refDate: Date, years: number): Date {
   const d = new Date(refDate);
-  d.setFullYear(d.getFullYear() - years);
+  d.setFullYear(d.getFullYear() - Math.floor(years));
+  return d;
+}
+
+function getDateNDaysAgo(refDate: Date, days: number): Date {
+  const d = new Date(refDate);
+  d.setTime(d.getTime() - days * 24 * 60 * 60 * 1000);
   return d;
 }
 
@@ -466,6 +472,6 @@ export function filterNavDataByInterval(
   days: number
 ): MutualFundNavHistoryData[] {
   if (!isFinite(days)) return navData;
-  const cutoffDate = getDateNYearsAgo(parseNavDate(navData[0].date), days / 365);
+  const cutoffDate = getDateNDaysAgo(parseNavDate(navData[0].date), days);
   return navData.filter((item) => parseNavDate(item.date) >= cutoffDate);
 }
