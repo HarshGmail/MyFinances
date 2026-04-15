@@ -68,3 +68,12 @@ export function useMfapiNavHistoryBatchQuery(schemeNumbers: (string | number)[])
     refetchIntervalInBackground: true,
   });
 }
+
+export function useSingleMFNavHistoryQuery(schemeCode: string | number | null) {
+  const result = useMfapiNavHistoryBatchQuery(schemeCode ? [schemeCode] : []);
+  return {
+    data: schemeCode && result.data ? result.data[schemeCode] : null,
+    isLoading: result.isLoading,
+    error: result.error,
+  };
+}
