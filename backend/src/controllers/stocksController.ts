@@ -268,9 +268,15 @@ export async function getStocksPortfolio(req: Request, res: Response) {
       const avgPrice = numOfShares > 0 ? totalAmount / numOfShares : 0;
       const investedAmount = parseFloat((avgPrice * numOfShares).toFixed(2));
 
-      const meta = priceData[stockName]?.chart?.result?.[0]?.meta;
+      const chartResult = priceData[stockName]?.chart?.result?.[0];
+      const meta = chartResult?.meta;
       const currentPrice = meta?.regularMarketPrice ?? null;
-      const previousClose = meta?.chartPreviousClose ?? null;
+      const closes: (number | null)[] = chartResult?.indicators?.quote?.[0]?.close ?? [];
+      const lastTwoCloses = closes.filter((v) => v !== null).slice(-2);
+      const previousClose =
+        lastTwoCloses.length >= 2
+          ? lastTwoCloses[lastTwoCloses.length - 2]
+          : (meta?.regularMarketPreviousClose ?? meta?.chartPreviousClose ?? null);
 
       const currentValuation =
         currentPrice !== null ? parseFloat((currentPrice * numOfShares).toFixed(2)) : 0;

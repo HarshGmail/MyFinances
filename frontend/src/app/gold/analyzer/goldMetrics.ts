@@ -145,7 +145,6 @@ export function computeGoldMetrics(
     (a, b) => parseGoldDate(b.date).getTime() - parseGoldDate(a.date).getTime()
   );
 
-  const currentPriceData = sortedPrices[0];
   const prevDayPrice = sortedPrices[1]?.price || currentPrice;
   const priceChange1D = currentPrice - prevDayPrice;
   const priceChangePct1D = prevDayPrice > 0 ? priceChange1D / prevDayPrice : 0;

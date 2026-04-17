@@ -48,6 +48,7 @@ export interface StockMeta {
   longName: string;
   shortName: string;
   chartPreviousClose: number;
+  regularMarketPreviousClose: number;
   priceHint: number;
   currentTradingPeriod: CurrentTradingPeriod;
   dataGranularity: string;

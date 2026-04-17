@@ -137,6 +137,29 @@ export interface EpfAccountPayload {
   startDate: Date;
 }
 
+export interface EpfBulkUpdatePayload {
+  accounts: Array<{
+    organizationName: string;
+    epfAmount: number;
+    creditDay: number;
+    startDate: string;
+  }>;
+}
+
+export interface EpfParsedSegment {
+  organizationName: string;
+  epfAmount: number;
+  creditDay: number;
+  startDate: string;
+  alreadyExists: boolean;
+}
+
+export interface EpfPassbookParseResult {
+  segments: EpfParsedSegment[];
+  uan: string;
+  establishmentName: string;
+}
+
 export interface EpfTimelineSummary {
   totalCurrentBalance: number;
   totalContributions: number;

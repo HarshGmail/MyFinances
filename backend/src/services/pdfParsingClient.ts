@@ -30,6 +30,12 @@ export function isPdfServiceAvailable(): boolean {
   return !!config.PDF_PARSING_SERVICE_URL;
 }
 
+/** Fire-and-forget: wakes the Render instance from sleep. Never throws. */
+export function warmupPdfService(): void {
+  if (!config.PDF_PARSING_SERVICE_URL) return;
+  axios.get(`${config.PDF_PARSING_SERVICE_URL}/jobs/warmup`).catch(() => {});
+}
+
 /**
  * Submits a batch of PDFs to the Rust parsing service.
  * Returns the job ID to poll with `waitForPdfJob`.

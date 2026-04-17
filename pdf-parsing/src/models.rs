@@ -79,6 +79,9 @@ pub struct GoldTransaction {
 /// EPF passbook transaction.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EpfTransaction {
+    /// Wage month the contribution is for, e.g. "Oct-2024".
+    pub wage_month: String,
+    /// Credit date in DD-MM-YYYY format, e.g. "13-11-2024".
     pub date: String,
     pub description: String,
     /// "credit" = contribution, "debit" = withdrawal.
@@ -87,6 +90,12 @@ pub struct EpfTransaction {
     pub employer_share: f64,
     pub pension_share: f64,
     pub balance: f64,
+    /// Day of the month on which contribution was credited (e.g. 13).
+    pub credit_day: u8,
+    /// Establishment name extracted from the passbook header.
+    pub establishment_name: String,
+    /// Universal Account Number.
+    pub uan: String,
 }
 
 /// Tagged union so callers know which transaction type they're getting.

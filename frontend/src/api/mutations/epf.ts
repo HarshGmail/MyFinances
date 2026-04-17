@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { EpfAccountPayload } from '../dataInterface';
+import { EpfAccountPayload, EpfPassbookParseResult, EpfBulkUpdatePayload } from '../dataInterface';
 
 async function addEpfAccount(data: EpfAccountPayload) {
   return apiRequest({
@@ -30,4 +30,32 @@ export function useAddEpfAccountMutation() {
     isSuccess: mutation.isSuccess,
     isError: mutation.isError,
   };
+}
+
+async function parseEpfPassbooks(files: Array<{ data: string; name: string }>) {
+  const response = await apiRequest({
+    endpoint: '/epf/parse-passbook',
+    method: 'POST',
+    body: { files },
+  });
+  return response.data as EpfPassbookParseResult;
+}
+
+export function useParseEpfPassbooksMutation() {
+  return useMutation({ mutationFn: parseEpfPassbooks });
+}
+
+async function bulkUpdateEpfAccounts(payload: EpfBulkUpdatePayload) {
+  return apiRequest({ endpoint: '/epf/bulk-update', method: 'POST', body: payload });
+}
+
+export function useBulkUpdateEpfAccountsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkUpdateEpfAccounts,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['epf-account'] });
+      queryClient.invalidateQueries({ queryKey: ['epf-timeline'] });
+    },
+  });
 }
