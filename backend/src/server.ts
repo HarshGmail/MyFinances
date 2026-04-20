@@ -43,7 +43,7 @@ const corsOptions: CorsOptions = {
     'http://localhost:5000',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5000',
-    'https://my-finances-alpha.vercel.app',
+    /^https:\/\/my-finances(-[a-z0-9]+)*\.vercel\.app$/,
     'https://www.my-finances.site',
     'https://my-finances.site',
     'https://mcp.my-finances.site',

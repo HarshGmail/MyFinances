@@ -5,7 +5,7 @@ import { stocksSchema } from '../schemas/stocks';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { StocksService } from '../services/stocksService';
 import { StockData } from '../utils/types';
-import { getCached, setCache } from '../utils/priceCache';
+import { getCached, getCachedWithMaxAge, setCache } from '../utils/priceCache';
 import logger from '../utils/logger';
 
 export async function addStockTransaction(req: Request, res: Response) {
@@ -388,12 +388,24 @@ export async function getPortfolioAnalytics(req: Request, res: Response) {
       return;
     }
 
-    const results = await Promise.all(
-      symbols.map(async (symbol) => {
+    const results: [string, unknown][] = [];
+    let prevWasYahooFetch = false;
+    for (const symbol of symbols) {
+      const cacheKey = `stock:financials:${symbol}`;
+      const cached = await getCachedWithMaxAge<unknown>(cacheKey, 7);
+      if (cached !== null) {
+        results.push([symbol, cached]);
+        prevWasYahooFetch = false;
+      } else {
+        if (prevWasYahooFetch) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
         const data = await StocksService.fetchFinancials(symbol);
-        return [symbol, data] as const;
-      })
-    );
+        await setCache(cacheKey, data);
+        results.push([symbol, data]);
+        prevWasYahooFetch = true;
+      }
+    }
 
     const data: Record<string, unknown> = Object.fromEntries(results);
     res.status(200).json({ success: true, data });
