@@ -91,3 +91,14 @@ export function useStockFinancialsQuery(symbol: string) {
     enabled: !!symbol,
   });
 }
+
+export function usePortfolioAnalyticsQuery() {
+  return useQuery<Record<string, StockFinancials>>({
+    queryKey: ['portfolio-analytics'],
+    queryFn: async () => {
+      const response = await apiRequest({ endpoint: '/stocks/portfolio-analytics', method: 'GET' });
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+}

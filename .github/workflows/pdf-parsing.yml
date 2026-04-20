@@ -1,0 +1,47 @@
+name: PDF Parsing Service CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pdf-parsing/**'
+      - '.github/workflows/pdf-parsing.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pdf-parsing/**'
+      - '.github/workflows/pdf-parsing.yml'
+
+defaults:
+  run:
+    working-directory: pdf-parsing
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pdf-parsing
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Test
+        run: cargo test

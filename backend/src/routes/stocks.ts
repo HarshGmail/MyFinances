@@ -6,6 +6,7 @@ import {
   searchStocksByName,
   getFullStockProfile,
   getStockFinancials,
+  getPortfolioAnalytics,
   updateStockTransaction,
   deleteStockTransaction,
   deleteAllUserStockTransactions,
@@ -35,6 +36,9 @@ router.get('/stock-profile', getFullStockProfile);
 
 // GET /stocks/financials?symbol=SYMBOL - quoteSummary metrics (P/E, margins, etc.)
 router.get('/financials', getStockFinancials);
+
+// GET /stocks/portfolio-analytics - fundamentals for all portfolio stocks in one call
+router.get('/portfolio-analytics', getPortfolioAnalytics);
 
 // GET /stocks/portfolio - Grouped portfolio with live prices, summary and raw transactions
 router.get('/portfolio', getStocksPortfolio);

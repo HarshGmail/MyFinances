@@ -1,4 +1,4 @@
-# ourFinance
+# MyFinance
 
 Personal finance tracker built for Indian investors. Track stocks, mutual funds, gold, crypto, EPF, FD, RD, and expenses — all in one place.
 
@@ -35,7 +35,7 @@ Personal finance tracker built for Indian investors. Track stocks, mutual funds,
 ## Project Structure
 
 ```
-ourFinance/
+MyFinance/
 ├── frontend/     Next.js app (port 3000)
 ├── backend/      Express API (port 5000)
 └── scripts/      Utility scripts

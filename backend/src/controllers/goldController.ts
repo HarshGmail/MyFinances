@@ -250,7 +250,14 @@ export async function getSafeGoldRates(req: Request, res: Response) {
     const todayIsStale =
       !todayCacheDoc || Date.now() - new Date(todayCacheDoc.fetchedAt).getTime() > 15 * 60 * 1000;
 
-    const missingDates = dates.filter((d) => !cachedMap.has(d) || (d === today && todayIsStale));
+    const isWeekend = (d: string) => {
+      const day = new Date(d).getDay();
+      return day === 0 || day === 6;
+    };
+
+    const missingDates = dates.filter(
+      (d) => !isWeekend(d) && (!cachedMap.has(d) || (d === today && todayIsStale))
+    );
 
     if (missingDates.length > 0) {
       const sorted = [...missingDates].sort();
@@ -263,9 +270,17 @@ export async function getSafeGoldRates(req: Request, res: Response) {
       );
     }
 
-    const data = dates
-      .filter((d) => cachedMap.has(d))
-      .map((d) => ({ date: d, rate: cachedMap.get(d)! }));
+    // Carry-forward last known rate for weekends/holidays
+    let lastRate: string | null = null;
+    const data: { date: string; rate: string }[] = [];
+    for (const d of dates) {
+      if (cachedMap.has(d)) {
+        lastRate = cachedMap.get(d)!;
+        data.push({ date: d, rate: lastRate });
+      } else if (lastRate !== null) {
+        data.push({ date: d, rate: lastRate });
+      }
+    }
 
     res.status(200).json({ success: true, data });
   } catch (error) {
