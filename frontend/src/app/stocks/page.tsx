@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { BarChart3, RefreshCw, Receipt, Search } from 'lucide-react';
+import { BarChart3, RefreshCw, Receipt, Search, PieChart } from 'lucide-react';
 
 export default function StocksPage() {
   const sections = [
@@ -28,6 +28,13 @@ export default function StocksPage() {
       description: 'Add or edit your stock transactions',
       icon: RefreshCw,
       href: '/stocks/updateStock',
+    },
+    {
+      title: 'Portfolio Analytics',
+      description:
+        'Deep fundamental analysis across all your holdings — valuation, profitability, growth, and risk',
+      icon: PieChart,
+      href: '/stocks/analytics',
     },
   ];
 

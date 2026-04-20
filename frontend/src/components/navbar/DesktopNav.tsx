@@ -18,6 +18,7 @@ import {
   Search,
   PictureInPicture2,
   Plug,
+  BarChart3,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -268,6 +269,7 @@ function DesktopDropdownMenu({
 
 const STOCKS_ITEMS = [
   { title: 'Portfolio', icon: <Briefcase className="w-4 h-4" />, path: '/stocks/portfolio' },
+  { title: 'Analytics', icon: <BarChart3 className="w-4 h-4" />, path: '/stocks/analytics' },
   { title: 'Update Stocks', icon: <RefreshCw className="w-4 h-4" />, path: '/stocks/updateStock' },
   { title: 'Transactions', icon: <Receipt className="w-4 h-4" />, path: '/stocks/transactions' },
   { title: 'Search', icon: <Search className="w-4 h-4" />, path: '/stocks/detail' },

@@ -50,7 +50,15 @@ frontend/src/
 │   ├── providers.tsx         TanStack QueryClientProvider
 │   ├── home/page.tsx         Master dashboard (all assets combined)
 │   ├── stocks/
-│   │   ├── page.tsx          Stocks landing
+│   │   ├── page.tsx          Stocks landing (links to Portfolio, Analytics, Research, Transactions, Update)
+│   │   ├── analytics/        Portfolio-wide fundamental analysis (NEW)
+│   │   │   ├── page.tsx              Orchestrator — fetches usePortfolioAnalyticsQuery + useStocksPortfolioQuery
+│   │   │   ├── PortfolioSummaryBar.tsx  5 KPI cards: avg P/E, portfolio beta, avg ROE, earnings growth %, avg net margin
+│   │   │   ├── ValuationSection.tsx    P/E + P/B bucket column charts
+│   │   │   ├── ProfitabilitySection.tsx  Grouped bar: ROE / op margin / net margin per stock
+│   │   │   ├── GrowthSection.tsx        Grouped column: rev growth + EPS growth per stock (red = negative)
+│   │   │   ├── RiskSection.tsx          Beta + D/E donut charts + risk flags list
+│   │   │   └── StockScorecardTable.tsx  All stocks × metrics table with colored verdict dots + sort dropdown
 │   │   ├── detail/
 │   │   │   ├── page.tsx      Search landing — company switcher with portfolio quick-pick
 │   │   │   └── [symbol]/
@@ -82,7 +90,16 @@ frontend/src/
 │   │   ├── useDashboardData.ts  All dashboard calculations (useMemo)
 │   │   ├── useTrackerData.ts    Tracker chart calculations (useMemo)
 │   │   └── types.ts          Zod schemas, constants (EXPENSE_TAGS, FIXED_EXPENSE_TAGS)
-│   ├── epf/                  EPF account management
+│   ├── epf/                  EPF account management + passbook import
+│   │   ├── page.tsx                   Orchestrator; "Import Passbook" button + EpfPassbookImportDialog
+│   │   ├── EpfPassbookImportDialog.tsx Upload PDF passbooks → parse → confirm import
+│   │   ├── EpfAccountsDrawer.tsx      Drawer listing all EPF accounts
+│   │   ├── AddEpfAccountDialog.tsx    Manual add EPF account form
+│   │   ├── EpfSummaryCards.tsx        KPI cards (balance, contributions, interest)
+│   │   ├── EpfGrowthChart.tsx         Nominal vs real EPF balance growth (Highcharts area)
+│   │   ├── EpfContributionTimeline.tsx Contribution rows + interest rows table
+│   │   ├── EpfPageSkeleton.tsx        Loading skeleton
+│   │   └── useEpfCalculations.ts      EPF growth projection math (inflated/real)
 │   ├── fd/                   Fixed deposits
 │   ├── rd/                   Recurring deposits
 │   ├── goals/                Investment goals
@@ -94,7 +111,7 @@ frontend/src/
 │   │   ├── api.ts            apiRequest() — base fetch wrapper (handles 401 → redirect to /)
 │   │   └── baseUrl.ts        API_BASE_URL from env
 │   ├── query/
-│   │   ├── stocks.ts         useStockFinancialsQuery, useStockFullProfile, useStocksPortfolioQuery
+│   │   ├── stocks.ts         useStockFinancialsQuery, useStockFullProfile, useStocksPortfolioQuery, usePortfolioAnalyticsQuery
 │   │   └── emailIntegration.ts  useEmailIntegrationStatusQuery, etc.
 │   ├── mutations/
 │   │   ├── stocks.ts         Stock transaction mutations
@@ -143,7 +160,9 @@ backend/src/
 │   ├── gmailService.ts        Gmail OAuth2 + PDF attachment fetching (paginated, supports incremental sync via afterDate)
 │   ├── pdfParser.ts           Password-protected PDF text extraction using pdf-parse
 │   ├── cdslParser.ts          CDSL eCAS MF transaction parser
-│   └── safegoldParser.ts      SafeGold gold transaction parser
+│   ├── safegoldParser.ts      SafeGold gold transaction parser
+│   ├── epfPassbookParser.ts   Regex-based EPF passbook text parser (TS fallback); captures employee+employer contributions
+│   └── pdfParsingClient.ts    Rust PDF service client: submitPdfJob/waitForPdfJob/warmupPdfService (fire-and-forget warm-up)
 ├── middleware/
 │   ├── jwt.ts            authenticateToken middleware — extracts { name, email, userId }
 │   └── requestLogger.ts
@@ -158,7 +177,7 @@ backend/src/
 | Prefix | Domain |
 |---|---|
 | `/api/auth` | Login, signup |
-| `/api/stocks` | Stock transactions + NSE quotes + Yahoo Finance search + financials |
+| `/api/stocks` | Stock transactions + NSE quotes + Yahoo Finance search + financials + portfolio analytics |
 | `/api/gold` | Gold transactions + SafeGold rates |
 | `/api/crypto` | Crypto transactions + CoinDCX prices + candle data |
 | `/api/mutual-funds` | MF transactions |
@@ -394,3 +413,17 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 18. **Live calculations are flexible** — `MetricCalculation` interface supports any type of calculation via generic `label1/value1/label2/value2/result/formula` fields. This allows the same drawer component to display P/E (two inputs, one result), margin calcs (single result), growth comparisons, ratios, etc. Adding new metrics only requires adding a case to `getMetricCalculation()` — drawer component doesn't change.
 
 19. **Stock detail chart uses IST timezone offset** — The 1D intraday chart applies a 5.5-hour offset in the x-axis formatter to convert UTC timestamps to IST (Indian Standard Time). For 1D charts, data is also filtered to market hours (09:00–16:00) + latest trading day only, eliminating the overnight gap and cleanly showing only active trading session data.
+
+20. **Stock 1-day change uses second-to-last close, not `chartPreviousClose`** — `meta.chartPreviousClose` from the Yahoo Finance chart API is the first data point of the fetched range (not yesterday's close), so it produces wrong values for ETFs or stocks with splits. `getStocksPortfolio` in `stocksController.ts` instead reads the last two non-null values from `indicators.quote[0].close` and uses the second-to-last as previous close. Falls back to `regularMarketPreviousClose` / `chartPreviousClose` only if the close array has fewer than 2 entries.
+
+21. **Gold rates carry-forward weekends** — Yahoo Finance's `GC=F` API only returns trading days (Mon–Fri). `getSafeGoldRates` in `goldController.ts` fills weekend/holiday gaps by carrying forward the last known Friday close. Weekends are also excluded from the `missingDates` list so no unnecessary Yahoo Finance calls are made for Sat/Sun.
+
+22. **EPF passbook import — employee + employer contributions** — EPFO passbook has three balance columns: Employee, Employer, Pension. The withdrawable EPF balance = Employee + Employer. Both `epfPassbookParser.ts` (TS fallback) and the Rust service path in `epfController.ts` sum `employee_share + employer_share`. The stored `epfAmount` therefore reflects the total monthly credit, not just the employee half.
+
+23. **EPF interest shown for any completed FY** — `getEpfTimeline` includes interest for every financial year where March 31 has passed (`interestCreditDate <= currentDate`). A prior 6-month buffer that delayed inclusion until September was removed — it caused the just-ended FY to be excluded for the first half of the new year.
+
+24. **Rust PDF parsing service warm-up** — The Rust service at `PDF_PARSING_SERVICE_URL` (hosted on Render) sleeps after 15 min of inactivity. `getEpfAccounts` calls `warmupPdfService()` (fire-and-forget GET to `/jobs/warmup`) whenever the EPF page loads, keeping the instance warm for passbook uploads. Errors are silently swallowed.
+
+25. **EPF Rust service fallback on error** — `parseEpfPassbooks` tries the Rust service first. If it throws for any reason (429, timeout, service down), it logs a warning and falls back to the TypeScript `epfPassbookParser.ts` parser automatically. The `usedRustService` flag gates which path ran.
+
+26. **Portfolio analytics uses a single batch backend call** — `GET /api/stocks/portfolio-analytics` fetches the user's transactions, extracts unique symbols, runs `StocksService.fetchFinancials()` for all in parallel, and returns `Record<symbol, StockFinancials>` in one response. The frontend hook `usePortfolioAnalyticsQuery()` (10 min staleTime) makes this single call. The analytics page also uses `useStocksPortfolioQuery()` for investment weights (portfolio beta weighting, scorecard sort).
