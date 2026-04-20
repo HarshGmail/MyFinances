@@ -363,6 +363,46 @@ export async function getStockFinancials(req: Request, res: Response) {
   }
 }
 
+export async function getPortfolioAnalytics(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const db = database.getDb();
+    const transactions = await db
+      .collection('stocks')
+      .find({ userId: new ObjectId(user.userId) })
+      .toArray();
+
+    const symbolSet = new Set<string>();
+    for (const tx of transactions) {
+      if (tx.stockName) symbolSet.add(tx.stockName as string);
+    }
+    const symbols = Array.from(symbolSet);
+
+    if (symbols.length === 0) {
+      res.status(200).json({ success: true, data: {} });
+      return;
+    }
+
+    const results = await Promise.all(
+      symbols.map(async (symbol) => {
+        const data = await StocksService.fetchFinancials(symbol);
+        return [symbol, data] as const;
+      })
+    );
+
+    const data: Record<string, unknown> = Object.fromEntries(results);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching portfolio analytics');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getFullStockProfile(req: Request, res: Response) {
   try {
     const { symbol } = req.query;

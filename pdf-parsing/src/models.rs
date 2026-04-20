@@ -100,7 +100,11 @@ pub struct EpfTransaction {
 
 /// Tagged union so callers know which transaction type they're getting.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "parser_type", content = "transactions", rename_all = "snake_case")]
+#[serde(
+    tag = "parser_type",
+    content = "transactions",
+    rename_all = "snake_case"
+)]
 pub enum JobResult {
     CdslCas(Vec<MfTransaction>),
     SafeGold(Vec<GoldTransaction>),
