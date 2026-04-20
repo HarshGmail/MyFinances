@@ -4,8 +4,13 @@ import database from '../database';
 import { stocksSchema } from '../schemas/stocks';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { StocksService } from '../services/stocksService';
-import { StockData } from '../utils/types';
-import { getCached, setCache } from '../utils/priceCache';
+import { StockData, StockSearchResponse } from '../utils/types';
+import {
+  getCached,
+  getCachedWithMaxAge,
+  getCachedWithMaxAgeMs,
+  setCache,
+} from '../utils/priceCache';
 import logger from '../utils/logger';
 
 export async function addStockTransaction(req: Request, res: Response) {
@@ -189,8 +194,24 @@ export async function searchStocksByName(req: Request, res: Response) {
       return;
     }
 
-    const results = await StocksService.searchStocks(query);
-    res.status(200).json({ success: true, data: results });
+    const cacheKey = `stock:search:${query.toLowerCase()}`;
+    try {
+      const results = await StocksService.searchStocks(query);
+      await setCache(cacheKey, results);
+      res.status(200).json({ success: true, data: results });
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 429) {
+        const cached = await getCachedWithMaxAge<StockSearchResponse[]>(cacheKey, 1);
+        logger.warn(
+          { query },
+          `Yahoo 429 on search — ${cached ? 'serving cache' : 'returning empty'}`
+        );
+        res.status(200).json({ success: true, data: cached ?? [] });
+        return;
+      }
+      throw err;
+    }
   } catch (err) {
     logger.error({ err }, 'Error searching stocks by name');
     res.status(500).json({ message: 'Failed to search stocks' });
@@ -355,7 +376,14 @@ export async function getStockFinancials(req: Request, res: Response) {
       res.status(400).json({ success: false, message: 'symbol is required' });
       return;
     }
+    const cacheKey = `stock:financials:${symbol}`;
+    const cached = await getCachedWithMaxAge<unknown>(cacheKey, 7);
+    if (cached !== null) {
+      res.status(200).json({ success: true, data: cached });
+      return;
+    }
     const data = await StocksService.fetchFinancials(symbol);
+    await setCache(cacheKey, data);
     res.status(200).json({ success: true, data });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching stock financials');
@@ -388,12 +416,24 @@ export async function getPortfolioAnalytics(req: Request, res: Response) {
       return;
     }
 
-    const results = await Promise.all(
-      symbols.map(async (symbol) => {
+    const results: [string, unknown][] = [];
+    let prevWasYahooFetch = false;
+    for (const symbol of symbols) {
+      const cacheKey = `stock:financials:${symbol}`;
+      const cached = await getCachedWithMaxAge<unknown>(cacheKey, 7);
+      if (cached !== null) {
+        results.push([symbol, cached]);
+        prevWasYahooFetch = false;
+      } else {
+        if (prevWasYahooFetch) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
         const data = await StocksService.fetchFinancials(symbol);
-        return [symbol, data] as const;
-      })
-    );
+        await setCache(cacheKey, data);
+        results.push([symbol, data]);
+        prevWasYahooFetch = true;
+      }
+    }
 
     const data: Record<string, unknown> = Object.fromEntries(results);
     res.status(200).json({ success: true, data });
@@ -402,6 +442,17 @@ export async function getPortfolioAnalytics(req: Request, res: Response) {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+const PROFILE_TTL_MS: Record<string, number> = {
+  '1d': 30 * 60 * 1000, // 30 min — intraday
+  '1w': 2 * 60 * 60 * 1000, // 2 h
+  '1m': 4 * 60 * 60 * 1000, // 4 h
+  '3m': 12 * 60 * 60 * 1000, // 12 h
+  '6m': 12 * 60 * 60 * 1000,
+  '1y': 24 * 60 * 60 * 1000, // 24 h
+  '5y': 24 * 60 * 60 * 1000,
+  max: 24 * 60 * 60 * 1000,
+};
 
 export async function getFullStockProfile(req: Request, res: Response) {
   try {
@@ -413,8 +464,19 @@ export async function getFullStockProfile(req: Request, res: Response) {
 
     const range = (req.query.range as string) || '1y';
     const interval = (req.query.interval as string) || '1d';
+    const ttlMs = PROFILE_TTL_MS[range] ?? 24 * 60 * 60 * 1000;
+    const cacheKey = `stock:profile:${symbol}:${range}:${interval}`;
+
+    const cached = await getCachedWithMaxAgeMs(cacheKey, ttlMs);
+    if (cached) {
+      res.status(200).json({ success: true, data: cached });
+      return;
+    }
 
     const data = await StocksService.getFullStockProfile(symbol, range, interval);
+    if (data.trends !== null || data.chartData !== null) {
+      await setCache(cacheKey, data);
+    }
     res.status(200).json({ success: true, data });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching full stock profile');
