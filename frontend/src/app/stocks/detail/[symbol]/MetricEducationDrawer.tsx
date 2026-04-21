@@ -1,7 +1,7 @@
 'use client';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { METRIC_DEFINITIONS } from './metricDefinitions';
+import { METRIC_DEFINITIONS, MetricDefinition } from './metricDefinitions';
 import { Lightbulb, Calculator } from 'lucide-react';
 import { MetricCalculation } from './verdicts';
 
@@ -10,10 +10,17 @@ interface Props {
   metricLabel: string;
   onClose: () => void;
   realData?: MetricCalculation | null;
+  definitions?: Record<string, MetricDefinition>;
 }
 
-export default function MetricEducationDrawer({ isOpen, metricLabel, onClose, realData }: Props) {
-  const definition = METRIC_DEFINITIONS[metricLabel];
+export default function MetricEducationDrawer({
+  isOpen,
+  metricLabel,
+  onClose,
+  realData,
+  definitions,
+}: Props) {
+  const definition = (definitions ?? METRIC_DEFINITIONS)[metricLabel];
 
   if (!definition) return null;
 

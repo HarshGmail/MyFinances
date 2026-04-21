@@ -17,8 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Info } from 'lucide-react';
 import { StockFinancials, StocksPortfolioItem } from '@/api/dataInterface';
 import { getVerdict } from '@/app/stocks/detail/[symbol]/verdicts';
+import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
+import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';
+
+const COL_METRIC_MAP: Record<string, string> = {
+  'P/E': 'Trailing P/E',
+  'P/B': 'Price / Book',
+  ROE: 'ROE',
+  'Net Margin': 'Net Margin',
+  'Rev Growth': 'Revenue Growth',
+  'EPS Growth': 'Earnings Growth',
+  Beta: 'Beta (5Y)',
+  'D/E': 'Debt / Equity',
+};
 
 interface Props {
   analyticsData: Record<string, StockFinancials>;
@@ -62,6 +76,7 @@ function fmt(v: number | null | undefined, pct = false, decimals = 1): string {
 export function StockScorecardTable({ analyticsData, portfolio }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('investedAmount');
   const [asc, setAsc] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const investMap = Object.fromEntries(portfolio.map((p) => [p.stockName, p.investedAmount]));
 
@@ -94,113 +109,128 @@ export function StockScorecardTable({ analyticsData, portfolio }: Props) {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <CardTitle>Stock Scorecard</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              All holdings with key fundamentals and colored verdicts
-            </p>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle>Stock Scorecard</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                All holdings with key fundamentals and colored verdicts
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <button
+                onClick={() => setAsc((p) => !p)}
+                className="px-3 py-1.5 text-sm border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                {asc ? '↑ Asc' : '↓ Desc'}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SORT_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Stock</TableHead>
+                <TableHead className="text-right">Invested</TableHead>
+                {Object.keys(COL_METRIC_MAP).map((col) => (
+                  <TableHead key={col} className="text-right">
+                    <span className="inline-flex items-center justify-end gap-1">
+                      {col}
+                      <button
+                        onClick={() => setSelectedMetric(COL_METRIC_MAP[col])}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Info className="h-3 w-3" />
+                      </button>
+                    </span>
+                  </TableHead>
                 ))}
-              </SelectContent>
-            </Select>
-            <button
-              onClick={() => setAsc((p) => !p)}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-muted/50 transition-colors"
-            >
-              {asc ? '↑ Asc' : '↓ Desc'}
-            </button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Stock</TableHead>
-              <TableHead className="text-right">Invested</TableHead>
-              <TableHead className="text-right">P/E</TableHead>
-              <TableHead className="text-right">P/B</TableHead>
-              <TableHead className="text-right">ROE</TableHead>
-              <TableHead className="text-right">Net Margin</TableHead>
-              <TableHead className="text-right">Rev Growth</TableHead>
-              <TableHead className="text-right">EPS Growth</TableHead>
-              <TableHead className="text-right">Beta</TableHead>
-              <TableHead className="text-right">D/E</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((r) => (
-              <TableRow key={r.sym}>
-                <TableCell className="font-medium">{r.sym}</TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  ₹{r.invested.toLocaleString('en-IN')}
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {r.pe != null ? r.pe.toFixed(1) : '—'}
-                    {verdictDot(getVerdict('trailingPE', r.pe)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {r.pb != null ? r.pb.toFixed(1) : '—'}
-                    {verdictDot(getVerdict('priceToBook', r.pb)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {fmt(r.roe, true)}
-                    {verdictDot(getVerdict('returnOnEquity', r.roe)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {fmt(r.netMargin, true)}
-                    {verdictDot(getVerdict('profitMargins', r.netMargin)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {fmt(r.revGrowth, true)}
-                    {verdictDot(getVerdict('revenueGrowth', r.revGrowth)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {fmt(r.epsGrowth, true)}
-                    {verdictDot(getVerdict('earningsGrowth', r.epsGrowth)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {r.beta != null ? r.beta.toFixed(2) : '—'}
-                    {verdictDot(getVerdict('beta', r.beta)?.color)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    {r.de != null ? (r.de / 100).toFixed(2) : '—'}
-                    {verdictDot(getVerdict('debtToEquity', r.de)?.color)}
-                  </span>
-                </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((r) => (
+                <TableRow key={r.sym}>
+                  <TableCell className="font-medium">{r.sym}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    ₹{r.invested.toLocaleString('en-IN')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {r.pe != null ? r.pe.toFixed(1) : '—'}
+                      {verdictDot(getVerdict('trailingPE', r.pe)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {r.pb != null ? r.pb.toFixed(1) : '—'}
+                      {verdictDot(getVerdict('priceToBook', r.pb)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {fmt(r.roe, true)}
+                      {verdictDot(getVerdict('returnOnEquity', r.roe)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {fmt(r.netMargin, true)}
+                      {verdictDot(getVerdict('profitMargins', r.netMargin)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {fmt(r.revGrowth, true)}
+                      {verdictDot(getVerdict('revenueGrowth', r.revGrowth)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {fmt(r.epsGrowth, true)}
+                      {verdictDot(getVerdict('earningsGrowth', r.epsGrowth)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {r.beta != null ? r.beta.toFixed(2) : '—'}
+                      {verdictDot(getVerdict('beta', r.beta)?.color)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      {r.de != null ? (r.de / 100).toFixed(2) : '—'}
+                      {verdictDot(getVerdict('debtToEquity', r.de)?.color)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <MetricEducationDrawer
+        isOpen={selectedMetric !== null}
+        metricLabel={selectedMetric ?? ''}
+        onClose={() => setSelectedMetric(null)}
+        realData={null}
+        definitions={ANALYTICS_METRIC_DEFINITIONS}
+      />
+    </>
   );
 }
