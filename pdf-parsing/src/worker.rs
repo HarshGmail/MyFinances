@@ -2,14 +2,14 @@ use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info};
 
-use crate::models::{JobStatus, ParserType, PdfInput};
+use crate::models::{JobStatus, ParserType, ResolvedPdf};
 use crate::parsers;
 use crate::state::AppState;
 
 pub struct WorkerJob {
     pub job_id: String,
     pub parser_type: ParserType,
-    pub pdfs: Vec<PdfInput>,
+    pub pdfs: Vec<ResolvedPdf>,
 }
 
 /// Runs forever, consuming jobs from the channel one at a time.

@@ -16,7 +16,13 @@ import { parseSafeGoldTransactions } from '../services/safegoldParser';
 import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
-import { isPdfServiceAvailable, submitPdfJob, waitForPdfJob } from '../services/pdfParsingClient';
+import {
+  isPdfServiceAvailable,
+  submitPdfJob,
+  submitPdfJobByIds,
+  uploadPdf,
+  waitForPdfJob,
+} from '../services/pdfParsingClient';
 import { decrypt } from '../utils/encryption';
 import config from '../config';
 import logger from '../utils/logger';
@@ -318,7 +324,13 @@ async function runSyncInBackground(
   const useRustService = isPdfServiceAvailable();
 
   logger.info(
-    { jobId, accounts: integrations.length, useRustService, hasPan: !!cdslPassword, hasPhone: !!safegoldPassword },
+    {
+      jobId,
+      accounts: integrations.length,
+      useRustService,
+      hasPan: !!cdslPassword,
+      hasPhone: !!safegoldPassword,
+    },
     '[Sync] Starting background sync'
   );
 
@@ -330,13 +342,20 @@ async function runSyncInBackground(
       const sgPasswords = safegoldPassword ? [safegoldPassword, ''] : [''];
 
       logger.info(
-        { account: accountTag, afterDate: afterDate?.toISOString() ?? 'full sync (no lastSyncAt)', useRustService },
+        {
+          account: accountTag,
+          afterDate: afterDate?.toISOString() ?? 'full sync (no lastSyncAt)',
+          useRustService,
+        },
         '[Sync] Processing account'
       );
 
       // ── CDSL ──────────────────────────────────────────────────────────────
       try {
-        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching CDSL emails');
+        logger.info(
+          { account: accountTag, afterDate: afterDate?.toISOString() },
+          '[Sync] Fetching CDSL emails'
+        );
         const cdslPdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           'from:eCAS@cdslstatement.com has:attachment',
@@ -347,14 +366,83 @@ async function runSyncInBackground(
         if (cdslPdfs.length > 0) {
           if (useRustService) {
             try {
-              logger.info({ account: accountTag, pdfCount: cdslPdfs.length }, '[Sync] Submitting CDSL PDFs to Rust service');
-              const rustJobId = await submitPdfJob('cdsl_cas', cdslPdfs, cdslPasswords);
-              logger.info({ account: accountTag, rustJobId }, '[Sync] Rust CDSL job submitted, waiting...');
+              // Upload each PDF individually to avoid large JSON payloads (24 PDFs = ~12MB)
+              logger.info(
+                { account: accountTag, pdfCount: cdslPdfs.length },
+                '[Sync] Uploading CDSL PDFs to Rust service'
+              );
+              const fileIds: string[] = [];
+              for (const pdfBuffer of cdslPdfs) {
+                const fileId = await uploadPdf(pdfBuffer, cdslPasswords);
+                fileIds.push(fileId);
+              }
+
+              const rustJobId = await submitPdfJobByIds('cdsl_cas', fileIds);
+              logger.info(
+                { account: accountTag, rustJobId },
+                '[Sync] Rust CDSL job submitted, waiting...'
+              );
               const result = await waitForPdfJob(rustJobId);
-              logger.info({ account: accountTag, rustJobId, parserType: result?.parser_type }, '[Sync] Rust CDSL job complete');
+              logger.info(
+                { account: accountTag, rustJobId, parserType: result?.parser_type },
+                '[Sync] Rust CDSL job complete'
+              );
+
               if (result?.parser_type === 'cdsl_cas') {
-                // TODO: map Rust MfTransaction[] to Node.js parseCdslMFTransactions format
-                // once the Rust CDSL parser is implemented
+                const rustTxs = result.transactions as Array<{
+                  date: string;
+                  fund_name: string;
+                  units: number;
+                  nav: number;
+                  amount: number;
+                  transaction_type: string;
+                }>;
+
+                const mapped = rustTxs.map((tx) => ({
+                  date: new Date(tx.date),
+                  fundName: tx.fund_name,
+                  numOfUnits: tx.units,
+                  fundPrice: tx.nav,
+                  amount: tx.amount,
+                  type: tx.transaction_type as 'credit' | 'debit',
+                }));
+
+                if (mapped.length > 0) {
+                  allMFTransactions.push(...mapped);
+                  logger.info(
+                    { account: accountTag, count: mapped.length },
+                    '[Sync] CDSL Rust transactions mapped'
+                  );
+                } else {
+                  logger.warn(
+                    { account: accountTag },
+                    '[Sync] Rust CDSL returned 0 transactions — falling back to Node.js parser'
+                  );
+                  for (const pdf of cdslPdfs) {
+                    try {
+                      const text = await extractTextFromPdf(pdf, cdslPasswords);
+                      const mfTxs = parseCdslMFTransactions(text);
+                      const holdings = parseCdslStockHoldings(text);
+                      allMFTransactions.push(...mfTxs);
+                      allStockHoldings.push(...holdings);
+                      logger.info(
+                        {
+                          account: accountTag,
+                          mfCount: mfTxs.length,
+                          holdingsCount: holdings.length,
+                        },
+                        '[Sync] CDSL PDF parsed (Node.js fallback)'
+                      );
+                    } catch (e) {
+                      const msg = `[${accountTag}] CDSL Node.js fallback parse error: ${e instanceof Error ? e.message : String(e)}`;
+                      errors.push(msg);
+                      logger.error(
+                        { err: e, account: accountTag },
+                        '[Sync] CDSL Node.js fallback parse error'
+                      );
+                    }
+                  }
+                }
               }
             } catch (e) {
               const msg = `[${accountTag}] CDSL Rust parse error: ${e instanceof Error ? e.message : String(e)}`;
@@ -369,7 +457,10 @@ async function runSyncInBackground(
                 const holdings = parseCdslStockHoldings(text);
                 allMFTransactions.push(...mfTxs);
                 allStockHoldings.push(...holdings);
-                logger.info({ account: accountTag, mfCount: mfTxs.length, holdingsCount: holdings.length }, '[Sync] CDSL PDF parsed');
+                logger.info(
+                  { account: accountTag, mfCount: mfTxs.length, holdingsCount: holdings.length },
+                  '[Sync] CDSL PDF parsed'
+                );
               } catch (e) {
                 const msg = `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
                 errors.push(msg);
@@ -393,25 +484,94 @@ async function runSyncInBackground(
       // ── SafeGold statement ────────────────────────────────────────────────
       try {
         const sgSender = (integration.safegoldSender as string) ?? 'estatements@safegold.in';
-        logger.info({ account: accountTag, sender: sgSender, afterDate: afterDate?.toISOString() }, '[Sync] Fetching SafeGold statement emails');
+        logger.info(
+          { account: accountTag, sender: sgSender, afterDate: afterDate?.toISOString() },
+          '[Sync] Fetching SafeGold statement emails'
+        );
         const sgPdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           `from:${sgSender} has:attachment`,
           afterDate
         );
-        logger.info({ account: accountTag, count: sgPdfs.length }, '[Sync] SafeGold statement PDFs fetched');
+        logger.info(
+          { account: accountTag, count: sgPdfs.length },
+          '[Sync] SafeGold statement PDFs fetched'
+        );
 
         if (sgPdfs.length > 0) {
           if (useRustService) {
             try {
-              logger.info({ account: accountTag, pdfCount: sgPdfs.length }, '[Sync] Submitting SafeGold PDFs to Rust service');
-              const rustJobId = await submitPdfJob('safe_gold', sgPdfs, sgPasswords);
-              logger.info({ account: accountTag, rustJobId }, '[Sync] Rust SafeGold job submitted, waiting...');
+              logger.info(
+                { account: accountTag, pdfCount: sgPdfs.length },
+                '[Sync] Uploading SafeGold PDFs to Rust service'
+              );
+              const fileIds: string[] = [];
+              for (const pdfBuffer of sgPdfs) {
+                const fileId = await uploadPdf(pdfBuffer, sgPasswords);
+                fileIds.push(fileId);
+              }
+
+              const rustJobId = await submitPdfJobByIds('safe_gold', fileIds);
+              logger.info(
+                { account: accountTag, rustJobId },
+                '[Sync] Rust SafeGold job submitted, waiting...'
+              );
               const result = await waitForPdfJob(rustJobId);
-              logger.info({ account: accountTag, rustJobId, parserType: result?.parser_type }, '[Sync] Rust SafeGold job complete');
+              logger.info(
+                { account: accountTag, rustJobId, parserType: result?.parser_type },
+                '[Sync] Rust SafeGold job complete'
+              );
+
               if (result?.parser_type === 'safe_gold') {
-                // TODO: map Rust GoldTransaction[] to Node.js parseSafeGoldTransactions format
-                // once the Rust SafeGold parser is implemented
+                const rustTxs = result.transactions as Array<{
+                  date: string;
+                  transaction_type: string;
+                  grams: number;
+                  amount: number;
+                  gold_price: number;
+                  tax: number;
+                }>;
+
+                const mapped = rustTxs.map((tx) => ({
+                  date: new Date(tx.date),
+                  quantity: tx.grams,
+                  amount: tx.amount,
+                  goldPrice: tx.gold_price,
+                  tax: tx.tax,
+                  type: tx.transaction_type as 'credit' | 'debit',
+                  platform: 'SafeGold' as const,
+                }));
+
+                if (mapped.length > 0) {
+                  allGoldTransactions.push(...mapped);
+                  logger.info(
+                    { account: accountTag, count: mapped.length },
+                    '[Sync] SafeGold Rust transactions mapped'
+                  );
+                } else {
+                  logger.warn(
+                    { account: accountTag },
+                    '[Sync] Rust SafeGold returned 0 transactions — falling back to Node.js parser'
+                  );
+                  for (const pdf of sgPdfs) {
+                    try {
+                      const text = await extractTextFromPdf(pdf, sgPasswords);
+                      const txs = parseSafeGoldTransactions(text);
+                      allGoldTransactions.push(...txs);
+                      logger.info(
+                        { account: accountTag, count: txs.length },
+                        '[Sync] SafeGold PDF parsed (Node.js fallback)'
+                      );
+                    } catch (e) {
+                      const msg = `[${accountTag}] SafeGold Node.js fallback parse error: ${e instanceof Error ? e.message : String(e)}`;
+                      errors.push(msg);
+                      logger.error(
+                        { err: e, account: accountTag },
+                        '[Sync] SafeGold Node.js fallback parse error'
+                      );
+                    }
+                  }
+                }
               }
             } catch (e) {
               const msg = `[${accountTag}] SafeGold Rust parse error: ${e instanceof Error ? e.message : String(e)}`;
@@ -424,7 +584,10 @@ async function runSyncInBackground(
                 const text = await extractTextFromPdf(pdf, sgPasswords);
                 const txs = parseSafeGoldTransactions(text);
                 allGoldTransactions.push(...txs);
-                logger.info({ account: accountTag, count: txs.length }, '[Sync] SafeGold statement PDF parsed');
+                logger.info(
+                  { account: accountTag, count: txs.length },
+                  '[Sync] SafeGold statement PDF parsed'
+                );
               } catch (e) {
                 const msg = `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
                 errors.push(msg);
@@ -447,13 +610,19 @@ async function runSyncInBackground(
 
       // ── SafeGold invoices (stays in Node.js — not encrypted, quick parse) ─
       try {
-        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching SafeGold invoice emails');
+        logger.info(
+          { account: accountTag, afterDate: afterDate?.toISOString() },
+          '[Sync] Fetching SafeGold invoice emails'
+        );
         const sgInvoicePdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           'from:noreply@safegold.in has:attachment',
           afterDate
         );
-        logger.info({ account: accountTag, count: sgInvoicePdfs.length }, '[Sync] SafeGold invoice PDFs fetched');
+        logger.info(
+          { account: accountTag, count: sgInvoicePdfs.length },
+          '[Sync] SafeGold invoice PDFs fetched'
+        );
 
         for (const pdf of sgInvoicePdfs) {
           try {
@@ -483,20 +652,29 @@ async function runSyncInBackground(
 
       // ── CoinDCX (email body, not PDF — always in Node.js) ─────────────────
       try {
-        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching CoinDCX trade emails');
+        logger.info(
+          { account: accountTag, afterDate: afterDate?.toISOString() },
+          '[Sync] Fetching CoinDCX trade emails'
+        );
         const cdxBodies = await fetchEmailBodies(
           integration.refreshToken as string,
           'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
           afterDate
         );
-        logger.info({ account: accountTag, count: cdxBodies.length }, '[Sync] CoinDCX emails fetched');
+        logger.info(
+          { account: accountTag, count: cdxBodies.length },
+          '[Sync] CoinDCX emails fetched'
+        );
 
         for (const body of cdxBodies) {
           try {
             const trade = parseCoinDCXTradeEmail(body);
             if (trade) {
               allCryptoTrades.push(trade);
-              logger.info({ account: accountTag, coin: trade.coinSymbol, date: trade.date }, '[Sync] CoinDCX trade parsed');
+              logger.info(
+                { account: accountTag, coin: trade.coinSymbol, date: trade.date },
+                '[Sync] CoinDCX trade parsed'
+              );
             }
           } catch (e) {
             const msg = `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`;
