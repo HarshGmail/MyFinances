@@ -128,16 +128,36 @@ export class StocksService {
 
     // Fetch each module independently so a single failure doesn't block the rest
     const results: Record<string, unknown> = {};
+    let rateLimitedCount = 0;
     await Promise.all(
       modules.map(async (mod) => {
         try {
           const data = await yahooFinance.quoteSummary(yfSymbol, { modules: [mod] });
           results[mod] = (data as Record<string, unknown>)[mod] ?? null;
-        } catch {
+        } catch (err) {
+          const anyErr = err as Record<string, unknown>;
+          const status = (anyErr?.response as Record<string, unknown>)?.status ?? anyErr?.status;
+          const isRateLimit =
+            status === 429 ||
+            (err instanceof Error &&
+              (err.message.includes('429') ||
+                err.message.toLowerCase().includes('too many requests')));
+          if (isRateLimit) {
+            rateLimitedCount++;
+            logger.warn({ symbol, mod }, 'Yahoo 429 on financials module');
+          } else {
+            logger.warn({ err, symbol, mod }, 'Yahoo fetch failed for financials module');
+          }
           results[mod] = null;
         }
       })
     );
+
+    if (rateLimitedCount === modules.length) {
+      const err = Object.assign(new Error('Yahoo Finance rate limit exceeded'), { status: 429 });
+      throw err;
+    }
+
     return results;
   }
 

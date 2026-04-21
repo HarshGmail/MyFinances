@@ -382,9 +382,34 @@ export async function getStockFinancials(req: Request, res: Response) {
       res.status(200).json({ success: true, data: cached });
       return;
     }
-    const data = await StocksService.fetchFinancials(symbol);
-    await setCache(cacheKey, data);
-    res.status(200).json({ success: true, data });
+    try {
+      const data = await StocksService.fetchFinancials(symbol);
+      const hasData = Object.values(data).some((v) => v !== null);
+      if (hasData) await setCache(cacheKey, data);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      if ((err as { status?: number })?.status === 429) {
+        const stale = await getCached<unknown>(cacheKey);
+        if (stale) {
+          logger.warn({ symbol }, 'Yahoo 429 on financials — serving stale cache');
+          res.status(200).json({ success: true, data: stale });
+          return;
+        }
+        logger.warn({ symbol }, 'Yahoo 429 on financials — no cache available');
+        res.status(200).json({
+          success: true,
+          data: {
+            summaryDetail: null,
+            defaultKeyStatistics: null,
+            financialData: null,
+            price: null,
+            earningsTrend: null,
+          },
+        });
+        return;
+      }
+      throw err;
+    }
   } catch (error) {
     logger.error({ err: error }, 'Error fetching stock financials');
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -428,9 +453,19 @@ export async function getPortfolioAnalytics(req: Request, res: Response) {
         if (prevWasYahooFetch) {
           await new Promise((resolve) => setTimeout(resolve, 300));
         }
-        const data = await StocksService.fetchFinancials(symbol);
-        await setCache(cacheKey, data);
-        results.push([symbol, data]);
+        try {
+          const data = await StocksService.fetchFinancials(symbol);
+          const hasData = Object.values(data).some((v) => v !== null);
+          if (hasData) await setCache(cacheKey, data);
+          results.push([symbol, hasData ? data : ((await getCached(cacheKey)) ?? data)]);
+        } catch (err) {
+          if ((err as { status?: number })?.status === 429) {
+            logger.warn({ symbol }, 'Yahoo 429 on portfolio analytics — using stale or null');
+            results.push([symbol, (await getCached(cacheKey)) ?? null]);
+          } else {
+            throw err;
+          }
+        }
         prevWasYahooFetch = true;
       }
     }
@@ -476,6 +511,27 @@ export async function getFullStockProfile(req: Request, res: Response) {
     const data = await StocksService.getFullStockProfile(symbol, range, interval);
     if (data.trends !== null || data.chartData !== null) {
       await setCache(cacheKey, data);
+      res.status(200).json({ success: true, data });
+      return;
+    }
+
+    // Both null — Yahoo is likely rate limiting. Try stale profile cache first,
+    // then fall back to the NSE quote cache (stock:chart:SYMBOL) which has valid
+    // chart data fetched by the portfolio endpoint.
+    const staleProfile = await getCached<unknown>(cacheKey);
+    if (staleProfile) {
+      logger.warn({ symbol, range }, 'Yahoo returned null profile — serving stale cache');
+      res.status(200).json({ success: true, data: staleProfile });
+      return;
+    }
+    const nseCache = await getCached<unknown>(`stock:chart:${symbol}`);
+    if (nseCache) {
+      logger.warn(
+        { symbol, range },
+        'Yahoo returned null profile — falling back to NSE chart cache'
+      );
+      res.status(200).json({ success: true, data: { trends: null, chartData: nseCache } });
+      return;
     }
     res.status(200).json({ success: true, data });
   } catch (error) {

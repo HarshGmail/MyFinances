@@ -317,6 +317,11 @@ async function runSyncInBackground(
   const allCryptoTrades: ParsedCoinDCXTrade[] = [];
   const useRustService = isPdfServiceAvailable();
 
+  logger.info(
+    { jobId, accounts: integrations.length, useRustService, hasPan: !!cdslPassword, hasPhone: !!safegoldPassword },
+    '[Sync] Starting background sync'
+  );
+
   try {
     for (const integration of integrations) {
       const afterDate: Date | undefined = (integration.lastSyncAt as Date | null) ?? undefined;
@@ -324,142 +329,190 @@ async function runSyncInBackground(
       const cdslPasswords = cdslPassword ? [cdslPassword, ''] : [''];
       const sgPasswords = safegoldPassword ? [safegoldPassword, ''] : [''];
 
+      logger.info(
+        { account: accountTag, afterDate: afterDate?.toISOString() ?? 'full sync (no lastSyncAt)', useRustService },
+        '[Sync] Processing account'
+      );
+
       // ── CDSL ──────────────────────────────────────────────────────────────
       try {
+        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching CDSL emails');
         const cdslPdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           'from:eCAS@cdslstatement.com has:attachment',
           afterDate
         );
-        logger.info(`[Sync:${accountTag}] Found ${cdslPdfs.length} CDSL PDF(s)`);
+        logger.info({ account: accountTag, count: cdslPdfs.length }, '[Sync] CDSL PDFs fetched');
 
         if (cdslPdfs.length > 0) {
           if (useRustService) {
             try {
+              logger.info({ account: accountTag, pdfCount: cdslPdfs.length }, '[Sync] Submitting CDSL PDFs to Rust service');
               const rustJobId = await submitPdfJob('cdsl_cas', cdslPdfs, cdslPasswords);
+              logger.info({ account: accountTag, rustJobId }, '[Sync] Rust CDSL job submitted, waiting...');
               const result = await waitForPdfJob(rustJobId);
+              logger.info({ account: accountTag, rustJobId, parserType: result?.parser_type }, '[Sync] Rust CDSL job complete');
               if (result?.parser_type === 'cdsl_cas') {
                 // TODO: map Rust MfTransaction[] to Node.js parseCdslMFTransactions format
                 // once the Rust CDSL parser is implemented
-                logger.info(`[Sync:${accountTag}] Rust CDSL job done — implement mapping`);
               }
             } catch (e) {
-              errors.push(
-                `[${accountTag}] CDSL Rust parse error: ${e instanceof Error ? e.message : String(e)}`
-              );
+              const msg = `[${accountTag}] CDSL Rust parse error: ${e instanceof Error ? e.message : String(e)}`;
+              errors.push(msg);
+              logger.error({ err: e, account: accountTag }, '[Sync] CDSL Rust parse error');
             }
           } else {
             for (const pdf of cdslPdfs) {
               try {
                 const text = await extractTextFromPdf(pdf, cdslPasswords);
-                allMFTransactions.push(...parseCdslMFTransactions(text));
-                allStockHoldings.push(...parseCdslStockHoldings(text));
+                const mfTxs = parseCdslMFTransactions(text);
+                const holdings = parseCdslStockHoldings(text);
+                allMFTransactions.push(...mfTxs);
+                allStockHoldings.push(...holdings);
+                logger.info({ account: accountTag, mfCount: mfTxs.length, holdingsCount: holdings.length }, '[Sync] CDSL PDF parsed');
               } catch (e) {
-                errors.push(
-                  `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`
-                );
+                const msg = `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
+                errors.push(msg);
+                logger.error({ err: e, account: accountTag }, '[Sync] CDSL PDF parse error');
               }
             }
           }
         }
       } catch (e) {
-        errors.push(
-          `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`
+        const msg = `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`;
+        errors.push(msg);
+        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+        logger.error(
+          { err: e, account: accountTag, isInvalidGrant },
+          isInvalidGrant
+            ? '[Sync] CDSL fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
+            : '[Sync] CDSL email fetch error'
         );
       }
 
       // ── SafeGold statement ────────────────────────────────────────────────
       try {
         const sgSender = (integration.safegoldSender as string) ?? 'estatements@safegold.in';
+        logger.info({ account: accountTag, sender: sgSender, afterDate: afterDate?.toISOString() }, '[Sync] Fetching SafeGold statement emails');
         const sgPdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           `from:${sgSender} has:attachment`,
           afterDate
         );
-        logger.info(`[Sync:${accountTag}] Found ${sgPdfs.length} SafeGold PDF(s)`);
+        logger.info({ account: accountTag, count: sgPdfs.length }, '[Sync] SafeGold statement PDFs fetched');
 
         if (sgPdfs.length > 0) {
           if (useRustService) {
             try {
+              logger.info({ account: accountTag, pdfCount: sgPdfs.length }, '[Sync] Submitting SafeGold PDFs to Rust service');
               const rustJobId = await submitPdfJob('safe_gold', sgPdfs, sgPasswords);
+              logger.info({ account: accountTag, rustJobId }, '[Sync] Rust SafeGold job submitted, waiting...');
               const result = await waitForPdfJob(rustJobId);
+              logger.info({ account: accountTag, rustJobId, parserType: result?.parser_type }, '[Sync] Rust SafeGold job complete');
               if (result?.parser_type === 'safe_gold') {
                 // TODO: map Rust GoldTransaction[] to Node.js parseSafeGoldTransactions format
                 // once the Rust SafeGold parser is implemented
-                logger.info(`[Sync:${accountTag}] Rust SafeGold job done — implement mapping`);
               }
             } catch (e) {
-              errors.push(
-                `[${accountTag}] SafeGold Rust parse error: ${e instanceof Error ? e.message : String(e)}`
-              );
+              const msg = `[${accountTag}] SafeGold Rust parse error: ${e instanceof Error ? e.message : String(e)}`;
+              errors.push(msg);
+              logger.error({ err: e, account: accountTag }, '[Sync] SafeGold Rust parse error');
             }
           } else {
             for (const pdf of sgPdfs) {
               try {
                 const text = await extractTextFromPdf(pdf, sgPasswords);
-                allGoldTransactions.push(...parseSafeGoldTransactions(text));
+                const txs = parseSafeGoldTransactions(text);
+                allGoldTransactions.push(...txs);
+                logger.info({ account: accountTag, count: txs.length }, '[Sync] SafeGold statement PDF parsed');
               } catch (e) {
-                errors.push(
-                  `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`
-                );
+                const msg = `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
+                errors.push(msg);
+                logger.error({ err: e, account: accountTag }, '[Sync] SafeGold PDF parse error');
               }
             }
           }
         }
       } catch (e) {
-        errors.push(
-          `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`
+        const msg = `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`;
+        errors.push(msg);
+        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+        logger.error(
+          { err: e, account: accountTag, isInvalidGrant },
+          isInvalidGrant
+            ? '[Sync] SafeGold fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
+            : '[Sync] SafeGold email fetch error'
         );
       }
 
       // ── SafeGold invoices (stays in Node.js — not encrypted, quick parse) ─
       try {
+        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching SafeGold invoice emails');
         const sgInvoicePdfs = await fetchPdfAttachments(
           integration.refreshToken as string,
           'from:noreply@safegold.in has:attachment',
           afterDate
         );
-        logger.info(`[Sync:${accountTag}] Found ${sgInvoicePdfs.length} SafeGold invoice PDF(s)`);
+        logger.info({ account: accountTag, count: sgInvoicePdfs.length }, '[Sync] SafeGold invoice PDFs fetched');
 
         for (const pdf of sgInvoicePdfs) {
           try {
             const text = await extractTextFromPdf(pdf, []);
             const tx = parseSafeGoldInvoice(text);
-            if (tx) allGoldTransactions.push(tx);
+            if (tx) {
+              allGoldTransactions.push(tx);
+              logger.info({ account: accountTag, date: tx.date }, '[Sync] SafeGold invoice parsed');
+            }
           } catch (e) {
-            errors.push(
-              `[${accountTag}] SafeGold invoice parse error: ${e instanceof Error ? e.message : String(e)}`
-            );
+            const msg = `[${accountTag}] SafeGold invoice parse error: ${e instanceof Error ? e.message : String(e)}`;
+            errors.push(msg);
+            logger.error({ err: e, account: accountTag }, '[Sync] SafeGold invoice parse error');
           }
         }
       } catch (e) {
-        errors.push(
-          `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`
+        const msg = `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`;
+        errors.push(msg);
+        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+        logger.error(
+          { err: e, account: accountTag, isInvalidGrant },
+          isInvalidGrant
+            ? '[Sync] SafeGold invoice fetch failed — invalid_grant; user must reconnect Gmail'
+            : '[Sync] SafeGold invoice fetch error'
         );
       }
 
       // ── CoinDCX (email body, not PDF — always in Node.js) ─────────────────
       try {
+        logger.info({ account: accountTag, afterDate: afterDate?.toISOString() }, '[Sync] Fetching CoinDCX trade emails');
         const cdxBodies = await fetchEmailBodies(
           integration.refreshToken as string,
           'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
           afterDate
         );
-        logger.info(`[Sync:${accountTag}] Found ${cdxBodies.length} CoinDCX trade email(s)`);
+        logger.info({ account: accountTag, count: cdxBodies.length }, '[Sync] CoinDCX emails fetched');
 
         for (const body of cdxBodies) {
           try {
             const trade = parseCoinDCXTradeEmail(body);
-            if (trade) allCryptoTrades.push(trade);
+            if (trade) {
+              allCryptoTrades.push(trade);
+              logger.info({ account: accountTag, coin: trade.coinSymbol, date: trade.date }, '[Sync] CoinDCX trade parsed');
+            }
           } catch (e) {
-            errors.push(
-              `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`
-            );
+            const msg = `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`;
+            errors.push(msg);
+            logger.error({ err: e, account: accountTag }, '[Sync] CoinDCX email parse error');
           }
         }
       } catch (e) {
-        errors.push(
-          `[${accountTag}] CoinDCX fetch error: ${e instanceof Error ? e.message : String(e)}`
+        const msg = `[${accountTag}] CoinDCX fetch error: ${e instanceof Error ? e.message : String(e)}`;
+        errors.push(msg);
+        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+        logger.error(
+          { err: e, account: accountTag, isInvalidGrant },
+          isInvalidGrant
+            ? '[Sync] CoinDCX fetch failed — invalid_grant; user must reconnect Gmail'
+            : '[Sync] CoinDCX fetch error'
         );
       }
     }
@@ -478,6 +531,20 @@ async function runSyncInBackground(
     await db
       .collection('emailIntegrations')
       .updateMany({ userId }, { $set: { lastSyncAt: new Date() } });
+
+    logger.info(
+      {
+        jobId,
+        newMF: newMF.length,
+        newGold: newGold.length,
+        newStocks: newStocks.length,
+        newCrypto: newCrypto.length,
+        skipped: skippedMF + skippedGold + skippedStocks + skippedCrypto,
+        errorCount: errors.length,
+        errors,
+      },
+      '[Sync] Sync complete'
+    );
 
     await db.collection('syncJobs').updateOne(
       { _id: new ObjectId(jobId) },

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import config from '../config';
+import logger from '../utils/logger';
 
 type ParserType = 'cdsl_cas' | 'safe_gold' | 'epf_passbook';
 
@@ -51,12 +52,24 @@ export async function submitPdfJob(
     passwords,
   }));
 
-  const res = await axios.post<{ job_id: string }>(`${base}/jobs`, {
-    parser_type: parserType,
-    pdfs,
-  } satisfies JobPayload);
+  const totalSizeKb = Math.round(pdfs.reduce((s, p) => s + p.data.length, 0) / 1024);
+  logger.info(
+    { parserType, pdfCount: buffers.length, payloadSizeKb: totalSizeKb, url: `${base}/jobs` },
+    '[PdfClient] Submitting job'
+  );
 
-  return res.data.job_id;
+  try {
+    const res = await axios.post<{ job_id: string }>(`${base}/jobs`, {
+      parser_type: parserType,
+      pdfs,
+    } satisfies JobPayload);
+    logger.info({ parserType, jobId: res.data.job_id }, '[PdfClient] Job submitted successfully');
+    return res.data.job_id;
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    logger.error({ err, parserType, payloadSizeKb: totalSizeKb, status }, '[PdfClient] Job submission failed');
+    throw err;
+  }
 }
 
 /**
@@ -70,16 +83,33 @@ export async function waitForPdfJob(
   const base = config.PDF_PARSING_SERVICE_URL!;
   const deadline = Date.now() + timeoutMs;
 
-  while (Date.now() < deadline) {
-    const res = await axios.get<RustJobStatus>(`${base}/jobs/${jobId}`);
-    const { status, result, error } = res.data;
+  logger.info({ jobId }, '[PdfClient] Waiting for job result');
 
-    if (status === 'done') return result ?? null;
-    if (status === 'failed') throw new Error(`PDF parsing job failed: ${error ?? 'unknown'}`);
+  while (Date.now() < deadline) {
+    try {
+      const res = await axios.get<RustJobStatus>(`${base}/jobs/${jobId}`);
+      const { status, result, error } = res.data;
+
+      if (status === 'done') {
+        logger.info({ jobId, transactionCount: result?.transactions?.length ?? 0 }, '[PdfClient] Job done');
+        return result ?? null;
+      }
+      if (status === 'failed') {
+        logger.error({ jobId, error }, '[PdfClient] Job failed');
+        throw new Error(`PDF parsing job failed: ${error ?? 'unknown'}`);
+      }
+
+      logger.info({ jobId, status }, '[PdfClient] Job still processing, polling again');
+    } catch (err) {
+      if ((err as Error).message.startsWith('PDF parsing job')) throw err;
+      logger.error({ err, jobId }, '[PdfClient] Error polling job status');
+      throw err;
+    }
 
     await sleep(1500);
   }
 
+  logger.error({ jobId, timeoutMs }, '[PdfClient] Job timed out');
   throw new Error(`PDF parsing job timed out after ${timeoutMs / 1000}s`);
 }
 

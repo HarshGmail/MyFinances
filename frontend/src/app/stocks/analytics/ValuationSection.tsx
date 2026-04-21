@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+import { Info } from 'lucide-react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StockFinancials } from '@/api/dataInterface';
+import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
+import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';
 
 interface Props {
   analyticsData: Record<string, StockFinancials>;
@@ -36,30 +40,45 @@ function bucket(
   return 'N/A';
 }
 
+type BucketEntry = { companies: { name: string; value: number | null }[] };
+
 function buildColumnOptions(
-  title: string,
   labels: string[],
-  counts: number[],
+  buckets: BucketEntry[],
   colors: string[],
   textColor: string
 ): Highcharts.Options {
   return {
-    chart: { type: 'column', backgroundColor: 'transparent', height: 280 },
-    title: { text: title, style: { color: textColor, fontSize: '14px', fontWeight: '600' } },
+    chart: { type: 'column', backgroundColor: 'transparent', height: 260 },
+    title: { text: undefined },
     xAxis: { categories: labels, labels: { style: { color: textColor } } },
     yAxis: {
       title: { text: 'Stocks', style: { color: textColor } },
       allowDecimals: false,
       labels: { style: { color: textColor } },
     },
-    tooltip: { pointFormat: '<b>{point.y} stock(s)</b>' },
+    tooltip: {
+      useHTML: true,
+      formatter: function (this: any) {
+        const companies = (this.point?.custom as BucketEntry | undefined)?.companies ?? [];
+        if (!companies.length) return `<b>${this.x}</b><br/>No stocks`;
+        const rows = companies
+          .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity))
+          .map(
+            (c) =>
+              `<tr><td style="padding-right:8px;color:${textColor}">${c.name}</td><td style="text-align:right;color:#94a3b8">${c.value != null ? c.value.toFixed(2) : 'N/A'}</td></tr>`
+          )
+          .join('');
+        return `<span style="color:${textColor}"><b>${this.x}</b> — ${companies.length} stock(s)</span><br/><table style="margin-top:4px;border-spacing:0">${rows}</table>`;
+      },
+    },
     legend: { enabled: false },
     credits: { enabled: false },
     series: [
       {
         type: 'column',
         name: 'Stocks',
-        data: counts.map((c, i) => ({ y: c, color: colors[i] })),
+        data: buckets.map((b, i) => ({ y: b.companies.length, color: colors[i], custom: b })),
         borderRadius: 4,
       },
     ],
@@ -68,28 +87,28 @@ function buildColumnOptions(
 }
 
 export function ValuationSection({ analyticsData, theme }: Props) {
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const textColor = theme === 'dark' ? '#fff' : '#18181b';
-  const entries = Object.values(analyticsData);
 
-  const peBucketMap: Record<string, number> = {
-    'Value (<15)': 0,
-    'Fair (15–25)': 0,
-    'Moderate (25–35)': 0,
-    'Expensive (>35)': 0,
-    'N/A': 0,
+  const peBucketMap: Record<string, BucketEntry> = {
+    'Value (<15)': { companies: [] },
+    'Fair (15–25)': { companies: [] },
+    'Moderate (25–35)': { companies: [] },
+    'Expensive (>35)': { companies: [] },
+    'N/A': { companies: [] },
   };
-  const pbBucketMap: Record<string, number> = {
-    'Below Book (<1)': 0,
-    'Reasonable (1–3)': 0,
-    'Premium (>3)': 0,
-    'N/A': 0,
+  const pbBucketMap: Record<string, BucketEntry> = {
+    'Below Book (<1)': { companies: [] },
+    'Reasonable (1–3)': { companies: [] },
+    'Premium (>3)': { companies: [] },
+    'N/A': { companies: [] },
   };
 
-  for (const f of entries) {
+  for (const [sym, f] of Object.entries(analyticsData)) {
     const pe = f.summaryDetail?.trailingPE;
     const pb = f.defaultKeyStatistics?.priceToBook;
-    peBucketMap[bucket(pe, PE_BUCKETS)]++;
-    pbBucketMap[bucket(pb, PB_BUCKETS)]++;
+    peBucketMap[bucket(pe, PE_BUCKETS)].companies.push({ name: sym, value: pe ?? null });
+    pbBucketMap[bucket(pb, PB_BUCKETS)].companies.push({ name: sym, value: pb ?? null });
   }
 
   const peColors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#6b7280'];
@@ -98,35 +117,55 @@ export function ValuationSection({ analyticsData, theme }: Props) {
   const peLabels = Object.keys(peBucketMap);
   const pbLabels = Object.keys(pbBucketMap);
 
-  const peOptions = buildColumnOptions(
-    'P/E Ratio Distribution',
-    peLabels,
-    Object.values(peBucketMap),
-    peColors,
-    textColor
-  );
-  const pbOptions = buildColumnOptions(
-    'P/B Ratio Distribution',
-    pbLabels,
-    Object.values(pbBucketMap),
-    pbColors,
-    textColor
-  );
+  const peOptions = buildColumnOptions(peLabels, Object.values(peBucketMap), peColors, textColor);
+  const pbOptions = buildColumnOptions(pbLabels, Object.values(pbBucketMap), pbColors, textColor);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Valuation Analysis</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          How your holdings are priced relative to earnings and book value
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <HighchartsReact highcharts={Highcharts} options={peOptions} />
-          <HighchartsReact highcharts={Highcharts} options={pbOptions} />
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Valuation Analysis</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            How your holdings are priced relative to earnings and book value
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm font-semibold">P/E Ratio Distribution</span>
+                <button
+                  onClick={() => setSelectedMetric('Trailing P/E')}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <HighchartsReact highcharts={Highcharts} options={peOptions} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm font-semibold">P/B Ratio Distribution</span>
+                <button
+                  onClick={() => setSelectedMetric('Price / Book')}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <HighchartsReact highcharts={Highcharts} options={pbOptions} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <MetricEducationDrawer
+        isOpen={selectedMetric !== null}
+        metricLabel={selectedMetric ?? ''}
+        onClose={() => setSelectedMetric(null)}
+        realData={null}
+        definitions={ANALYTICS_METRIC_DEFINITIONS}
+      />
+    </>
   );
 }
