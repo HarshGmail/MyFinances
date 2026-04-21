@@ -38,6 +38,62 @@ export function warmupPdfService(): void {
 }
 
 /**
+ * Uploads a single PDF binary to the Rust service's /files endpoint.
+ * Returns the file_id to reference in submitPdfJobByIds.
+ * Use this instead of submitPdfJob when handling large batches (24+ PDFs).
+ */
+export async function uploadPdf(buffer: Buffer, passwords: string[]): Promise<string> {
+  const base = config.PDF_PARSING_SERVICE_URL!;
+  const sizeKb = Math.round(buffer.length / 1024);
+
+  logger.info({ sizeKb }, '[PdfClient] Uploading PDF');
+
+  try {
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([Uint8Array.from(buffer)], { type: 'application/pdf' }),
+      'document.pdf'
+    );
+    form.append('passwords', JSON.stringify(passwords));
+
+    const res = await axios.post<{ file_id: string }>(`${base}/files`, form);
+    logger.info({ fileId: res.data.file_id, sizeKb }, '[PdfClient] PDF uploaded');
+    return res.data.file_id;
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    logger.error({ err, sizeKb, status }, '[PdfClient] PDF upload failed');
+    throw err;
+  }
+}
+
+/**
+ * Submits a parse job referencing pre-uploaded file IDs.
+ * Returns the job ID to poll with `waitForPdfJob`.
+ */
+export async function submitPdfJobByIds(
+  parserType: ParserType,
+  fileIds: string[]
+): Promise<string> {
+  const base = config.PDF_PARSING_SERVICE_URL!;
+
+  logger.info({ parserType, fileCount: fileIds.length }, '[PdfClient] Submitting job by file IDs');
+
+  try {
+    const res = await axios.post<{ job_id: string }>(`${base}/jobs`, {
+      parser_type: parserType,
+      file_ids: fileIds,
+    });
+    logger.info({ parserType, jobId: res.data.job_id }, '[PdfClient] Job submitted by IDs');
+    return res.data.job_id;
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    logger.error({ err, parserType, status }, '[PdfClient] Job submission by IDs failed');
+    throw err;
+  }
+}
+
+/**
  * Submits a batch of PDFs to the Rust parsing service.
  * Returns the job ID to poll with `waitForPdfJob`.
  */
@@ -67,7 +123,10 @@ export async function submitPdfJob(
     return res.data.job_id;
   } catch (err) {
     const status = (err as { response?: { status?: number } })?.response?.status;
-    logger.error({ err, parserType, payloadSizeKb: totalSizeKb, status }, '[PdfClient] Job submission failed');
+    logger.error(
+      { err, parserType, payloadSizeKb: totalSizeKb, status },
+      '[PdfClient] Job submission failed'
+    );
     throw err;
   }
 }
@@ -91,7 +150,10 @@ export async function waitForPdfJob(
       const { status, result, error } = res.data;
 
       if (status === 'done') {
-        logger.info({ jobId, transactionCount: result?.transactions?.length ?? 0 }, '[PdfClient] Job done');
+        logger.info(
+          { jobId, transactionCount: result?.transactions?.length ?? 0 },
+          '[PdfClient] Job done'
+        );
         return result ?? null;
       }
       if (status === 'failed') {

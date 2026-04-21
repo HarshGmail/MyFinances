@@ -11,6 +11,22 @@ pub struct PdfInput {
     pub passwords: Vec<String>,
 }
 
+/// PDF bytes already decoded from base64 (or received via multipart upload),
+/// ready to be passed directly to the parser without re-encoding.
+#[derive(Debug, Clone)]
+pub struct ResolvedPdf {
+    pub bytes: Vec<u8>,
+    pub passwords: Vec<String>,
+}
+
+/// Holds a pre-uploaded PDF binary waiting for a job submission that
+/// references it by ID. Stored in AppState.files.
+#[derive(Debug, Clone)]
+pub struct StoredFile {
+    pub bytes: Vec<u8>,
+    pub passwords: Vec<String>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum ParserType {
@@ -22,7 +38,12 @@ pub enum ParserType {
 #[derive(Debug, Deserialize)]
 pub struct JobRequest {
     pub parser_type: ParserType,
+    /// PDFs as inline base64 blobs (legacy / small payloads).
+    #[serde(default)]
     pub pdfs: Vec<PdfInput>,
+    /// Pre-uploaded file IDs (upload-then-parse flow for large payloads).
+    #[serde(default)]
+    pub file_ids: Vec<String>,
 }
 
 // ── Outbound ─────────────────────────────────────────────────────────────────
@@ -56,6 +77,7 @@ pub struct StatusResponse {
 /// Mutual fund transaction parsed from a CDSL eCAS PDF.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MfTransaction {
+    /// ISO date string: YYYY-MM-DD
     pub date: String,
     pub fund_name: String,
     /// "credit" = purchase / switch-in, "debit" = redemption / switch-out.
@@ -69,11 +91,14 @@ pub struct MfTransaction {
 /// Gold transaction parsed from a SafeGold PDF.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GoldTransaction {
+    /// ISO date string: YYYY-MM-DD
     pub date: String,
     /// "credit" = purchased, "debit" = sold.
     pub transaction_type: String,
     pub grams: f64,
     pub amount: f64,
+    pub gold_price: f64,
+    pub tax: f64,
 }
 
 /// EPF passbook transaction.

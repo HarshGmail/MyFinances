@@ -29,6 +29,10 @@
     "prettier:backend": "cd backend && npm run prettier:fix",
     "prettier:mcp": "cd mcp-server && npm run prettier:fix",
     "prettier:all": "npm run prettier:frontend && npm run prettier:backend && npm run prettier:mcp",
+    "fmt:rust": "cargo fmt --manifest-path pdf-parsing/Cargo.toml",
+    "fmt:rust:check": "cargo fmt --manifest-path pdf-parsing/Cargo.toml -- --check",
+    "fmt": "npm run prettier:all && npm run fmt:rust",
+    "fmt:check": "npm run prettier:check && npm run fmt:rust:check",
     "deploy:check": "node scripts/deploy-check.js",
     "deploy": "node scripts/deploy.js"
   },
