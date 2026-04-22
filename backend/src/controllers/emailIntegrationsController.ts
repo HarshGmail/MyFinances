@@ -9,23 +9,38 @@ import {
   fetchPdfAttachments,
   fetchEmailBodies,
 } from '../services/gmailService';
-import { extractTextFromPdf } from '../services/pdfParser';
 import { parseCdslMFTransactions } from '../services/cdslParser';
-import { parseCdslStockHoldings, ParsedStockHolding } from '../services/cdslStocksParser';
+import { ParsedStockHolding } from '../services/cdslStocksParser';
 import { parseSafeGoldTransactions } from '../services/safegoldParser';
-import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
 import {
   isPdfServiceAvailable,
-  submitPdfJob,
-  submitPdfJobByIds,
   uploadPdf,
+  submitPdfJobByIds,
   waitForPdfJob,
 } from '../services/pdfParsingClient';
 import { decrypt } from '../utils/encryption';
 import config from '../config';
 import logger from '../utils/logger';
+
+interface RustMfTx {
+  date: string;
+  fund_name: string;
+  transaction_type: string;
+  units: number;
+  nav: number;
+  amount: number;
+}
+
+interface RustGoldTx {
+  date: string;
+  transaction_type: string;
+  grams: number;
+  amount: number;
+  gold_price: number;
+  tax: number;
+}
 
 // ─── Wake PDF Parser ──────────────────────────────────────────────────────────
 // Fires a health-check at the Rust service in the background so its cold start
@@ -301,6 +316,37 @@ export async function getSyncJobStatus(req: Request, res: Response) {
   }
 }
 
+// ─── Cancel Sync ─────────────────────────────────────────────────────────────
+
+export async function cancelSync(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { jobId } = req.params;
+    const db = database.getDb();
+    const result = await db
+      .collection('syncJobs')
+      .updateOne(
+        { _id: new ObjectId(jobId), userId: new ObjectId(user.userId), status: 'processing' },
+        { $set: { status: 'cancelled', completedAt: new Date() } }
+      );
+
+    if (result.matchedCount === 0) {
+      res.status(404).json({ success: false, message: 'Job not found or already completed' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, 'Cancel sync error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 // ─── Background sync worker ───────────────────────────────────────────────────
 
 async function runSyncInBackground(
@@ -310,6 +356,7 @@ async function runSyncInBackground(
   integrations: Record<string, unknown>[],
   db: ReturnType<typeof database.getDb>
 ) {
+  const useRustService = isPdfServiceAvailable();
   const cdslPassword = derivesCdslPassword(userDoc.panNumber as string | undefined);
   const safegoldPassword = derivesSafeGoldPassword(
     userDoc.name as string,
@@ -321,13 +368,10 @@ async function runSyncInBackground(
   const allGoldTransactions: ReturnType<typeof parseSafeGoldTransactions> = [];
   const allStockHoldings: ParsedStockHolding[] = [];
   const allCryptoTrades: ParsedCoinDCXTrade[] = [];
-  const useRustService = isPdfServiceAvailable();
-
   logger.info(
     {
       jobId,
       accounts: integrations.length,
-      useRustService,
       hasPan: !!cdslPassword,
       hasPhone: !!safegoldPassword,
     },
@@ -336,6 +380,12 @@ async function runSyncInBackground(
 
   try {
     for (const integration of integrations) {
+      const jobDoc = await db.collection('syncJobs').findOne({ _id: new ObjectId(jobId) });
+      if (jobDoc?.status === 'cancelled') {
+        logger.info({ jobId }, '[Sync] Job cancelled by user, stopping early');
+        return;
+      }
+
       const afterDate: Date | undefined = (integration.lastSyncAt as Date | null) ?? undefined;
       const accountTag = integration.email as string;
       const cdslPasswords = cdslPassword ? [cdslPassword, ''] : [''];
@@ -345,7 +395,6 @@ async function runSyncInBackground(
         {
           account: accountTag,
           afterDate: afterDate?.toISOString() ?? 'full sync (no lastSyncAt)',
-          useRustService,
         },
         '[Sync] Processing account'
       );
@@ -364,23 +413,35 @@ async function runSyncInBackground(
         logger.info({ account: accountTag, count: cdslPdfs.length }, '[Sync] CDSL PDFs fetched');
 
         if (cdslPdfs.length > 0) {
-          // CDSL PDFs use AES-256 encryption which lopdf does not support.
-          // Always parse via Node.js (pdf-parse/pdfjs handles AES-256 correctly).
-          for (const pdf of cdslPdfs) {
+          if (useRustService) {
             try {
-              const text = await extractTextFromPdf(pdf, cdslPasswords);
-              const mfTxs = parseCdslMFTransactions(text);
-              const holdings = parseCdslStockHoldings(text);
-              allMFTransactions.push(...mfTxs);
-              allStockHoldings.push(...holdings);
-              logger.info(
-                { account: accountTag, mfCount: mfTxs.length, holdingsCount: holdings.length },
-                '[Sync] CDSL PDF parsed'
+              const fileIds = await Promise.all(
+                cdslPdfs.map((pdf) => uploadPdf(pdf, cdslPasswords))
               );
-            } catch (e) {
-              const msg = `[${accountTag}] CDSL PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
+              const rustJobId = await submitPdfJobByIds('cdsl_cas', fileIds);
+              const rustResult = await waitForPdfJob(rustJobId);
+              if (rustResult?.transactions) {
+                const mfTxs = (rustResult.transactions as RustMfTx[]).map((tx) => ({
+                  date: new Date(tx.date),
+                  fundName: tx.fund_name,
+                  type: tx.transaction_type as 'credit' | 'debit',
+                  numOfUnits: tx.units,
+                  fundPrice: tx.nav,
+                  amount: tx.amount,
+                }));
+                allMFTransactions.push(...(mfTxs as typeof allMFTransactions));
+                logger.info(
+                  { account: accountTag, count: mfTxs.length },
+                  '[Sync] CDSL parsed via Rust service'
+                );
+              }
+            } catch (rustErr) {
+              const msg = `[${accountTag}] CDSL Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
               errors.push(msg);
-              logger.error({ err: e, account: accountTag }, '[Sync] CDSL PDF parse error');
+              logger.error(
+                { err: rustErr, account: accountTag },
+                '[Sync] Rust service failed for CDSL'
+              );
             }
           }
         }
@@ -416,117 +477,32 @@ async function runSyncInBackground(
         if (sgPdfs.length > 0) {
           if (useRustService) {
             try {
-              logger.info(
-                { account: accountTag, pdfCount: sgPdfs.length },
-                '[Sync] Uploading SafeGold PDFs to Rust service'
-              );
-              const fileIds: string[] = [];
-              for (const pdfBuffer of sgPdfs) {
-                const fileId = await uploadPdf(pdfBuffer, sgPasswords);
-                fileIds.push(fileId);
-              }
-
+              const fileIds = await Promise.all(sgPdfs.map((pdf) => uploadPdf(pdf, sgPasswords)));
               const rustJobId = await submitPdfJobByIds('safe_gold', fileIds);
-              logger.info(
-                { account: accountTag, rustJobId },
-                '[Sync] Rust SafeGold job submitted, waiting...'
-              );
-              const result = await waitForPdfJob(rustJobId);
-              logger.info(
-                { account: accountTag, rustJobId, parserType: result?.parser_type },
-                '[Sync] Rust SafeGold job complete'
-              );
-
-              if (result?.parser_type === 'safe_gold') {
-                const rustTxs = result.transactions as Array<{
-                  date: string;
-                  transaction_type: string;
-                  grams: number;
-                  amount: number;
-                  gold_price: number;
-                  tax: number;
-                }>;
-
-                const mapped = rustTxs.map((tx) => ({
+              const rustResult = await waitForPdfJob(rustJobId);
+              if (rustResult?.transactions) {
+                const goldTxs = (rustResult.transactions as RustGoldTx[]).map((tx) => ({
                   date: new Date(tx.date),
+                  type: tx.transaction_type as 'credit' | 'debit',
                   quantity: tx.grams,
                   amount: tx.amount,
                   goldPrice: tx.gold_price,
                   tax: tx.tax,
-                  type: tx.transaction_type as 'credit' | 'debit',
                   platform: 'SafeGold' as const,
                 }));
-
-                if (mapped.length > 0) {
-                  allGoldTransactions.push(...mapped);
-                  logger.info(
-                    { account: accountTag, count: mapped.length },
-                    '[Sync] SafeGold Rust transactions mapped'
-                  );
-                } else {
-                  logger.warn(
-                    { account: accountTag },
-                    '[Sync] Rust SafeGold returned 0 transactions — falling back to Node.js parser'
-                  );
-                  for (const pdf of sgPdfs) {
-                    try {
-                      const text = await extractTextFromPdf(pdf, sgPasswords);
-                      const txs = parseSafeGoldTransactions(text);
-                      allGoldTransactions.push(...txs);
-                      logger.info(
-                        { account: accountTag, count: txs.length },
-                        '[Sync] SafeGold PDF parsed (Node.js fallback)'
-                      );
-                    } catch (e) {
-                      const msg = `[${accountTag}] SafeGold Node.js fallback parse error: ${e instanceof Error ? e.message : String(e)}`;
-                      errors.push(msg);
-                      logger.error(
-                        { err: e, account: accountTag },
-                        '[Sync] SafeGold Node.js fallback parse error'
-                      );
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              logger.warn(
-                { err: e, account: accountTag },
-                '[Sync] SafeGold Rust parse error — falling back to Node.js parser'
-              );
-              for (const pdf of sgPdfs) {
-                try {
-                  const text = await extractTextFromPdf(pdf, sgPasswords);
-                  const txs = parseSafeGoldTransactions(text);
-                  allGoldTransactions.push(...txs);
-                  logger.info(
-                    { account: accountTag, count: txs.length },
-                    '[Sync] SafeGold PDF parsed (Node.js fallback after Rust error)'
-                  );
-                } catch (fe) {
-                  const msg = `[${accountTag}] SafeGold Node.js fallback parse error: ${fe instanceof Error ? fe.message : String(fe)}`;
-                  errors.push(msg);
-                  logger.error(
-                    { err: fe, account: accountTag },
-                    '[Sync] SafeGold Node.js fallback parse error'
-                  );
-                }
-              }
-            }
-          } else {
-            for (const pdf of sgPdfs) {
-              try {
-                const text = await extractTextFromPdf(pdf, sgPasswords);
-                const txs = parseSafeGoldTransactions(text);
-                allGoldTransactions.push(...txs);
+                allGoldTransactions.push(...(goldTxs as typeof allGoldTransactions));
                 logger.info(
-                  { account: accountTag, count: txs.length },
-                  '[Sync] SafeGold statement PDF parsed'
+                  { account: accountTag, count: goldTxs.length },
+                  '[Sync] SafeGold parsed via Rust service'
                 );
-              } catch (e) {
-                const msg = `[${accountTag}] SafeGold PDF parse error: ${e instanceof Error ? e.message : String(e)}`;
-                errors.push(msg);
-                logger.error({ err: e, account: accountTag }, '[Sync] SafeGold PDF parse error');
               }
+            } catch (rustErr) {
+              const msg = `[${accountTag}] SafeGold statement Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
+              errors.push(msg);
+              logger.error(
+                { err: rustErr, account: accountTag },
+                '[Sync] Rust service failed for SafeGold statement'
+              );
             }
           }
         }
@@ -542,7 +518,7 @@ async function runSyncInBackground(
         );
       }
 
-      // ── SafeGold invoices (stays in Node.js — not encrypted, quick parse) ─
+      // ── SafeGold invoices (Rust service) ─────────────────────────────────
       try {
         logger.info(
           { account: accountTag, afterDate: afterDate?.toISOString() },
@@ -558,18 +534,41 @@ async function runSyncInBackground(
           '[Sync] SafeGold invoice PDFs fetched'
         );
 
-        for (const pdf of sgInvoicePdfs) {
-          try {
-            const text = await extractTextFromPdf(pdf, []);
-            const tx = parseSafeGoldInvoice(text);
-            if (tx) {
-              allGoldTransactions.push(tx);
-              logger.info({ account: accountTag, date: tx.date }, '[Sync] SafeGold invoice parsed');
+        if (sgInvoicePdfs.length > 0) {
+          if (useRustService) {
+            try {
+              const fileIds = await Promise.all(sgInvoicePdfs.map((pdf) => uploadPdf(pdf, [])));
+              const rustJobId = await submitPdfJobByIds('safe_gold_invoice', fileIds);
+              const rustResult = await waitForPdfJob(rustJobId);
+              if (rustResult?.transactions) {
+                const goldTxs = (rustResult.transactions as RustGoldTx[]).map((tx) => ({
+                  date: new Date(tx.date),
+                  type: tx.transaction_type as 'credit' | 'debit',
+                  quantity: tx.grams,
+                  amount: tx.amount,
+                  goldPrice: tx.gold_price,
+                  tax: tx.tax,
+                  platform: 'SafeGold' as const,
+                }));
+                allGoldTransactions.push(...(goldTxs as typeof allGoldTransactions));
+                logger.info(
+                  { account: accountTag, count: goldTxs.length },
+                  '[Sync] SafeGold invoices parsed via Rust service'
+                );
+              }
+            } catch (rustErr) {
+              const msg = `[${accountTag}] SafeGold invoice Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
+              errors.push(msg);
+              logger.error(
+                { err: rustErr, account: accountTag },
+                '[Sync] Rust service failed for SafeGold invoices'
+              );
             }
-          } catch (e) {
-            const msg = `[${accountTag}] SafeGold invoice parse error: ${e instanceof Error ? e.message : String(e)}`;
-            errors.push(msg);
-            logger.error({ err: e, account: accountTag }, '[Sync] SafeGold invoice parse error');
+          } else {
+            logger.warn(
+              { account: accountTag },
+              '[Sync] Rust PDF service not configured — SafeGold invoices skipped'
+            );
           }
         }
       } catch (e) {

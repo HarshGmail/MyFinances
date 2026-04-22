@@ -596,7 +596,7 @@ export interface StockTransaction {
 }
 
 export interface SyncJobStatus {
-  status: 'processing' | 'done' | 'failed';
+  status: 'processing' | 'done' | 'failed' | 'cancelled';
   result: EmailSyncPreview | null;
   error: string | null;
 }

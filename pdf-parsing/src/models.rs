@@ -32,6 +32,7 @@ pub struct StoredFile {
 pub enum ParserType {
     CdslCas,
     SafeGold,
+    SafeGoldInvoice,
     EpfPassbook,
 }
 
@@ -133,5 +134,6 @@ pub struct EpfTransaction {
 pub enum JobResult {
     CdslCas(Vec<MfTransaction>),
     SafeGold(Vec<GoldTransaction>),
+    SafeGoldInvoice(Vec<GoldTransaction>),
     EpfPassbook(Vec<EpfTransaction>),
 }

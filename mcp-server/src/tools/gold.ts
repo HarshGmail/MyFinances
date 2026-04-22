@@ -24,12 +24,11 @@ export function registerGoldTools(server: McpServer, client: BackendClient): voi
       inputSchema: z.object({
         type: z.enum(['credit', 'debit']).describe('"credit" = buy, "debit" = sell'),
         date: z.string().describe('Transaction date in ISO format e.g. "2025-03-20"'),
-        numOfGrams: z.number().positive().describe('Weight of gold in grams'),
-        pricePerGram: z
-          .number()
-          .positive()
-          .describe('Price per gram in INR at time of transaction'),
-        amount: z.number().positive().describe('Total transaction value in INR'),
+        quantity: z.number().positive().describe('Weight of gold in grams'),
+        goldPrice: z.number().positive().describe('Price per gram in INR at time of transaction'),
+        amount: z.number().nonnegative().describe('Total transaction value in INR'),
+        tax: z.number().nonnegative().describe('Tax amount in INR (use 0 if unknown)'),
+        platform: z.string().optional().describe('Platform used e.g. "SafeGold"'),
       }),
     },
     async (input) => {

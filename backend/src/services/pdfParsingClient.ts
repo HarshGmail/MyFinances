@@ -2,7 +2,7 @@ import axios from 'axios';
 import config from '../config';
 import logger from '../utils/logger';
 
-type ParserType = 'cdsl_cas' | 'safe_gold' | 'epf_passbook';
+type ParserType = 'cdsl_cas' | 'safe_gold' | 'safe_gold_invoice' | 'epf_passbook';
 
 interface PdfInput {
   data: string; // base64

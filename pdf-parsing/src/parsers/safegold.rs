@@ -1,5 +1,5 @@
+use log::{info, warn};
 use regex::Regex;
-use tracing::{info, warn};
 
 use crate::error::ParseError;
 use crate::models::GoldTransaction;

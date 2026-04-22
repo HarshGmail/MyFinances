@@ -26,8 +26,7 @@ export function useSyncJobStatusQuery(jobId: string | null) {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      // Stop polling once the job reaches a terminal state
-      return status === 'done' || status === 'failed' ? false : 5000;
+      return status === 'done' || status === 'failed' || status === 'cancelled' ? false : 5000;
     },
     staleTime: 0,
   });

@@ -1,6 +1,6 @@
+use log::{error, info};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
-use tracing::{error, info};
 
 use crate::models::{JobStatus, ParserType, ResolvedPdf};
 use crate::parsers;
@@ -19,7 +19,7 @@ pub async fn run(mut rx: Receiver<WorkerJob>, state: Arc<AppState>) {
     info!("worker started — waiting for jobs");
 
     while let Some(job) = rx.recv().await {
-        info!(job_id = %job.job_id, "starting job");
+        info!("starting job: {}", job.job_id);
         state.update_job(&job.job_id, JobStatus::Processing, None, None);
 
         let job_id = job.job_id.clone();
@@ -30,15 +30,15 @@ pub async fn run(mut rx: Receiver<WorkerJob>, state: Arc<AppState>) {
 
         match outcome {
             Ok(Ok(result)) => {
-                info!(job_id = %job_id, "job done");
+                info!("job done: {}", job_id);
                 state.update_job(&job_id, JobStatus::Done, Some(result), None);
             }
             Ok(Err(e)) => {
-                error!(job_id = %job_id, error = %e, "job failed");
+                error!("job failed {}: {}", job_id, e);
                 state.update_job(&job_id, JobStatus::Failed, None, Some(e.to_string()));
             }
             Err(e) => {
-                error!(job_id = %job_id, error = %e, "worker thread panicked");
+                error!("worker thread panicked {}: {}", job_id, e);
                 state.update_job(
                     &job_id,
                     JobStatus::Failed,

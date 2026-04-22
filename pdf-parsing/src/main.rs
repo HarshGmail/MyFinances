@@ -16,8 +16,6 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use tokio::sync::mpsc;
 use tower_http::cors::CorsLayer;
-use tower_http::trace::TraceLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
 use models::{JobRequest, JobResponse, ResolvedPdf, StoredFile};
@@ -68,7 +66,7 @@ async fn upload_file(
     let size_kb = bytes.len() / 1024;
     state.store_file(file_id.clone(), StoredFile { bytes, passwords });
 
-    tracing::info!(file_id = %file_id, size_kb = size_kb, "file uploaded");
+    log::info!("file uploaded: {} ({} KB)", file_id, size_kb);
 
     (
         StatusCode::OK,
@@ -166,19 +164,10 @@ async fn health() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    // Non-blocking writer offloads stdout I/O to a background thread so async
-    // tasks are never stalled waiting for the terminal/log sink to flush.
-    // The _guard must be held for the lifetime of main — dropping it flushes
-    // any buffered log lines before the process exits.
-    let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "pdf_parsing=debug,tower_http=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-        .init();
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("pdf_parsing=debug,info"),
+    )
+    .init();
 
     // Channel capacity of 100 — jobs queue up here if the worker is busy.
     let (tx, rx) = mpsc::channel::<WorkerJob>(100);
@@ -193,13 +182,12 @@ async fn main() {
         .route("/files", post(upload_file))
         .route("/jobs", post(submit_job))
         .route("/jobs/:job_id", get(get_job))
-        .layer(TraceLayer::new_for_http()) // logs every request + response + latency
         .layer(CorsLayer::permissive())
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{port}");
-    tracing::info!("pdf-parsing service listening on {addr}");
+    log::info!("pdf-parsing service listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

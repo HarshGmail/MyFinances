@@ -7,12 +7,16 @@ import {
   useEmailIntegrationStatusQuery,
   useSyncJobStatusQuery,
 } from '@/api/query';
-import { useEmailSyncMutation, useEmailImportMutation } from '@/api/mutations';
+import {
+  useEmailSyncMutation,
+  useEmailImportMutation,
+  useCancelSyncMutation,
+} from '@/api/mutations';
 import { apiRequest } from '@/api/configs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertTriangle, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmailSyncPreview as EmailSyncPreviewType } from '@/api/dataInterface';
 import LinkedAccountsList from './LinkedAccountsList';
@@ -56,9 +60,16 @@ export default function EmailIntegration({
   const { data: status, isLoading, refetch } = useEmailIntegrationStatusQuery();
   const { mutateAsync: sync, isPending: isSyncSubmitting } = useEmailSyncMutation();
   const { mutateAsync: importTxns, isPending: isImporting } = useEmailImportMutation();
+  const { mutateAsync: cancelSyncJob, isPending: isCancelling } = useCancelSyncMutation();
 
   const [preview, setPreview] = useState<EmailSyncPreviewType | null>(null);
   const [syncJobId, setSyncJobId] = useState<string | null>(null);
+
+  // Restore job ID from localStorage so polling survives a page refresh
+  useEffect(() => {
+    const stored = localStorage.getItem('emailSync_activeJobId');
+    if (stored) setSyncJobId(stored);
+  }, []);
 
   // Pre-warm the Rust PDF parsing service on mount — fire and forget
   useEffect(() => {
@@ -75,6 +86,7 @@ export default function EmailIntegration({
       const result = syncJobData.result;
       setPreview(result);
       setSyncJobId(null);
+      localStorage.removeItem('emailSync_activeJobId');
       const total =
         result.mutualFunds.length +
         result.gold.length +
@@ -89,7 +101,12 @@ export default function EmailIntegration({
       }
     } else if (syncJobData.status === 'failed') {
       setSyncJobId(null);
+      localStorage.removeItem('emailSync_activeJobId');
       toast.error(syncJobData.error ?? 'Sync failed');
+    } else if (syncJobData.status === 'cancelled') {
+      setSyncJobId(null);
+      localStorage.removeItem('emailSync_activeJobId');
+      toast.info('Sync stopped');
     }
   }, [syncJobData]);
 
@@ -112,10 +129,23 @@ export default function EmailIntegration({
   const handleSync = async () => {
     try {
       const { jobId } = await sync();
+      localStorage.setItem('emailSync_activeJobId', jobId);
       setSyncJobId(jobId);
       toast.info('Sync started — checking for new emails…');
     } catch {
       toast.error('Sync failed');
+    }
+  };
+
+  const handleStop = async () => {
+    if (!syncJobId) return;
+    try {
+      await cancelSyncJob(syncJobId);
+      localStorage.removeItem('emailSync_activeJobId');
+      setSyncJobId(null);
+      toast.info('Sync stopped');
+    } catch {
+      toast.error('Failed to stop sync');
     }
   };
 
@@ -201,10 +231,24 @@ export default function EmailIntegration({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Sync Emails</CardTitle>
-                <Button onClick={handleSync} disabled={isSyncing || !canSync} className="gap-2">
-                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Syncing…' : 'Sync Now'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isSyncing && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleStop}
+                      disabled={isCancelling}
+                      className="gap-2"
+                    >
+                      <StopCircle className="h-4 w-4" />
+                      {isCancelling ? 'Stopping…' : 'Stop'}
+                    </Button>
+                  )}
+                  <Button onClick={handleSync} disabled={isSyncing || !canSync} className="gap-2">
+                    <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Syncing…' : 'Sync Now'}
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

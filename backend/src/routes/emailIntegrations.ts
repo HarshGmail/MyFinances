@@ -8,6 +8,7 @@ import {
   updateSettings,
   syncEmails,
   getSyncJobStatus,
+  cancelSync,
   importTransactions,
   wakePdfParser,
 } from '../controllers/emailIntegrationsController';
@@ -24,6 +25,7 @@ router.post('/reset-sync', authenticateToken, resetSync);
 router.put('/settings', authenticateToken, updateSettings);
 router.post('/sync', authenticateToken, syncEmails);
 router.get('/sync-status/:jobId', authenticateToken, getSyncJobStatus);
+router.post('/sync/:jobId/cancel', authenticateToken, cancelSync);
 router.post('/import', authenticateToken, importTransactions);
 
 export default router;

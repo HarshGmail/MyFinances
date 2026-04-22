@@ -80,6 +80,17 @@ export function useEmailDisconnectMutation() {
   });
 }
 
+async function cancelSync(jobId: string) {
+  return apiRequest({
+    endpoint: `/email-integration/sync/${jobId}/cancel`,
+    method: 'POST',
+  });
+}
+
+export function useCancelSyncMutation() {
+  return useMutation({ mutationFn: cancelSync });
+}
+
 async function updateEmailSettings(data: { email: string; safegoldSender: string }) {
   return apiRequest({ endpoint: '/email-integration/settings', method: 'PUT', body: data });
 }
