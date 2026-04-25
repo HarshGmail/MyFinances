@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './baseUrl';
 import { toast } from 'sonner';
+import { clearQueryCache } from '@/lib/queryPersister';
 
 interface ApiFetchOptions extends RequestInit {
   endpoint: string;
@@ -42,8 +43,10 @@ export async function apiRequest<T = any>({
     }
     // Handle 401 Unauthorized: remove user from localStorage and reload
     if (response.status === 401) {
-      localStorage.removeItem('user');
-      window.location.assign('/');
+      clearQueryCache().finally(() => {
+        localStorage.removeItem('user');
+        window.location.assign('/');
+      });
     }
     throw errorObj;
   }

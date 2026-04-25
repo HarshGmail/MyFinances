@@ -57,7 +57,9 @@ export function SignupForm() {
       },
       {
         onSuccess: (data) => {
-          setUser(data.data.name);
+          const user = { id: data.data.id, name: data.data.name, email: data.data.email };
+          setUser(user);
+          localStorage.setItem('user', JSON.stringify(user));
           toast.success('Signup successful! Logging in');
           router.push('/home');
         },

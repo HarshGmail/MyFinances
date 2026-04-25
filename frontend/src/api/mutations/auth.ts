@@ -70,6 +70,7 @@ export function useResetPasswordMutation() {
 interface DemoLoginResponse {
   success: boolean;
   data: {
+    id: string;
     email: string;
     name: string;
     isDemo: boolean;

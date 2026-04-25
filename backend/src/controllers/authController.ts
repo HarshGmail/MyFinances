@@ -71,6 +71,7 @@ export async function signup(req: Request, res: Response) {
       success: true,
       message: 'User created and logged in successfully',
       data: {
+        id: result.insertedId.toString(),
         email: userData.email,
         name: userData.name,
       },
@@ -141,6 +142,7 @@ export async function login(req: Request, res: Response) {
       success: true,
       message: 'Login successful',
       data: {
+        id: user._id.toString(),
         email: user.email,
         name: user.name,
       },
@@ -714,6 +716,7 @@ export async function demoLogin(req: Request, res: Response) {
       success: true,
       message: 'Demo login successful',
       data: {
+        id: demoUser._id.toString(),
         email: demoUser.email,
         name: demoUser.name,
         isDemo: true,

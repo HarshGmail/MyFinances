@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
+import { clearQueryCache } from '@/lib/queryPersister';
 
 async function logout() {
   return apiRequest({
@@ -12,7 +13,8 @@ export function useLogoutMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: logout,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await clearQueryCache();
       queryClient.clear();
     },
   });

@@ -96,7 +96,9 @@ export function useHomePortfolioData() {
 
   // ===== GOLD =====
   const endDate = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const fiveYearsAgo = new Date();
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  const startDate = fiveYearsAgo.toISOString().slice(0, 10);
   const { data: goldRatesData, isLoading: goldRatesLoading } = useSafeGoldRatesQuery({
     startDate,
     endDate,

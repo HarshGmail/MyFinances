@@ -40,7 +40,7 @@ export default function StocksPortfolioPage() {
 
   // All data comes from the single portfolio query — no dependent waterfall
   const processedPortfolioData = useMemo(
-    () => portfolioData?.portfolio ?? [],
+    () => (portfolioData?.portfolio ?? []).filter((s) => s.numOfShares > 0),
     [portfolioData?.portfolio]
   );
   const priceData = useMemo(() => portfolioData?.priceData ?? {}, [portfolioData?.priceData]);

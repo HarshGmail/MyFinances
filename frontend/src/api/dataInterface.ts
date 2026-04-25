@@ -630,6 +630,7 @@ export interface UpdateExpenseTransactionPayload {
 }
 
 export interface User {
+  id?: string;
   name: string | null;
   email: string | null;
   isDemo?: boolean;

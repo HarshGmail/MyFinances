@@ -96,9 +96,14 @@ export default function Auth() {
     demoLogin(undefined, {
       onSuccess: (data: {
         success: boolean;
-        data: { email: string; name: string; isDemo: boolean };
+        data: { id: string; email: string; name: string; isDemo: boolean };
       }) => {
-        const userData = { name: data.data.name, email: data.data.email, isDemo: data.data.isDemo };
+        const userData = {
+          id: data.data.id,
+          name: data.data.name,
+          email: data.data.email,
+          isDemo: data.data.isDemo,
+        };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
         toast.success('Demo loaded! Explore with sample data.');
