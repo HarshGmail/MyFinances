@@ -83,7 +83,11 @@ export default function IntegrationsPage() {
 
         <div className="flex-1 min-w-0">
           {selected === 'upi' && (
-            <UpiIntegration ingestToken={profile?.ingestToken} isLoadingToken={isLoading} />
+            <UpiIntegration
+              ingestToken={profile?.ingestToken}
+              isLoadingToken={isLoading}
+              ingestSenderEmail={profile?.ingestSenderEmail}
+            />
           )}
           {selected === 'mcp' && <McpIntegration ingestToken={profile?.ingestToken} />}
           {selected === 'email' && (

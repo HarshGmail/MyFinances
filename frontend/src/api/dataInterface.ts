@@ -658,6 +658,7 @@ export interface UserProfile {
   salaryHistory?: SalaryRecord[];
   paymentHistory?: MonthlyPayment[];
   ingestToken?: string;
+  ingestSenderEmail?: string | null;
   phone?: string;
   panNumber?: string; // masked, e.g. "ABCDE****F"
   session?: {

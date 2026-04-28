@@ -1,20 +1,45 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, Mail, MessageSquare, Clock, Loader2 } from 'lucide-react';
+import { Copy, Mail, MessageSquare, Clock, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useUpdateIngestSenderEmailMutation } from '@/api/mutations';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface UpiIntegrationProps {
   ingestToken?: string;
   isLoadingToken?: boolean;
+  ingestSenderEmail?: string | null;
 }
 
 export default function UpiIntegration({
   ingestToken,
   isLoadingToken = false,
+  ingestSenderEmail,
 }: UpiIntegrationProps) {
   const emailAddress = 'transactions-ingest@my-finances.site';
+  const [senderEmailInput, setSenderEmailInput] = useState('');
+  const queryClient = useQueryClient();
+  const { mutate: saveSenderEmail, isPending: isSaving } = useUpdateIngestSenderEmailMutation();
+
+  useEffect(() => {
+    setSenderEmailInput(ingestSenderEmail ?? '');
+  }, [ingestSenderEmail]);
+
+  function handleSaveSenderEmail() {
+    const trimmed = senderEmailInput.trim();
+    saveSenderEmail(trimmed || null, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+        toast.success(trimmed ? 'Sender email saved' : 'Sender email cleared');
+      },
+      onError: () => toast.error('Failed to save sender email'),
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -234,6 +259,44 @@ UPI/P2M/123456/Amazon - Rs.500 debit from HDFC Bank`}
               <li>Transactions sync when you open the Expense Tracker tab</li>
             </ul>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Sender Email Failsafe */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Sender Email Failsafe
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Register the email address you send from. If the ingest token is missing from an email,
+            we&apos;ll match it to your account using this address as a fallback.
+          </p>
+          <div className="flex gap-2 items-center">
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={senderEmailInput}
+              onChange={(e) => setSenderEmailInput(e.target.value)}
+              className="flex-1 text-sm"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveSenderEmail}
+              disabled={isSaving || senderEmailInput.trim() === (ingestSenderEmail ?? '')}
+            >
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+          {ingestSenderEmail && (
+            <p className="text-xs text-green-600 dark:text-green-400">
+              ✓ Failsafe active — emails from <strong>{ingestSenderEmail}</strong> will be matched
+              to your account
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

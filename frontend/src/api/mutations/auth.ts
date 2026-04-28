@@ -89,3 +89,19 @@ export function useDemoLoginMutation() {
     mutationFn: demoLogin,
   });
 }
+
+// Update Ingest Sender Email
+
+async function updateIngestSenderEmail(ingestSenderEmail: string | null) {
+  return apiRequest<{ success: boolean; data: { ingestSenderEmail: string | null } }>({
+    endpoint: '/auth/ingest-sender-email',
+    method: 'PUT',
+    body: { ingestSenderEmail },
+  });
+}
+
+export function useUpdateIngestSenderEmailMutation() {
+  return useMutation({
+    mutationFn: updateIngestSenderEmail,
+  });
+}

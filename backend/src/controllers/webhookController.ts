@@ -98,23 +98,24 @@ export async function handleResendEmailWebhook(req: Request, res: Response) {
     const emailBody = text || html || '';
     const ingestToken = extractTokenFromEmailBody(emailBody);
 
-    if (!ingestToken) {
-      logger.warn({ emailId: id, from: from.email }, 'No ingest token found in email body');
-      res
-        .status(200)
-        .json({ success: true, message: 'Invalid email format: missing ingest token' });
-      return;
+    const db = database.getDb();
+    let user = null;
+
+    if (ingestToken) {
+      user = await db.collection('users').findOne({ ingestToken });
     }
 
-    // Find user by ingest token
-    const db = database.getDb();
-    const user = await db.collection('users').findOne({
-      ingestToken,
-    });
+    // Fallback: match by registered sender email if token lookup failed
+    if (!user && from.email) {
+      user = await db.collection('users').findOne({ ingestSenderEmail: from.email });
+      if (user) {
+        logger.info({ emailId: id, from: from.email }, 'Matched user via ingestSenderEmail fallback');
+      }
+    }
 
     if (!user) {
-      logger.warn({ ingestToken }, 'No user found for this ingest token');
-      res.status(200).json({ success: true, message: 'Invalid ingest token' });
+      logger.warn({ emailId: id, from: from.email }, 'No user found for ingest token or sender email');
+      res.status(200).json({ success: true, message: 'Unrecognized sender or invalid token' });
       return;
     }
 

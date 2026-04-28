@@ -243,6 +243,7 @@ export async function userProfile(req: Request, res: Response) {
         salaryHistory: user.salaryHistory ?? [],
         paymentHistory: user.paymentHistory ?? [],
         ingestToken,
+        ingestSenderEmail: user.ingestSenderEmail ?? null,
         session: {
           loginTime: userPayload.iat ? new Date(userPayload.iat * 1000) : null,
           expiry: userPayload.exp ? new Date(userPayload.exp * 1000) : null,
@@ -470,6 +471,35 @@ export async function ingestTokenExchange(req: Request, res: Response) {
     res.json({ success: true, token });
   } catch (err) {
     logger.error({ err }, 'Ingest token exchange error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function updateIngestSenderEmail(req: Request, res: Response) {
+  try {
+    const userPayload = getUserFromRequest(req);
+    if (!userPayload) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { ingestSenderEmail } = req.body;
+    if (ingestSenderEmail !== null && ingestSenderEmail !== undefined) {
+      if (typeof ingestSenderEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ingestSenderEmail)) {
+        res.status(400).json({ success: false, message: 'Invalid email address' });
+        return;
+      }
+    }
+
+    const db = database.getDb();
+    await db.collection('users').updateOne(
+      { _id: new ObjectId(userPayload.userId) },
+      { $set: { ingestSenderEmail: ingestSenderEmail ?? null } }
+    );
+
+    res.status(200).json({ success: true, data: { ingestSenderEmail: ingestSenderEmail ?? null } });
+  } catch (err) {
+    logger.error({ err }, 'Update ingest sender email error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

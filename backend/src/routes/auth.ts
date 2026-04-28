@@ -7,6 +7,7 @@ import {
   updateUserProfile,
   regenerateIngestToken,
   ingestTokenExchange,
+  updateIngestSenderEmail,
   changePassword,
   forgotPassword,
   resetPassword,
@@ -24,6 +25,7 @@ router.get('/profile', authenticateToken, userProfile);
 router.put('/profile', authenticateToken, updateUserProfile);
 router.post('/ingest-token/regenerate', authenticateToken, regenerateIngestToken);
 router.post('/ingest-token/exchange', ingestTokenExchange);
+router.put('/ingest-sender-email', authenticateToken, updateIngestSenderEmail);
 router.post('/change-password', authenticateToken, changePassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
