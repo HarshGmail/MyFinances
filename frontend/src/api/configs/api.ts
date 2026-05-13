@@ -5,6 +5,7 @@ import { clearQueryCache } from '@/lib/queryPersister';
 interface ApiFetchOptions extends RequestInit {
   endpoint: string;
   body?: any;
+  skipAuthRedirect?: boolean;
 }
 
 export async function apiRequest<T = any>({
@@ -12,6 +13,7 @@ export async function apiRequest<T = any>({
   method = 'GET',
   headers = {},
   body,
+  skipAuthRedirect = false,
   ...rest
 }: ApiFetchOptions): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -42,7 +44,7 @@ export async function apiRequest<T = any>({
       toast.error('Demo data is read-only');
     }
     // Handle 401 Unauthorized: remove user from localStorage and reload
-    if (response.status === 401) {
+    if (response.status === 401 && !skipAuthRedirect) {
       clearQueryCache().finally(() => {
         localStorage.removeItem('user');
         window.location.assign('/');

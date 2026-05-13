@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { compactJSON, toCSV } from '../compact.js';
 
 export function registerSavingsTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -12,7 +13,7 @@ export function registerSavingsTools(server: McpServer, client: BackendClient): 
     },
     async () => {
       const data = await client.get('/epf/getInfo');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: compactJSON(data) }] };
     }
   );
 
@@ -25,7 +26,7 @@ export function registerSavingsTools(server: McpServer, client: BackendClient): 
     },
     async () => {
       const data = await client.get('/fixed-deposit/getDeposits');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 
@@ -38,7 +39,7 @@ export function registerSavingsTools(server: McpServer, client: BackendClient): 
     },
     async () => {
       const data = await client.get('/recurring-deposit/getDeposits');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 }

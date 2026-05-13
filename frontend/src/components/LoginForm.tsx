@@ -16,10 +16,10 @@ import {
 } from '@/components/ui/form';
 import { PasswordInput } from './ui/password-input';
 import { useLoginMutation } from '@/api/mutations';
-import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { User } from '@/api/dataInterface';
+import { AlertCircle } from 'lucide-react';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -39,15 +39,18 @@ export function LoginForm() {
   const { mutate, isPending } = useLoginMutation();
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    form.clearErrors('root');
     mutate(values, {
       onSuccess: (user: User) => {
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
-        toast.success('Login successful!');
         router.push('/home');
       },
       onError: (error: unknown) => {
-        toast.error('Login failed.', { description: (error as Error)?.message });
+        const msg = (error as { message?: string })?.message;
+        form.setError('root', {
+          message: msg || 'Something went wrong. Please try again.',
+        });
       },
     });
   }
@@ -92,6 +95,13 @@ export function LoginForm() {
         <Button type="submit" className="w-full" disabled={isPending}>
           {isPending ? 'Logging in...' : 'Login'}
         </Button>
+
+        {form.formState.errors.root && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {form.formState.errors.root.message}
+          </div>
+        )}
       </form>
     </Form>
   );

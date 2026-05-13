@@ -11,6 +11,17 @@ export interface MutualFundTransactionPayload {
   platform?: string;
 }
 
+async function deleteMutualFundTransaction(id: string) {
+  return apiRequest({ endpoint: `/mutual-funds/transaction/${id}`, method: 'DELETE' });
+}
+export function useDeleteMutualFundTransactionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMutualFundTransaction,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutual-fund-transactions'] }),
+  });
+}
+
 async function addMutualFundTransaction(data: MutualFundTransactionPayload) {
   return apiRequest({
     endpoint: '/mutual-funds/transaction',

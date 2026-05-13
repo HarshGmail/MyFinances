@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { compactJSON } from '../compact.js';
 
 export function registerCapitalGainsTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -44,9 +45,9 @@ export function registerCapitalGainsTools(server: McpServer, client: BackendClie
             byFY: { [fy]: data.summary.byFY[fy] ?? null },
           },
         };
-        return { content: [{ type: 'text' as const, text: JSON.stringify(filtered, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: compactJSON(filtered) }] };
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: compactJSON(data) }] };
     }
   );
 }

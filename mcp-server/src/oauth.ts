@@ -229,7 +229,7 @@ router.post('/oauth/token', (req: Request, res: Response) => {
   res.json({
     access_token: pending.ingestToken,
     token_type: 'Bearer', // capital B required by RFC 6750
-    expires_in: 86400,
+    expires_in: 2592000,
     resource: tokenResource,
   });
 });

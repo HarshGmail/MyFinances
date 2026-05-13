@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { compactJSON } from '../compact.js';
 
 export function registerGoalTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -12,7 +13,7 @@ export function registerGoalTools(server: McpServer, client: BackendClient): voi
     },
     async () => {
       const data = await client.get('/goals');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: compactJSON(data) }] };
     }
   );
 }

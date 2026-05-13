@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { okResponse, toCSV } from '../compact.js';
 
 export function registerExpenseTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -18,7 +19,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       const data = await client.get('/expense-transactions', params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 
@@ -38,12 +39,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
     async (input) => {
       const result = await client.post('/expense-transactions', input);
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Expense logged successfully.\n${JSON.stringify(result, null, 2)}`,
-          },
-        ],
+        content: [{ type: 'text' as const, text: okResponse(result) }],
       };
     }
   );
@@ -57,7 +53,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
     },
     async () => {
       const data = await client.get('/expenses');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 }

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "lint:strict": "eslint . --max-warnings 0",
     "sort:interfaces": "node scripts/sort-ts-interfaces.js",
     "prettier:check": "prettier --check .",

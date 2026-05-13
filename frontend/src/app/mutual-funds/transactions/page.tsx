@@ -1,11 +1,13 @@
 'use client';
 
 import { useMutualFundTransactionsQuery } from '@/api/query';
+import { useDeleteMutualFundTransactionMutation } from '@/api/mutations/mutual-funds';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 
 interface MutualFundTransaction {
   _id?: string;
@@ -21,6 +23,7 @@ interface MutualFundTransaction {
 export default function MutualFundsTransactionsPage() {
   const { data: mutualFundTransactions, isLoading, error } = useMutualFundTransactionsQuery();
   const router = useRouter();
+  const { mutate: deleteMfTx } = useDeleteMutualFundTransactionMutation();
 
   // Table data state
   const [tableRows, setTableRows] = useState<Row[]>([]);
@@ -40,6 +43,7 @@ export default function MutualFundsTransactionsPage() {
     if (!mutualFundTransactions) return [];
 
     return mutualFundTransactions.map((tx: MutualFundTransaction) => ({
+      _id: tx._id,
       fundName: tx.fundName || '-',
       date: tx.date || '-',
       numOfUnits: tx.numOfUnits ?? '-',
@@ -49,10 +53,17 @@ export default function MutualFundsTransactionsPage() {
     }));
   }, [mutualFundTransactions]);
 
-  // Update table rows when raw data changes
-  useMemo(() => {
-    setTableRows(rawTableRows);
-  }, [rawTableRows]);
+  useMemo(() => setTableRows(rawTableRows), [rawTableRows]);
+
+  const handleDelete = (id?: string) => {
+    if (!id) return;
+    if (!confirm('Delete this transaction? This cannot be undone.')) return;
+    deleteMfTx(id, {
+      onSuccess: () => toast.success('MF transaction deleted'),
+      onError: (e: unknown) =>
+        toast.error('Delete failed', { description: (e as Error)?.message || 'Unknown error' }),
+    });
+  };
 
   return (
     <div className="p-4 h-full">
@@ -72,6 +83,17 @@ export default function MutualFundsTransactionsPage() {
             Add Transaction
           </Button>
         }
+        actionsRenderer={(row) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Delete transaction"
+            onClick={() => handleDelete(row._id)}
+            className="hover:bg-accent"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       />
     </div>
   );

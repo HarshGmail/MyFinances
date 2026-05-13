@@ -87,9 +87,28 @@ export async function processUpiEmailIngest(
     // Extract SMS content (remove token line)
     emailBody = extractSmsFromEmailBody(emailBody);
 
-    // Check if this is actually a UPI SMS (should contain debit keyword)
-    if (!/debit/i.test(emailBody)) {
-      logger.info({ email: emailData.from }, 'Skipped: not a debit transaction');
+    // Distinguish debit (money out) from credit (money in). We only track debits as expenses.
+    // Broader keyword list — many banks don't use the literal word "debit".
+    const debitPattern =
+      /\b(debit(?:ed)?|deducted|paid|sent|spent|transferred|withdrawn|paying|purchase)\b/i;
+    const creditPattern = /\b(credit(?:ed)?|received|deposited|refund(?:ed)?)\b/i;
+
+    const isDebit = debitPattern.test(emailBody);
+    const isCredit = creditPattern.test(emailBody);
+
+    if (isCredit && !isDebit) {
+      logger.info(
+        { email: emailData.from, bodyPreview: emailBody.slice(0, 200) },
+        'Skipped: looks like a credit/refund, not a debit'
+      );
+      return { success: false, message: 'Not a debit transaction' };
+    }
+
+    if (!isDebit) {
+      logger.info(
+        { email: emailData.from, bodyPreview: emailBody.slice(0, 200) },
+        'Skipped: no debit keyword found'
+      );
       return { success: false, message: 'Not a debit transaction' };
     }
 
@@ -97,7 +116,10 @@ export async function processUpiEmailIngest(
     const { amount, merchant } = parseUpiSms(emailBody);
 
     if (!amount || amount <= 0) {
-      logger.warn({ email: emailData.from, emailBody }, 'Could not parse amount from email');
+      logger.warn(
+        { email: emailData.from, bodyPreview: emailBody.slice(0, 300) },
+        'Could not parse amount from email'
+      );
       return { success: false, message: 'Could not parse amount from email' };
     }
 

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { okResponse, toCSV } from '../compact.js';
 
 export function registerGoldTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -12,7 +13,7 @@ export function registerGoldTools(server: McpServer, client: BackendClient): voi
     },
     async () => {
       const data = await client.get('/gold/transactions');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 
@@ -42,14 +43,7 @@ export function registerGoldTools(server: McpServer, client: BackendClient): voi
       const tax = input.tax ?? Math.round(((input.amount * 3) / 103) * 100) / 100;
       const platform = input.platform ?? 'SafeGold';
       const result = await client.post('/gold/transaction', { ...input, tax, platform });
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Gold transaction added successfully.\n${JSON.stringify(result, null, 2)}`,
-          },
-        ],
-      };
+      return { content: [{ type: 'text' as const, text: okResponse(result) }] };
     }
   );
 }

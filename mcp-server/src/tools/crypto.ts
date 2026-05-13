@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
+import { okResponse, toCSV } from '../compact.js';
 
 export function registerCryptoTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -12,7 +13,7 @@ export function registerCryptoTools(server: McpServer, client: BackendClient): v
     },
     async () => {
       const data = await client.get('/crypto/transactions');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: toCSV(data) }] };
     }
   );
 
@@ -36,14 +37,7 @@ export function registerCryptoTools(server: McpServer, client: BackendClient): v
     },
     async (input) => {
       const result = await client.post('/crypto/transaction', input);
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Crypto transaction added successfully.\n${JSON.stringify(result, null, 2)}`,
-          },
-        ],
-      };
+      return { content: [{ type: 'text' as const, text: okResponse(result) }] };
     }
   );
 }

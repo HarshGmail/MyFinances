@@ -13,6 +13,15 @@ import {
 } from '../utils/priceCache';
 import logger from '../utils/logger';
 
+// Strip exchange suffixes (.NS, .BO, etc.) that should not be stored — stocksService
+// appends .NS itself when calling Yahoo Finance.
+function normalizeSymbol(raw: string): string {
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/\.(NS|BO|BSE|NSE|MCX)$/i, '');
+}
+
 export async function addStockTransaction(req: Request, res: Response) {
   try {
     const user = getUserFromRequest(req);
@@ -21,12 +30,52 @@ export async function addStockTransaction(req: Request, res: Response) {
       return;
     }
     const parsed = stocksSchema.omit({ userId: true, _id: true }).parse(req.body);
+    const db = database.getDb();
+    const uid = new ObjectId(user.userId);
+
+    // Resolve stockName to the canonical NSE symbol already used in the user's transactions
+    // so portfolio grouping stays consistent even when Claude sends "reliance" or "RELIANCE.NS".
+    const normalized = normalizeSymbol(parsed.stockName);
+
+    const existingSymbols = (await db
+      .collection('stocks')
+      .distinct('stockName', { userId: uid })) as string[];
+
+    let resolvedSymbol = normalized;
+
+    if (!existingSymbols.includes(normalized)) {
+      // Search Yahoo Finance to turn a full company name or alternate form into
+      // the canonical NSE ticker (e.g. "Reliance Industries" → "RELIANCE").
+      // If Yahoo Finance is unavailable (429 / network), fall through with normalized symbol.
+      try {
+        const results = await StocksService.searchStocks(parsed.stockName);
+        if (results.length > 0) {
+          // searchStocks already filters to exchange === 'NSI'; strip .NS from symbol
+          const ticker = normalizeSymbol(results[0].symbol);
+          resolvedSymbol = ticker;
+          if (ticker !== normalized) {
+            logger.info(`[Stocks] Symbol resolved: "${parsed.stockName}" → "${ticker}"`);
+          }
+        } else if (existingSymbols.length > 0) {
+          // No Yahoo Finance match — return a helpful 422
+          res.status(422).json({
+            success: false,
+            message: `Stock symbol "${parsed.stockName}" not found on NSE. Tracked symbols: ${existingSymbols.join(', ')}`,
+          });
+          return;
+        }
+        // If existingSymbols is empty this is their first stock — allow the normalized form through
+      } catch (searchErr) {
+        logger.warn({ err: searchErr }, '[Stocks] Symbol search failed — using normalized form');
+      }
+    }
+
     const transaction = {
       ...parsed,
-      userId: new ObjectId(user.userId),
+      stockName: resolvedSymbol,
+      userId: uid,
       date: new Date(parsed.date),
     };
-    const db = database.getDb();
     const collection = db.collection('stocks');
     const result = await collection.insertOne(transaction);
     res.status(201).json({ success: true, message: 'Transaction added', id: result.insertedId });

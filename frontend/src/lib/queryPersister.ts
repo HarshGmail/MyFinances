@@ -9,7 +9,9 @@ function getCacheKey(): string {
       if (user?.id) return `myfinances-cache-${user.id}`;
       if (user?.email) return `myfinances-cache-${user.email}`;
     }
-  } catch {}
+  } catch {
+    // fall through to anon cache key
+  }
   return 'myfinances-cache-anon';
 }
 

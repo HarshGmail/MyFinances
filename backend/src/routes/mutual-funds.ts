@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   addMutualFundTransaction,
   getMutualFundTransactions,
+  deleteMutualFundTransaction,
   deleteAllUserMutualFundTransactions,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
@@ -18,6 +19,7 @@ router.get('/transactions', getMutualFundTransactions);
 
 // GET /mutual-funds/search - Search mutual funds by name
 router.get('/search', searchMutualFundsByName);
+router.delete('/transaction/:id', deleteMutualFundTransaction);
 router.delete('/all', deleteAllUserMutualFundTransactions);
 
 export default router;

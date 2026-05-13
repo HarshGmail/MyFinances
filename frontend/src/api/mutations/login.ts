@@ -14,6 +14,7 @@ export function useLoginMutation() {
         endpoint: '/auth/login',
         method: 'POST',
         body: data,
+        skipAuthRedirect: true,
       });
       return response.data as User;
     },

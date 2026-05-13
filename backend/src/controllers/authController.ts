@@ -485,17 +485,22 @@ export async function updateIngestSenderEmail(req: Request, res: Response) {
 
     const { ingestSenderEmail } = req.body;
     if (ingestSenderEmail !== null && ingestSenderEmail !== undefined) {
-      if (typeof ingestSenderEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ingestSenderEmail)) {
+      if (
+        typeof ingestSenderEmail !== 'string' ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ingestSenderEmail)
+      ) {
         res.status(400).json({ success: false, message: 'Invalid email address' });
         return;
       }
     }
 
     const db = database.getDb();
-    await db.collection('users').updateOne(
-      { _id: new ObjectId(userPayload.userId) },
-      { $set: { ingestSenderEmail: ingestSenderEmail ?? null } }
-    );
+    await db
+      .collection('users')
+      .updateOne(
+        { _id: new ObjectId(userPayload.userId) },
+        { $set: { ingestSenderEmail: ingestSenderEmail ?? null } }
+      );
 
     res.status(200).json({ success: true, data: { ingestSenderEmail: ingestSenderEmail ?? null } });
   } catch (err) {
