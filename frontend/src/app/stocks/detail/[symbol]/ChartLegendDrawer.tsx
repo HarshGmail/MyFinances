@@ -60,6 +60,28 @@ export default function ChartLegendDrawer({ isOpen, onClose }: Props) {
             non-obvious tips about how to read them together.
           </p>
 
+          <Section title="Overlays button — how to use it">
+            The <b className="text-foreground">Overlays</b> button (top right of this chart) opens a
+            side panel where you can turn indicators on and off. Because the list is growing, we
+            keep it out of the main header — pick what you want, hit{' '}
+            <b className="text-foreground">Apply</b>, and the chart redraws once.
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              <li>
+                <b className="text-foreground">Apply</b> — commits your selection to the chart.
+              </li>
+              <li>
+                <b className="text-foreground">Reset</b> — throws away unsaved changes and snaps
+                back to what&apos;s currently drawn.
+              </li>
+              <li>
+                <b className="text-foreground">Clear all</b> — unchecks every overlay. Good shortcut
+                to go back to a clean candlestick view.
+              </li>
+            </ul>
+            The count badge on the button (e.g. <span className="font-mono">Overlays 3</span>) shows
+            how many are currently active at a glance.
+          </Section>
+
           <Section
             title="Candlesticks"
             swatch={
@@ -219,6 +241,161 @@ export default function ChartLegendDrawer({ isOpen, onClose }: Props) {
             (bullish); the reverse is a &ldquo;death cross&rdquo; (bearish).
           </Section>
 
+          <Section
+            title="EMA 9 / 21 / 50 — Exponential Moving Averages"
+            swatch={
+              <span className="inline-flex flex-col gap-1">
+                <span className="block w-6 h-0.5 bg-pink-400" />
+                <span className="block w-6 h-0.5 bg-indigo-400" />
+                <span className="block w-6 h-0.5 bg-fuchsia-400" />
+              </span>
+            }
+          >
+            <p>
+              Same goal as SMA — smooth out price to see the underlying trend — but EMA weighs
+              recent bars more heavily so it reacts faster to new price action.
+            </p>
+            <p className="mt-2">
+              Formula:{' '}
+              <span className="font-mono text-xs">EMA = α · close + (1 − α) · prev_EMA</span>, where{' '}
+              <span className="font-mono text-xs">α = 2 / (N + 1)</span>. Larger N = more smoothing,
+              slower reaction.
+            </p>
+            <p className="mt-3">
+              <b className="text-foreground">What each one is good for:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-pink-400">EMA 9</b> — hugs price closely. Day-traders use it for
+                tight stops and quick entry confirmation. If price keeps closing above EMA 9,
+                short-term momentum is bullish.
+              </li>
+              <li>
+                <b className="text-indigo-400">EMA 21</b> — the classic &ldquo;trend filter&rdquo;.
+                Price above EMA 21 + EMA 21 rising = healthy uptrend; below + falling = downtrend.
+                Many swing setups require price to pull back to EMA 21 before entering.
+              </li>
+              <li>
+                <b className="text-fuchsia-400">EMA 50</b> — broader trend. Institutions often treat
+                it as dynamic support/resistance. A clean break through EMA 50 after a long
+                consolidation is a common trend-change alert.
+              </li>
+            </ul>
+            <p className="mt-3">
+              <b className="text-foreground">Insight you can pull out:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-foreground">Alignment</b> — when EMA 9 &gt; EMA 21 &gt; EMA 50
+                and all rising, the stock is in a strong uptrend; reverse order and falling = strong
+                downtrend. Mixed / weaving = no trend, don&apos;t force trades.
+              </li>
+              <li>
+                <b className="text-foreground">EMA 9 / 21 cross</b> — the faster line crossing the
+                slower is an early momentum signal (earlier than SMA 20 / 50&apos;s golden cross,
+                but noisier).
+              </li>
+              <li>
+                <b className="text-foreground">Slope matters</b> — a flat EMA means the trend is
+                fading even if price is above it.
+              </li>
+            </ul>
+            <p className="mt-2 text-xs italic">
+              Trade-off: EMA reacts quickly and catches turns early, but the same speed means more
+              whipsaws in sideways markets. Pair it with volume or Bollinger Bands to filter out
+              noise.
+            </p>
+          </Section>
+
+          <Section
+            title="Bollinger Bands (20, 2σ) — volatility envelope"
+            swatch={<span className="block w-6 h-0.5 bg-teal-400 opacity-80" />}
+          >
+            <p>
+              A shaded band around price showing how volatile the stock has been recently. The
+              middle reference is a 20-period SMA; the upper and lower band are{' '}
+              <span className="font-mono text-xs">±2</span> standard deviations from that mean,
+              computed over the same 20 bars.
+            </p>
+            <p className="mt-2">
+              Statistically, price stays inside the bands ~95% of the time — so tagging the band is
+              a rare event by construction.
+            </p>
+            <p className="mt-3">
+              <b className="text-foreground">How to read it for insight:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-foreground">Squeeze</b> — when the band becomes very narrow,
+                volatility has collapsed. Often a precursor to a sharp move (direction unknown);
+                watch for the breakout candle on volume.
+              </li>
+              <li>
+                <b className="text-foreground">Expansion</b> — bands spreading apart signals a real
+                trend is underway. You typically want to <em>ride</em> this, not fade it.
+              </li>
+              <li>
+                <b className="text-foreground">Walking the band</b> — in a strong trend, price will
+                ride along the upper (or lower) band for many candles. This is strength, not
+                &ldquo;overbought&rdquo; — don&apos;t short a stock just because it&apos;s touching
+                the upper band.
+              </li>
+              <li>
+                <b className="text-foreground">Mean reversion</b> — in sideways markets, price tends
+                to oscillate between the bands and back to the middle SMA. Useful for fading moves
+                when there&apos;s no clear trend.
+              </li>
+              <li>
+                <b className="text-foreground">Double bottom / top into a band</b> — two tests of
+                the lower band that hold = classic reversal setup (and vice versa on the upper).
+              </li>
+            </ul>
+            <p className="mt-2 text-xs italic">
+              Bands tell you <em>how volatile</em>, not <em>which direction</em>. Always combine
+              with price action (candle patterns) or a trend filter (EMA) before acting.
+            </p>
+          </Section>
+
+          <Section
+            title="Volume SMA 20 — average trading activity"
+            swatch={<span className="block w-6 h-0.5 bg-sky-400" />}
+          >
+            <p>
+              A 20-bar average of volume, drawn as a line on the volume pane. It gives you a
+              baseline for &ldquo;typical&rdquo; activity so you can instantly tell whether a given
+              bar is unusually loud or quiet.
+            </p>
+            <p className="mt-3">
+              <b className="text-foreground">What to look for:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-foreground">Volume bar &gt; 1.5-2× the line</b> — meaningful
+                spike. Combined with a strong candle (big body, small wicks), this is often a real
+                institutional move.
+              </li>
+              <li>
+                <b className="text-foreground">Volume bar below the line</b> — participation is
+                thin. Price moves on low volume are easier to reverse and generally less
+                trustworthy.
+              </li>
+              <li>
+                <b className="text-foreground">Breakout confirmation</b> — a candle clearing 52W
+                high <em>and</em> its volume bar towering over Volume SMA 20 = high-conviction
+                breakout. Same candle on average volume = suspect.
+              </li>
+              <li>
+                <b className="text-foreground">Climax volume</b> — a volume bar 3×+ the line at the
+                end of an extended move often marks exhaustion (buying or selling climax).
+              </li>
+            </ul>
+            <p className="mt-2 text-xs italic">
+              The line gives you context — the same 50-lakh-share bar is huge for a small-cap and
+              tiny for a mega-cap. That&apos;s why comparing to the stock&apos;s own recent average
+              is more useful than an absolute number.
+            </p>
+          </Section>
+
           <InsightCallout title="Why SMA 20 looks longer than SMA 50">
             An N-period moving average can&apos;t produce a value until it has seen N bars of data —
             so the longer the lookback, the later the line starts.
@@ -340,6 +517,17 @@ export default function ChartLegendDrawer({ isOpen, onClose }: Props) {
                 </b>{' '}
                 It tells you whether today&apos;s average participant is in profit or loss, not
                 where the stock is headed longer-term.
+              </li>
+              <li>
+                <b className="text-foreground">Squeeze + volume spike = setup alert.</b> Narrow
+                Bollinger Bands plus a volume bar towering over Volume SMA 20 is one of the cleanest
+                early-breakout signals. Direction still comes from price action.
+              </li>
+              <li>
+                <b className="text-foreground">Stack your overlays, don&apos;t pile them.</b> Two or
+                three well-chosen indicators (e.g. EMA 21 + Bollinger + Volume SMA) cover trend,
+                volatility, and participation — adding more usually just clutters the chart without
+                adding new information.
               </li>
             </ul>
           </InsightCallout>
