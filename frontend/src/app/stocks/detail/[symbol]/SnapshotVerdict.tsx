@@ -59,9 +59,9 @@ export default function SnapshotVerdict({ financialData: fd, financials }: Props
     <>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Info className="h-4 w-4" />
+          <CardTitle className="text-base flex items-center gap-1.5">
             Snapshot Verdict
+            <Info className="h-4 w-4 text-muted-foreground" />
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -40,7 +40,7 @@ export default function StockDetailPage() {
   // Show skeleton while loading
   if (isFinancialsLoading && !financials) {
     return (
-      <div className="p-4 max-w-5xl mx-auto space-y-6">
+      <div className="p-4 max-w-8xl mx-auto space-y-6">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -51,12 +51,14 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="p-4 max-w-5xl mx-auto space-y-6">
-      <CompanySearchBar
-        currentSymbol={symbol}
-        portfolioStocks={portfolioStocks}
-        onSelect={(sym) => router.push(`/stocks/detail/${encodeURIComponent(sym)}`)}
-      />
+    <div className="p-4 max-w-8xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto">
+        <CompanySearchBar
+          currentSymbol={symbol}
+          portfolioStocks={portfolioStocks}
+          onSelect={(sym) => router.push(`/stocks/detail/${encodeURIComponent(sym)}`)}
+        />
+      </div>
 
       <CompanyHeader
         companyName={financials?.price?.shortName ?? financials?.price?.longName ?? symbol}
