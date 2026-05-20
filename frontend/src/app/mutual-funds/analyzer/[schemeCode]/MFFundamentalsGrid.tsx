@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MFMetrics, buildMFMetricCards, getMFMetricCalculation } from './mfVerdicts';
 import MFMetricEducationDrawer from './MFMetricEducationDrawer';
 import CustomCAGRCalculator from './CustomCAGRCalculator';
 import { MutualFundNavHistoryData } from '@/api/dataInterface';
 import { HelpCircle } from 'lucide-react';
+import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface Props {
   metrics: MFMetrics | null;
@@ -15,7 +16,7 @@ interface Props {
 }
 
 export default function MFFundamentalsGrid({ metrics, navData, isLoading }: Props) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('metric');
   const cards = useMemo(() => (metrics ? buildMFMetricCards(metrics) : []), [metrics]);
 
   return (

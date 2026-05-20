@@ -8,7 +8,7 @@ import {
   OverlayConfig,
   DEFAULT_OVERLAYS,
   countActiveOverlays,
-  useStockDetailStore,
+  useStockDetailOverlays,
 } from './stockDetailStore';
 
 interface ToggleRowProps {
@@ -76,8 +76,7 @@ interface Props {
 }
 
 export default function OverlaysDrawer({ isOpen, onClose, isIntraday, hasDayHL }: Props) {
-  const committed = useStockDetailStore((s) => s.overlays);
-  const setCommitted = useStockDetailStore((s) => s.setOverlays);
+  const [committed, setCommitted] = useStockDetailOverlays();
 
   const [draft, setDraft] = useState<OverlayConfig>(committed);
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Info } from 'lucide-react';
+import { useUrlNullableState } from '@/utils/useUrlState';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,7 +63,7 @@ function buildDonut(
 }
 
 export function RiskSection({ analyticsData, theme }: Props) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('riskMetric');
   const textColor = theme === 'dark' ? '#fff' : '#18181b';
   const entries = Object.entries(analyticsData);
 

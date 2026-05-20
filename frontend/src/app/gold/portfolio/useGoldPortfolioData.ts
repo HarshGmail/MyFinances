@@ -1,15 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@/api/query';
 import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import xirr, { XirrTransaction } from '@/utils/xirr';
 import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
 import Highcharts from 'highcharts';
+import { useUrlState } from '@/utils/useUrlState';
 
 export function useGoldPortfolioData() {
   const { theme } = useAppStore();
   const TIMEFRAMES = getTimeframes();
-  const [timeframe, setTimeframe] = useState(TIMEFRAMES[1].label);
+  const TIMEFRAME_LABELS = useMemo(() => TIMEFRAMES.map((t) => t.label), [TIMEFRAMES]);
+  const [timeframe, setTimeframe] = useUrlState('tf', TIMEFRAMES[1].label, TIMEFRAME_LABELS);
 
   const endDate = new Date().toISOString().slice(0, 10);
   const fiveYearsAgo = new Date();

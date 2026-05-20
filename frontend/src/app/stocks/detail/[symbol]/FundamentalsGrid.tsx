@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StockFinancials } from '@/api/dataInterface';
 import { buildMetricCards, getMetricCalculation } from './verdicts';
 import MetricEducationDrawer from './MetricEducationDrawer';
 import { HelpCircle } from 'lucide-react';
+import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface Props {
   financials?: StockFinancials;
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function FundamentalsGrid({ financials, isLoading }: Props) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('metric');
   const cards = useMemo(() => (financials ? buildMetricCards(financials) : []), [financials]);
 
   return (

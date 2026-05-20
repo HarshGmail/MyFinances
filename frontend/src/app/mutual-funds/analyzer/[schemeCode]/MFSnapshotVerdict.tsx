@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { getMFVerdict, MFMetrics } from './mfVerdicts';
 import MFMetricEducationDrawer from './MFMetricEducationDrawer';
+import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface MFSnapshotVerdictProps {
   metrics: MFMetrics | null;
@@ -10,7 +10,7 @@ interface MFSnapshotVerdictProps {
 }
 
 export default function MFSnapshotVerdict({ metrics, isLoading }: MFSnapshotVerdictProps) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('metric');
 
   if (isLoading || !metrics) {
     return null;

@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info, HelpCircle } from 'lucide-react';
 import { StockFinancials } from '@/api/dataInterface';
 import MetricEducationDrawer from './MetricEducationDrawer';
 import { getMetricCalculation } from './verdicts';
+import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface Props {
   financialData?: StockFinancials['financialData'];
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function SnapshotVerdict({ financialData: fd, financials }: Props) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('metric');
   const lines = useMemo(() => {
     if (!fd) return [];
     const result: { text: string; positive: boolean }[] = [];

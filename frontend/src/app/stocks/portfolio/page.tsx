@@ -11,8 +11,9 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
+import { useUrlState } from '@/utils/useUrlState';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,7 +30,8 @@ export default function StocksPortfolioPage() {
   const { theme } = useAppStore();
   const isDark = theme === 'dark';
   const TIMEFRAMES = getTimeframes('1y');
-  const [timeframe, setTimeframe] = useState(TIMEFRAMES[4].label);
+  const TIMEFRAME_LABELS = useMemo(() => TIMEFRAMES.map((t) => t.label), [TIMEFRAMES]);
+  const [timeframe, setTimeframe] = useUrlState('interval', TIMEFRAMES[4].label, TIMEFRAME_LABELS);
   const selectedTimeframe = TIMEFRAMES.find((tf) => tf.label === timeframe) || TIMEFRAMES[1];
   const timeframeStart = getPastDate(selectedTimeframe.days);
 

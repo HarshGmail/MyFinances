@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useAppStore } from '@/store/useAppStore';
+import { useUrlState } from '@/utils/useUrlState';
 
 interface GoldRateData {
   date: string;
@@ -23,6 +24,8 @@ const INTERVALS = [
   { label: '5Y', days: 365 * 5 },
   { label: 'All', days: null },
 ];
+
+const INTERVAL_LABELS = INTERVALS.map((i) => i.label) as readonly string[];
 
 function parseGoldDate(dateStr: string): Date {
   return new Date(dateStr);
@@ -47,7 +50,7 @@ function filterPriceDataByInterval(
 }
 
 export default function GoldPriceChartAnalyzer({ ratesData }: GoldPriceChartAnalyzerProps) {
-  const [selectedInterval, setSelectedInterval] = useState('1Y');
+  const [selectedInterval, setSelectedInterval] = useUrlState('interval', '1Y', INTERVAL_LABELS);
   const { theme } = useAppStore();
 
   const priceData = useMemo(

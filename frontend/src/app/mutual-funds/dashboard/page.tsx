@@ -7,8 +7,9 @@ import {
 import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
 import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import groupBy from 'lodash/groupBy';
+import { useUrlState } from '@/utils/useUrlState';
 import {
   Table,
   TableHeader,
@@ -204,7 +205,7 @@ export default function MutualFundsDashboardPage() {
     return profitLoss >= 0 ? 'default' : 'destructive';
   };
 
-  const [selectedFund, setSelectedFund] = useState('All');
+  const [selectedFund, setSelectedFund] = useUrlState<string>('fund', 'All');
 
   // Build combined portfolio and per-fund chart data in one pass
   const chartData = useMemo(() => {

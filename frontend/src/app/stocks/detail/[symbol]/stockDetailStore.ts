@@ -1,4 +1,8 @@
-import { create } from 'zustand';
+'use client';
+
+import { useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useUrlBatchUpdate, useUrlState } from '@/utils/useUrlState';
 
 export interface OverlayConfig {
   sma20: boolean;
@@ -28,26 +32,48 @@ export const DEFAULT_OVERLAYS: OverlayConfig = {
   transactions: false,
 };
 
+const OVERLAY_KEYS = Object.keys(DEFAULT_OVERLAYS) as (keyof OverlayConfig)[];
+
 export function countActiveOverlays(cfg: OverlayConfig): number {
   return Object.values(cfg).filter(Boolean).length;
 }
 
 export type StockIntervalLabel = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | '5Y' | 'Max';
 
-interface StockDetailState {
-  selectedIntervalLabel: StockIntervalLabel;
-  setSelectedIntervalLabel: (label: StockIntervalLabel) => void;
+const INTERVAL_LABELS = ['1D', '1W', '1M', '3M', '6M', '1Y', '5Y', 'Max'] as const;
 
-  overlays: OverlayConfig;
-  setOverlays: (overlays: OverlayConfig) => void;
-  resetOverlays: () => void;
+function overlaysToString(o: OverlayConfig): string {
+  return OVERLAY_KEYS.filter((k) => o[k]).join(',');
 }
 
-export const useStockDetailStore = create<StockDetailState>((set) => ({
-  selectedIntervalLabel: '1D',
-  setSelectedIntervalLabel: (selectedIntervalLabel) => set({ selectedIntervalLabel }),
+function overlaysFromString(raw: string | null): OverlayConfig {
+  const cfg = { ...DEFAULT_OVERLAYS };
+  if (!raw) return cfg;
+  const allowed = new Set<string>(OVERLAY_KEYS);
+  for (const key of raw.split(',')) {
+    if (allowed.has(key)) cfg[key as keyof OverlayConfig] = true;
+  }
+  return cfg;
+}
 
-  overlays: DEFAULT_OVERLAYS,
-  setOverlays: (overlays) => set({ overlays }),
-  resetOverlays: () => set({ overlays: DEFAULT_OVERLAYS }),
-}));
+export function useStockDetailInterval(): [
+  StockIntervalLabel,
+  (label: StockIntervalLabel) => void,
+] {
+  return useUrlState<StockIntervalLabel>('interval', '1D', INTERVAL_LABELS);
+}
+
+export function useStockDetailOverlays(): [OverlayConfig, (next: OverlayConfig) => void] {
+  const searchParams = useSearchParams();
+  const replace = useUrlBatchUpdate();
+  const raw = searchParams.get('ov');
+  const value = useMemo(() => overlaysFromString(raw), [raw]);
+  const set = useCallback(
+    (next: OverlayConfig) => {
+      const str = overlaysToString(next);
+      replace({ ov: str === '' ? null : str });
+    },
+    [replace]
+  );
+  return [value, set];
+}

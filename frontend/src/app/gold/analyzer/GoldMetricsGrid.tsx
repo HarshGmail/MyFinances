@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { MetricCard } from './goldMetrics';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface GoldMetricsGridProps {
   cards: MetricCard[];
@@ -59,7 +60,7 @@ const metricDefinitions: Record<string, { title: string; description: string; fo
 };
 
 export default function GoldMetricsGrid({ cards, isLoading }: GoldMetricsGridProps) {
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('metric');
 
   if (isLoading) {
     return (

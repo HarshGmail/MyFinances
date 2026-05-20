@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUrlNullableState, useUrlState } from '@/utils/useUrlState';
 import {
   Table,
   TableBody,
@@ -56,6 +56,10 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'beta', label: 'Beta' },
 ];
 
+const SORT_KEYS = SORT_OPTIONS.map((o) => o.value) as readonly SortKey[];
+const SORT_DIRS = ['desc', 'asc'] as const;
+type SortDir = (typeof SORT_DIRS)[number];
+
 function verdictDot(color: string | undefined) {
   if (!color) return <span className="text-muted-foreground text-xs">—</span>;
   const cls = color.includes('green')
@@ -74,9 +78,10 @@ function fmt(v: number | null | undefined, pct = false, decimals = 1): string {
 }
 
 export function StockScorecardTable({ analyticsData, portfolio }: Props) {
-  const [sortKey, setSortKey] = useState<SortKey>('investedAmount');
-  const [asc, setAsc] = useState(false);
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useUrlState<SortKey>('sortKey', 'investedAmount', SORT_KEYS);
+  const [sortDir, setSortDir] = useUrlState<SortDir>('sortDir', 'desc', SORT_DIRS);
+  const asc = sortDir === 'asc';
+  const [selectedMetric, setSelectedMetric] = useUrlNullableState('tableMetric');
 
   const investMap = Object.fromEntries(portfolio.map((p) => [p.stockName, p.investedAmount]));
 
@@ -133,7 +138,7 @@ export function StockScorecardTable({ analyticsData, portfolio }: Props) {
                 </SelectContent>
               </Select>
               <button
-                onClick={() => setAsc((p) => !p)}
+                onClick={() => setSortDir(asc ? 'desc' : 'asc')}
                 className="px-3 py-1.5 text-sm border rounded-md hover:bg-muted/50 transition-colors"
               >
                 {asc ? '↑ Asc' : '↓ Desc'}

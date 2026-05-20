@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Highcharts from 'highcharts/esm/highstock';
 import 'highcharts/esm/highcharts-more';
 import HighchartsReact from 'highcharts-react-official';
@@ -8,8 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStockFullProfile, useStockTransactionsQuery } from '@/api/query/stocks';
 import { useAppStore } from '@/store/useAppStore';
+import { useUrlBoolean } from '@/utils/useUrlState';
 import { INTERVALS, Interval } from './verdicts';
-import { useStockDetailStore } from './stockDetailStore';
+import { useStockDetailInterval, useStockDetailOverlays } from './stockDetailStore';
 import { buildChartOptions } from './chartOptions';
 import ChartLegendDrawer from './ChartLegendDrawer';
 import OverlaysDrawer from './OverlaysDrawer';
@@ -23,12 +24,11 @@ export default function PriceChart({ symbol }: Props) {
   const { theme } = useAppStore();
   const isDark = theme === 'dark';
 
-  const selectedIntervalLabel = useStockDetailStore((s) => s.selectedIntervalLabel);
-  const setSelectedIntervalLabel = useStockDetailStore((s) => s.setSelectedIntervalLabel);
-  const overlays = useStockDetailStore((s) => s.overlays);
+  const [selectedIntervalLabel, setSelectedIntervalLabel] = useStockDetailInterval();
+  const [overlays] = useStockDetailOverlays();
 
-  const [legendOpen, setLegendOpen] = useState(false);
-  const [overlaysOpen, setOverlaysOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useUrlBoolean('legend', false);
+  const [overlaysOpen, setOverlaysOpen] = useUrlBoolean('ovPanel', false);
 
   const selectedInterval: Interval =
     INTERVALS.find((i) => i.label === selectedIntervalLabel) ?? INTERVALS[0];

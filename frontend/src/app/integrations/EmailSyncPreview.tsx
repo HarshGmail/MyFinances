@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { EmailSyncPreview } from '@/api/dataInterface';
+import { useUrlBoolean } from '@/utils/useUrlState';
 
 function PreviewTable({
   title,
@@ -46,10 +46,10 @@ export default function EmailSyncPreviewCard({
   onImport: () => void;
   isImporting: boolean;
 }) {
-  const [mfExpanded, setMfExpanded] = useState(true);
-  const [goldExpanded, setGoldExpanded] = useState(true);
-  const [stocksExpanded, setStocksExpanded] = useState(true);
-  const [cryptoExpanded, setCryptoExpanded] = useState(true);
+  const [mfExpanded, setMfExpanded] = useUrlBoolean('mfExp', true);
+  const [goldExpanded, setGoldExpanded] = useUrlBoolean('goldExp', true);
+  const [stocksExpanded, setStocksExpanded] = useUrlBoolean('stocksExp', true);
+  const [cryptoExpanded, setCryptoExpanded] = useUrlBoolean('cryptoExp', true);
 
   const totalNew =
     preview.mutualFunds.length +

@@ -1,10 +1,11 @@
-import { useMemo, useCallback, useRef, useState } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import groupBy from 'lodash/groupBy';
 import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@/api/query';
 import { useMultipleCoinCandlesQuery } from '@/api/query/crypto';
 import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { CryptoTransaction } from '@/api/dataInterface';
+import { useUrlState } from '@/utils/useUrlState';
 
 export interface PortfolioItem {
   coinName: string;
@@ -48,9 +49,15 @@ export const COIN_COLORS = [
   '#F9E79F',
 ];
 
+const CRYPTO_TIMEFRAME_LABELS = CRYPTO_TIMEFRAMES.map((t) => t.label) as readonly string[];
+
 export function useCryptoPortfolioData() {
-  const [timeframe, setTimeframe] = useState(CRYPTO_TIMEFRAMES[6].label);
-  const [selectedCoin, setSelectedCoin] = useState('All');
+  const [timeframe, setTimeframe] = useUrlState(
+    'tf',
+    CRYPTO_TIMEFRAMES[6].label,
+    CRYPTO_TIMEFRAME_LABELS
+  );
+  const [selectedCoin, setSelectedCoin] = useUrlState<string>('coin', 'All');
   const chartRef = useRef<HTMLDivElement>(null);
 
   const selectedTimeframe =

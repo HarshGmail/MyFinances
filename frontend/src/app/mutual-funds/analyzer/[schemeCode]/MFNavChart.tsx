@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { MutualFundNavHistoryData } from '@/api/dataInterface';
 import { MF_INTERVALS, filterNavDataByInterval } from './mfVerdicts';
 import { useAppStore } from '@/store/useAppStore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlState } from '@/utils/useUrlState';
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });
 
@@ -20,8 +21,18 @@ function parseNavDate(dateStr: string): Date {
   return new Date(year, month - 1, day);
 }
 
+const MF_INTERVAL_LABELS = MF_INTERVALS.map((i) => i.label) as readonly string[];
+
 export default function MFNavChart({ navData, isLoading }: MFNavChartProps) {
-  const [selectedInterval, setSelectedInterval] = useState(0); // Index into MF_INTERVALS
+  const [selectedIntervalLabel, setSelectedIntervalLabel] = useUrlState(
+    'interval',
+    MF_INTERVALS[0].label,
+    MF_INTERVAL_LABELS
+  );
+  const selectedInterval = Math.max(
+    0,
+    MF_INTERVALS.findIndex((i) => i.label === selectedIntervalLabel)
+  );
   const theme = useAppStore((state) => state.theme);
 
   const chartOptions = useMemo(() => {
@@ -106,12 +117,12 @@ export default function MFNavChart({ navData, isLoading }: MFNavChartProps) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
-        {MF_INTERVALS.map((interval, idx) => (
+        {MF_INTERVALS.map((interval) => (
           <button
             key={interval.label}
-            onClick={() => setSelectedInterval(idx)}
+            onClick={() => setSelectedIntervalLabel(interval.label)}
             className={`px-3 py-1.5 text-sm font-medium rounded border transition-colors ${
-              selectedInterval === idx
+              selectedIntervalLabel === interval.label
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'border-muted-foreground/20 hover:bg-muted text-muted-foreground'
             }`}

@@ -10,8 +10,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Funnel, FunnelPlus } from 'lucide-react';
-import { useAppStore } from '@/store/useAppStore';
 import { FilterDrawer } from './FilterDrawer';
+import { useUrlFilters } from '@/utils/useUrlState';
+
+const DEFAULT_DATE_SORT = 'latest';
 
 export interface Column {
   id: string;
@@ -49,7 +51,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   actions,
   actionsRenderer,
 }) => {
-  const { filters, tempFilters, setFilters, setTempFilters, clearFilters } = useAppStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const filterColumns = useMemo(() => {
@@ -81,6 +82,10 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       });
   }, [columns, rows]);
 
+  const filterKeys = useMemo(() => filterColumns.map((c) => c.id), [filterColumns]);
+  const { filters, setFilters, clearFilters } = useUrlFilters(filterKeys);
+  const [tempFilters, setTempFilters] = useState<Record<string, string[]>>({});
+
   const filteredRows = useMemo(() => {
     let filtered = [...rows];
     columns.forEach((column) => {
@@ -89,8 +94,9 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       }
     });
     columns.forEach((column) => {
-      if (column.type === 'date' && filters[column.id + 'Sort']?.length > 0) {
-        const sortType = filters[column.id + 'Sort'][0];
+      if (column.type === 'date') {
+        const sortKey = column.id + 'Sort';
+        const sortType = filters[sortKey]?.[0] ?? DEFAULT_DATE_SORT;
         filtered.sort((a, b) => {
           const dateA = new Date(a[column.id] || '').getTime();
           const dateB = new Date(b[column.id] || '').getTime();
@@ -128,7 +134,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   };
   const closeDrawer = () => setIsDrawerOpen(false);
   const applyFilters = () => {
-    setFilters({ ...tempFilters });
+    setFilters(tempFilters);
     closeDrawer();
   };
   const cancelFilters = () => {
@@ -136,6 +142,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     closeDrawer();
   };
   const removeAllFilters = () => {
+    setTempFilters({});
     clearFilters();
     closeDrawer();
   };

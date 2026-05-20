@@ -18,12 +18,15 @@ import { useDashboardData } from './useDashboardData';
 import { useTrackerData } from './useTrackerData';
 import { DashboardTab } from './DashboardTab';
 import { TrackerTab } from './TrackerTab';
+import { useUrlState } from '@/utils/useUrlState';
 
 type Tab = 'dashboard' | 'tracker';
 
+const TABS = ['dashboard', 'tracker'] as const satisfies readonly Tab[];
+
 export default function ExpensesPage() {
   const { theme } = useAppStore();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useUrlState<Tab>('tab', 'dashboard', TABS);
   const [trackerDrawerOpen, setTrackerDrawerOpen] = useState(false);
   const { mutate: syncUpiEmails } = useUpiEmailSyncMutation();
 

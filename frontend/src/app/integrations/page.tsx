@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useUserProfileQuery } from '@/api/query';
 import { Badge } from '@/components/ui/badge';
 import { Smartphone, Bot, Mail, ChevronRight } from 'lucide-react';
@@ -8,6 +7,7 @@ import { toast } from 'sonner';
 import UpiIntegration from './UpiIntegration';
 import McpIntegration from './McpIntegration';
 import EmailIntegration from './EmailIntegration';
+import { useUrlState } from '@/utils/useUrlState';
 
 const INTEGRATIONS = [
   {
@@ -35,8 +35,10 @@ const INTEGRATIONS = [
 
 type TabId = (typeof INTEGRATIONS)[number]['id'];
 
+const TAB_IDS = ['upi', 'mcp', 'email'] as const satisfies readonly TabId[];
+
 export default function IntegrationsPage() {
-  const [selected, setSelected] = useState<TabId>('upi');
+  const [selected, setSelected] = useUrlState<TabId>('tab', 'upi', TAB_IDS);
   const { data: profile, isLoading } = useUserProfileQuery();
 
   return (
