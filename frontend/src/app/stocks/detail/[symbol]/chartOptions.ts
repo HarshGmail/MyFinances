@@ -1,5 +1,5 @@
 import Highcharts from 'highcharts/highstock';
-import type { YAxisPlotLinesOptions } from 'highcharts/highstock';
+import type { YAxisPlotLinesOptions, XAxisPlotLinesOptions } from 'highcharts/highstock';
 import {
   extractChartData,
   buildEventFlags,
@@ -7,7 +7,10 @@ import {
   YahooChartResult,
 } from './chartTransforms';
 import { buildChartSeries } from './chartSeries';
+import { buildSRPlotLines } from './srPlotLines';
+import { buildTransactionPlotLines } from './transactionPlotLines';
 import { OverlayConfig } from './stockDetailStore';
+import { StockTransaction } from '@/api/dataInterface';
 
 export interface BuildChartOptionsArgs {
   result: YahooChartResult | undefined;
@@ -16,6 +19,7 @@ export interface BuildChartOptionsArgs {
   isIntraday: boolean;
   onlyIntraday: boolean;
   isDark: boolean;
+  transactions?: StockTransaction[];
 }
 
 function buildPlotLines(
@@ -109,11 +113,18 @@ export function buildChartOptions({
   isIntraday,
   onlyIntraday,
   isDark,
+  transactions,
 }: BuildChartOptionsArgs): Highcharts.Options | null {
   const data = extractChartData(result, onlyIntraday);
   if (!data) return null;
 
   const { ohlc, vol, meta, events } = data;
+  const minT = ohlc[0][0];
+  const maxT = ohlc[ohlc.length - 1][0];
+  const xPlotLines: XAxisPlotLinesOptions[] =
+    overlays.transactions && transactions
+      ? buildTransactionPlotLines(transactions, symbol, minT, maxT)
+      : [];
   const firstClose = ohlc[0][4];
   const lastClose = ohlc[ohlc.length - 1][4];
   const isUp = lastClose >= firstClose;
@@ -137,7 +148,9 @@ export function buildChartOptions({
     overlays,
     isIntraday,
   });
-  const plotLines = buildPlotLines(meta, overlays.dayHL, isDark);
+  const referencePlotLines = buildPlotLines(meta, overlays.dayHL, isDark);
+  const srPlotLines = overlays.srLines ? buildSRPlotLines(ohlc, isDark) : [];
+  const plotLines = [...referencePlotLines, ...srPlotLines];
 
   return {
     chart: {
@@ -173,6 +186,7 @@ export function buildChartOptions({
       gridLineWidth: 1,
       gridLineColor: gridColor,
       lineColor: borderColor,
+      plotLines: xPlotLines,
     },
     yAxis: [
       {

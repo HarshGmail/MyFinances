@@ -6,7 +6,7 @@ import 'highcharts/esm/highcharts-more';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useStockFullProfile } from '@/api/query/stocks';
+import { useStockFullProfile, useStockTransactionsQuery } from '@/api/query/stocks';
 import { useAppStore } from '@/store/useAppStore';
 import { INTERVALS, Interval } from './verdicts';
 import { useStockDetailStore } from './stockDetailStore';
@@ -41,6 +41,8 @@ export default function PriceChart({ symbol }: Props) {
     selectedInterval.interval
   );
 
+  const { data: transactions } = useStockTransactionsQuery();
+
   const result = chartProfileData?.chartData?.chart?.result?.[0];
 
   const hasDayHL = useMemo(() => {
@@ -60,8 +62,9 @@ export default function PriceChart({ symbol }: Props) {
         isIntraday,
         onlyIntraday,
         isDark,
+        transactions,
       }),
-    [result, symbol, overlays, isIntraday, onlyIntraday, isDark]
+    [result, symbol, overlays, isIntraday, onlyIntraday, isDark, transactions]
   );
 
   return (

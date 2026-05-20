@@ -900,7 +900,6 @@ dependencies = [
  "pdf-extract",
  "rayon",
  "regex",
- "rust_src",
  "serde",
  "serde_json",
  "thiserror",
@@ -1057,12 +1056,6 @@ name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
-
-[[package]]
-name = "rust_src"
-version = "0.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0641980f0ea1cc4cefdb37f23233aaf66118011c7304e77be94e75d6dfbc878"
 
 [[package]]
 name = "rustversion"

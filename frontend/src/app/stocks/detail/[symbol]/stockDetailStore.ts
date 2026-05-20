@@ -10,6 +10,8 @@ export interface OverlayConfig {
   volSma: boolean;
   vwap: boolean;
   dayHL: boolean;
+  srLines: boolean;
+  transactions: boolean;
 }
 
 export const DEFAULT_OVERLAYS: OverlayConfig = {
@@ -22,13 +24,15 @@ export const DEFAULT_OVERLAYS: OverlayConfig = {
   volSma: false,
   vwap: false,
   dayHL: false,
+  srLines: false,
+  transactions: false,
 };
 
 export function countActiveOverlays(cfg: OverlayConfig): number {
   return Object.values(cfg).filter(Boolean).length;
 }
 
-export type StockIntervalLabel = '1D' | '1W' | '1M' | '3M' | '1Y';
+export type StockIntervalLabel = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | '5Y' | 'Max';
 
 interface StockDetailState {
   selectedIntervalLabel: StockIntervalLabel;

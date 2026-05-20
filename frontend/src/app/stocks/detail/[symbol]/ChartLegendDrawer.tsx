@@ -197,6 +197,93 @@ export default function ChartLegendDrawer({ isOpen, onClose }: Props) {
           </Section>
 
           <Section
+            title="Support / Resistance — auto-detected pivot levels"
+            swatch={
+              <span className="inline-flex flex-col gap-1">
+                <span className="block w-7 border-t border-green-500" />
+                <span className="block w-7 border-t border-dashed border-red-500" />
+              </span>
+            }
+          >
+            <p>
+              Horizontal lines drawn at price levels where the stock has paused, bounced, or
+              reversed multiple times in the past. Built in three steps:
+            </p>
+            <ol className="list-decimal pl-5 mt-2 space-y-1">
+              <li>
+                <b className="text-foreground">Find pivots</b> — every local high or low (a bar
+                whose high/low beats the surrounding ±5 bars).
+              </li>
+              <li>
+                <b className="text-foreground">Cluster</b> nearby pivots that sit within ~0.5% of
+                each other. Each cluster becomes one line, drawn at the cluster&apos;s mean price.
+              </li>
+              <li>
+                <b className="text-foreground">Rank by touches</b> — the more pivots in a cluster,
+                the stronger the level. We keep the top ~8 strongest.
+              </li>
+            </ol>
+            <p className="mt-3">
+              <b className="text-foreground">How to read the lines:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-green-500">Green (S · ₹X)</b> — a support level currently
+                <em>below</em> price.
+              </li>
+              <li>
+                <b className="text-red-500">Red (R · ₹X)</b> — a resistance level currently
+                <em>above</em> price.
+              </li>
+              <li>
+                <b className="text-foreground">Solid line</b> — the level has held in its current
+                role; price has not decisively closed through it from the other side.
+              </li>
+              <li>
+                <b className="text-foreground">Dashed line (S* / R*)</b> — <b>role-reversed</b>:
+                price has previously traded on the opposite side for ≥ 2 consecutive closes. Old
+                support that broke and is now resistance (or vice versa).
+              </li>
+              <li>
+                <b className="text-foreground">Line thickness</b> scales with the touch count shown
+                in the label (<span className="font-mono">·&nbsp;4×</span> = 4 pivots in the
+                cluster).
+              </li>
+            </ul>
+            <p className="mt-3">
+              <b className="text-foreground">Insights you can pull out:</b>
+            </p>
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>
+                <b className="text-foreground">Bounce setup</b> — price approaching a strong solid
+                support with shrinking selling volume often produces a bounce. The more touches, the
+                more &ldquo;respected&rdquo; the level.
+              </li>
+              <li>
+                <b className="text-foreground">Breakout target</b> — once price clears a strong
+                resistance, the next resistance line above is the natural first target. Stack of
+                unbroken resistances = stairstep targets.
+              </li>
+              <li>
+                <b className="text-foreground">Role-reversal retest</b> — a dashed line being
+                retested from its new side (e.g. broken support, now retesting from above as
+                resistance) is one of the highest-quality setups in technical analysis. Reject =
+                continuation in the breakout direction; reclaim = breakout was a fakeout.
+              </li>
+              <li>
+                <b className="text-foreground">No-trade zones</b> — when price is sitting between
+                two close-by levels with no clear breakout, you&apos;re in chop. Wait for a
+                definitive break before acting.
+              </li>
+            </ul>
+            <p className="mt-2 text-xs italic">
+              Detection is purely mechanical (no &ldquo;chart pattern&rdquo; opinions involved).
+              Works best on 3M / 1Y views where there are enough bars to find recurring touches; on
+              1D you&apos;ll typically see only 1–2 lines, if any.
+            </p>
+          </Section>
+
+          <Section
             title="Event flags"
             swatch={
               <span className="inline-flex gap-1">

@@ -3,11 +3,14 @@ import { StockFinancials } from '@/api/dataInterface';
 export type Verdict = { text: string; color: string };
 
 export const INTERVALS = [
-  { label: '1D', range: '1d', interval: '5m' },
-  { label: '1W', range: '1w', interval: '1h' },
-  { label: '1M', range: '1m', interval: '1d' },
-  { label: '3M', range: '3m', interval: '1d' },
-  { label: '1Y', range: '1y', interval: '1d' },
+  { label: '1D', range: '1d', interval: '1m' },
+  { label: '1W', range: '1w', interval: '5m' },
+  { label: '1M', range: '1m', interval: '15m' },
+  { label: '3M', range: '3m', interval: '1h' },
+  { label: '6M', range: '6m', interval: '1h' },
+  { label: '1Y', range: '1y', interval: '1h' },
+  { label: '5Y', range: '5y', interval: '1d' },
+  { label: 'Max', range: 'max', interval: '1wk' },
 ] as const;
 
 export type Interval = (typeof INTERVALS)[number];

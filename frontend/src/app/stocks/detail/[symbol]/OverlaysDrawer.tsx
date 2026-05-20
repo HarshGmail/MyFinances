@@ -157,6 +157,26 @@ export default function OverlaysDrawer({ isOpen, onClose, isIntraday, hasDayHL }
             />
           </SectionGroup>
 
+          <SectionGroup title="Levels & Structure">
+            <ToggleRow
+              label="Support / Resistance"
+              description="Auto-detected pivot levels with role-reversal (dashed = flipped)"
+              swatchClass="bg-gradient-to-r from-green-500 to-red-500"
+              checked={draft.srLines}
+              onChange={(v) => set({ srLines: v })}
+            />
+          </SectionGroup>
+
+          <SectionGroup title="Your Activity">
+            <ToggleRow
+              label="My Transactions"
+              description="Thin vertical lines at each buy (green) and sell (red) date"
+              swatchClass="bg-gradient-to-r from-green-500 to-red-500"
+              checked={draft.transactions}
+              onChange={(v) => set({ transactions: v })}
+            />
+          </SectionGroup>
+
           <SectionGroup title="Volume">
             <ToggleRow
               label="Volume SMA 20"
