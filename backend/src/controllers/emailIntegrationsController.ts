@@ -4,12 +4,7 @@ import axios from 'axios';
 import database from '../database';
 import { fundNameSimilarity, lookupMFAPIScheme } from '../utils/fundNameMatch';
 import { getUserFromRequest } from '../utils/jwtHelpers';
-import {
-  getAuthUrl,
-  exchangeCode,
-  fetchPdfAttachments,
-  fetchEmailBodies,
-} from '../services/gmailService';
+import { GmailClient } from '../services/gmailService';
 import { parseCdslMFTransactions } from '../services/cdslParser';
 import { ParsedStockHolding } from '../services/cdslStocksParser';
 import { parseSafeGoldTransactions } from '../services/safegoldParser';
@@ -66,7 +61,7 @@ export async function oauthConnect(req: Request, res: Response) {
       return;
     }
 
-    const authUrl = getAuthUrl(user.userId);
+    const authUrl = GmailClient.getAuthUrl(user.userId);
     res.json({ success: true, data: { authUrl } });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to generate auth URL';
@@ -90,7 +85,7 @@ export async function oauthCallback(req: Request, res: Response) {
       return;
     }
 
-    const { encryptedRefreshToken, email } = await exchangeCode(code);
+    const { encryptedRefreshToken, email } = await GmailClient.exchangeCode(code);
 
     const db = database.getDb();
     // Upsert keyed on (userId, email) so multiple Gmail accounts can be linked.
@@ -391,6 +386,7 @@ async function runSyncInBackground(
       const accountTag = integration.email as string;
       const cdslPasswords = cdslPassword ? [cdslPassword, ''] : [''];
       const sgPasswords = safegoldPassword ? [safegoldPassword, ''] : [''];
+      const gmailClient = new GmailClient(integration.refreshToken as string);
 
       logger.info(
         {
@@ -406,8 +402,7 @@ async function runSyncInBackground(
           { account: accountTag, afterDate: afterDate?.toISOString() },
           '[Sync] Fetching CDSL emails'
         );
-        const cdslPdfs = await fetchPdfAttachments(
-          integration.refreshToken as string,
+        const cdslPdfs = await gmailClient.fetchPdfAttachments(
           'from:eCAS@cdslstatement.com has:attachment',
           afterDate
         );
@@ -465,8 +460,7 @@ async function runSyncInBackground(
           { account: accountTag, sender: sgSender, afterDate: afterDate?.toISOString() },
           '[Sync] Fetching SafeGold statement emails'
         );
-        const sgPdfs = await fetchPdfAttachments(
-          integration.refreshToken as string,
+        const sgPdfs = await gmailClient.fetchPdfAttachments(
           `from:${sgSender} has:attachment`,
           afterDate
         );
@@ -525,8 +519,7 @@ async function runSyncInBackground(
           { account: accountTag, afterDate: afterDate?.toISOString() },
           '[Sync] Fetching SafeGold invoice emails'
         );
-        const sgInvoicePdfs = await fetchPdfAttachments(
-          integration.refreshToken as string,
+        const sgInvoicePdfs = await gmailClient.fetchPdfAttachments(
           'from:noreply@safegold.in has:attachment',
           afterDate
         );
@@ -590,8 +583,7 @@ async function runSyncInBackground(
           { account: accountTag, afterDate: afterDate?.toISOString() },
           '[Sync] Fetching CoinDCX trade emails'
         );
-        const cdxBodies = await fetchEmailBodies(
-          integration.refreshToken as string,
+        const cdxBodies = await gmailClient.fetchEmailBodies(
           'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
           afterDate
         );

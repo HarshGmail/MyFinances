@@ -29,7 +29,7 @@ import {
   emailIntegrationsRouter,
   webhooksRouter,
 } from './routes';
-import { requestLogger, blockDemoMutations } from './middleware';
+import { requestLogger, blockDemoMutations, errorHandler } from './middleware';
 import logger from './utils/logger';
 
 const app = express();
@@ -93,6 +93,9 @@ app.get('/api/health', (req, res) => {
     database: database.isConnected() ? 'connected' : 'disconnected',
   });
 });
+
+// Global error handler — must be the last middleware so it catches errors from all routes above
+app.use(errorHandler);
 
 // Initialize server
 async function startServer() {
