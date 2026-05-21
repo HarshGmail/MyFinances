@@ -5,7 +5,7 @@ import { compactJSON } from '../compact.js';
 
 export function registerGoalTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_goals',
+    'goals_list',
     {
       description:
         'Fetch all investment goals with their target amounts, current progress, and linked assets (stocks, mutual funds, etc.). If this tool fails or times out, retry it once.',

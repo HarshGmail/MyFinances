@@ -2,13 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
 import { compactJSON, okResponse, toCSV } from '../compact.js';
+import { StockTx, summarizeStockTransactions } from '../aggregations.js';
 
 export function registerStockTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_stock_transactions',
+    'stocks_get_transactions',
     {
       description:
-        'Fetch all stock buy and sell transactions. Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount for each transaction. If this tool fails or times out, retry it once.',
+        'Fetch all stock buy and sell transactions (raw audit trail). Returns symbol, type (credit=buy/debit=sell), date, price, shares, and amount per transaction. Prefer stocks_get_summary if you only need per-symbol holdings/P&L. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -18,10 +19,24 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   );
 
   server.registerTool(
-    'get_portfolio_summary',
+    'stocks_get_summary',
     {
       description:
-        'Fetch current stock portfolio with live NSE prices, P&L, and 1-day change for each holding. WARNING: This calls Yahoo Finance in real-time and may take 10-30 seconds depending on portfolio size. If this tool fails or times out, retry it once.',
+        'Per-symbol summary aggregated from raw transactions: units_held, total_invested, total_proceeds, net_invested, avg_buy_price, txn_count. Does NOT include live prices or current value — use stocks_get_portfolio for that. This is the cheapest tool token-wise; prefer it for "how much did I invest in X" or "how many shares of Y do I hold" questions.',
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const data = await client.get<StockTx[]>('/stocks/transactions');
+      const summary = summarizeStockTransactions(data ?? []);
+      return { content: [{ type: 'text' as const, text: toCSV(summary) }] };
+    }
+  );
+
+  server.registerTool(
+    'stocks_get_portfolio',
+    {
+      description:
+        'Current stock portfolio with LIVE NSE prices, current value, P&L, and 1-day change for each holding. WARNING: calls Yahoo Finance in real-time and may take 10-30 seconds. Use stocks_get_summary instead if you only need transaction-side metrics. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -31,10 +46,10 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   );
 
   server.registerTool(
-    'add_stock_transaction',
+    'stocks_add_transaction',
     {
       description:
-        'Log a stock buy (credit) or sell (debit) transaction. Use the exact NSE ticker symbol — call get_stock_transactions first to see existing symbols. Do NOT include exchange suffixes (.NS, .BO). The backend will resolve full company names to tickers via Yahoo Finance search as a fallback. If this tool fails or times out, retry it once.',
+        'Log a stock buy (credit) or sell (debit) transaction. Use the exact NSE ticker symbol — call stocks_get_summary first to see existing symbols. Do NOT include exchange suffixes (.NS, .BO). The backend will resolve full company names to tickers via Yahoo Finance search as a fallback. If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         type: z.enum(['credit', 'debit']).describe('"credit" = buy, "debit" = sell'),
         stockName: z

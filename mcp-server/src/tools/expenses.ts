@@ -5,7 +5,7 @@ import { okResponse, toCSV } from '../compact.js';
 
 export function registerExpenseTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_expense_transactions',
+    'expenses_get_transactions',
     {
       description:
         'Fetch daily expense log entries (individual purchases/payments). Supports optional date range filtering. Returns date, name, amount, category, and reason for each entry. If this tool fails or times out, retry it once.',
@@ -24,7 +24,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
   );
 
   server.registerTool(
-    'add_expense_transaction',
+    'expenses_add_transaction',
     {
       description:
         'Log a new daily expense transaction (individual purchase or payment). If this tool fails or times out, retry it once.',
@@ -45,7 +45,7 @@ export function registerExpenseTools(server: McpServer, client: BackendClient): 
   );
 
   server.registerTool(
-    'get_recurring_expenses',
+    'expenses_get_recurring',
     {
       description:
         'Fetch all recurring expense categories (rent, insurance, subscriptions, utilities etc.). These are fixed/regular expenses with a frequency field (daily, weekly, monthly, yearly, one-time). Different from daily expense transactions. If this tool fails or times out, retry it once.',

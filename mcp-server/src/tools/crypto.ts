@@ -2,13 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
 import { okResponse, toCSV } from '../compact.js';
+import { CryptoTx, summarizeCryptoTransactions } from '../aggregations.js';
 
 export function registerCryptoTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_crypto_transactions',
+    'crypto_get_transactions',
     {
       description:
-        'Fetch all cryptocurrency buy and sell transactions. Returns coin name, symbol, type (credit=buy/debit=sell), date, price, quantity, and amount for each transaction. If this tool fails or times out, retry it once.',
+        'Fetch all cryptocurrency buy and sell transactions (raw audit trail). Returns coin name, symbol, type (credit=buy/debit=sell), date, price, quantity, and amount per transaction. Prefer crypto_get_summary for per-coin holdings. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -18,7 +19,21 @@ export function registerCryptoTools(server: McpServer, client: BackendClient): v
   );
 
   server.registerTool(
-    'add_crypto_transaction',
+    'crypto_get_summary',
+    {
+      description:
+        'Per-coin summary aggregated from raw transactions: coins_held, total_invested, total_proceeds, net_invested, avg_buy_price, txn_count. Does NOT include live prices — does not call CoinDCX. Cheapest tool for "how much did I invest in BTC" or "how many ETH do I hold" questions.',
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const data = await client.get<CryptoTx[]>('/crypto/transactions');
+      const summary = summarizeCryptoTransactions(data ?? []);
+      return { content: [{ type: 'text' as const, text: toCSV(summary) }] };
+    }
+  );
+
+  server.registerTool(
+    'crypto_add_transaction',
     {
       description:
         'Log a new cryptocurrency buy (credit) or sell (debit) transaction. If this tool fails or times out, retry it once.',

@@ -2,13 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
 import { okResponse, toCSV } from '../compact.js';
+import { GoldTx, summarizeGoldTransactions } from '../aggregations.js';
 
 export function registerGoldTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_gold_transactions',
+    'gold_get_transactions',
     {
       description:
-        'Fetch all digital gold buy and sell transactions. Returns date, type (credit=buy/debit=sell), grams, price per gram, and amount for each transaction. If this tool fails or times out, retry it once.',
+        'Fetch all digital gold buy and sell transactions (raw audit trail). Returns date, type (credit=buy/debit=sell), grams, price per gram, and amount per transaction. Prefer gold_get_summary for per-platform totals. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -18,7 +19,21 @@ export function registerGoldTools(server: McpServer, client: BackendClient): voi
   );
 
   server.registerTool(
-    'add_gold_transaction',
+    'gold_get_summary',
+    {
+      description:
+        'Per-platform digital gold summary aggregated from raw transactions: grams_held, total_invested, total_proceeds, net_invested, avg_buy_price_per_gram, total_tax_paid, txn_count. Does NOT include live gold rates — backend currently has no MCP route for that.',
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const data = await client.get<GoldTx[]>('/gold/transactions');
+      const summary = summarizeGoldTransactions(data ?? []);
+      return { content: [{ type: 'text' as const, text: toCSV(summary) }] };
+    }
+  );
+
+  server.registerTool(
+    'gold_add_transaction',
     {
       description:
         'Log a new digital gold buy (credit) or sell (debit) transaction. If this tool fails or times out, retry it once.',

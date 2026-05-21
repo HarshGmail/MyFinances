@@ -5,7 +5,7 @@ import { compactJSON } from '../compact.js';
 
 export function registerCapitalGainsTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
-    'get_capital_gains_summary',
+    'tax_get_capital_gains',
     {
       description:
         'Returns realized capital gains grouped by Indian financial year (FY) for stocks, gold, crypto, and mutual funds, using FIFO cost-basis matching. Also returns current (unrealized) lot holdings with purchase date, cost per unit, and holding days. Includes estimated Indian capital gains tax: equity STCG 20%, LTCG 12.5% (threshold 365 days); gold LTCG 12.5% (threshold 730 days), STCG at income slab (not computed); crypto 30% flat. All based on Finance Act 2024 (effective July 23, 2024). Note: ₹1.25L annual LTCG exemption across equity+equity MF is NOT auto-applied. FD/RD are interest income, not capital gains. If this tool fails, retry once.',
