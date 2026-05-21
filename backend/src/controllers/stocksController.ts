@@ -479,11 +479,18 @@ export async function getPortfolioAnalytics(req: Request, res: Response) {
       .find({ userId: new ObjectId(user.userId) })
       .toArray();
 
-    const symbolSet = new Set<string>();
+    // Compute net shares per symbol so fully-sold positions are excluded from analytics.
+    const netSharesBySymbol: Record<string, number> = {};
     for (const tx of transactions) {
-      if (tx.stockName) symbolSet.add(tx.stockName as string);
+      const name = tx.stockName as string | undefined;
+      if (!name) continue;
+      const shares = tx.numOfShares as number;
+      netSharesBySymbol[name] =
+        (netSharesBySymbol[name] ?? 0) + (tx.type === 'credit' ? shares : -shares);
     }
-    const symbols = Array.from(symbolSet);
+    const symbols = Object.keys(netSharesBySymbol).filter(
+      (sym) => (netSharesBySymbol[sym] ?? 0) > 0
+    );
 
     if (symbols.length === 0) {
       res.status(200).json({ success: true, data: {} });
