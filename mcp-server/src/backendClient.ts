@@ -5,6 +5,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:5000/api';
 export type BackendClient = {
   get<T>(path: string, params?: Record<string, unknown>): Promise<T>;
   post<T>(path: string, body: unknown): Promise<T>;
+  put<T>(path: string, body: unknown): Promise<T>;
 };
 
 export async function exchangeIngestToken(ingestToken: string): Promise<string> {
@@ -33,6 +34,10 @@ export function createBackendClient(jwt: string): BackendClient {
     },
     async post<T>(path: string, body: unknown): Promise<T> {
       const res = await instance.post<{ success: boolean; data: T }>(path, body);
+      return res.data.data ?? (res.data as T);
+    },
+    async put<T>(path: string, body: unknown): Promise<T> {
+      const res = await instance.put<{ success: boolean; data: T }>(path, body);
       return res.data.data ?? (res.data as T);
     },
   };
