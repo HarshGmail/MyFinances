@@ -13,12 +13,14 @@ export default function AssetPortfolioCard({
   title,
   summary,
   xirr,
+  cagr,
   hasData,
   emptyMessage,
 }: {
   title: string;
   summary: AssetSummary;
   xirr: number | null;
+  cagr?: number | null;
   hasData: boolean;
   emptyMessage: string;
 }) {
@@ -50,6 +52,14 @@ export default function AssetPortfolioCard({
               {xirr !== null ? `${xirr.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
+          {cagr !== undefined && (
+            <div className="flex justify-between">
+              <span>CAGR:</span>
+              <span className={cagr !== null && cagr >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {cagr !== null ? `${cagr.toFixed(2)}%` : 'N/A'}
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex items-center justify-center h-24 text-muted-foreground">

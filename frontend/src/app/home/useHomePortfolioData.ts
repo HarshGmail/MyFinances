@@ -18,6 +18,7 @@ import {
 import { useStocksPortfolioQuery } from '@/api/query/stocks';
 import { useCapitalGainsQuery } from '@/api/query/capitalGains';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
+import { cagr, firstTransactionDate, earliestDate } from '@/utils/cagr';
 import { calcMFPortfolio, calcEPFPortfolio } from '@/utils/portfolioCalculations';
 import { buildAIInsightPrompt } from './aiCopy';
 
@@ -437,6 +438,103 @@ export function useHomePortfolioData() {
     portfolioSummary.total.currentValue,
   ]);
 
+  // ===== CAGR =====
+  // Naive single-bucket reference shown next to XIRR. Uses cost basis of
+  // currently held positions vs. current value over years since first txn.
+  const stockFirstDate = useMemo(
+    () => firstTransactionDate(stockTransactions ?? []),
+    [stockTransactions]
+  );
+  const mfFirstDate = useMemo(
+    () => firstTransactionDate(mutualFundsTransactionsData ?? []),
+    [mutualFundsTransactionsData]
+  );
+  const goldFirstDate = useMemo(
+    () => firstTransactionDate(goldTransactions ?? []),
+    [goldTransactions]
+  );
+  const cryptoFirstDate = useMemo(
+    () => firstTransactionDate(cryptoTransactions ?? []),
+    [cryptoTransactions]
+  );
+
+  const toPct = (r: number | null) => (r === null ? null : r * 100);
+
+  const stockCagr = useMemo(
+    () =>
+      stockFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.stocks.invested,
+              currentValue: portfolioSummary.stocks.currentValue,
+              startDate: stockFirstDate,
+            })
+          )
+        : null,
+    [stockFirstDate, portfolioSummary.stocks.invested, portfolioSummary.stocks.currentValue]
+  );
+
+  const mfCagr = useMemo(
+    () =>
+      mfFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.mutualFunds.invested,
+              currentValue: portfolioSummary.mutualFunds.currentValue,
+              startDate: mfFirstDate,
+            })
+          )
+        : null,
+    [mfFirstDate, portfolioSummary.mutualFunds.invested, portfolioSummary.mutualFunds.currentValue]
+  );
+
+  const goldCagr = useMemo(
+    () =>
+      goldFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.gold.invested,
+              currentValue: portfolioSummary.gold.currentValue,
+              startDate: goldFirstDate,
+            })
+          )
+        : null,
+    [goldFirstDate, portfolioSummary.gold.invested, portfolioSummary.gold.currentValue]
+  );
+
+  const cryptoCagr = useMemo(
+    () =>
+      cryptoFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.crypto.invested,
+              currentValue: portfolioSummary.crypto.currentValue,
+              startDate: cryptoFirstDate,
+            })
+          )
+        : null,
+    [cryptoFirstDate, portfolioSummary.crypto.invested, portfolioSummary.crypto.currentValue]
+  );
+
+  const overallCagr = useMemo(() => {
+    const start = earliestDate([stockFirstDate, mfFirstDate, goldFirstDate, cryptoFirstDate]);
+    if (!start) return null;
+    return toPct(
+      cagr({
+        netInvested: portfolioSummary.total.invested,
+        currentValue: portfolioSummary.total.currentValue,
+        startDate: start,
+      })
+    );
+  }, [
+    stockFirstDate,
+    mfFirstDate,
+    goldFirstDate,
+    cryptoFirstDate,
+    portfolioSummary.total.invested,
+    portfolioSummary.total.currentValue,
+  ]);
+
   // ===== AI PROMPT =====
   const aiPrompt = useMemo(
     () =>
@@ -588,6 +686,11 @@ export function useHomePortfolioData() {
     goldXirr,
     cryptoXirr,
     overallXirr,
+    stockCagr,
+    mfCagr,
+    goldCagr,
+    cryptoCagr,
+    overallCagr,
     polarCategories,
     investedData,
     currentValueData,

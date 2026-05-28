@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Copy, CopyCheck } from 'lucide-react';
+import { Copy, CopyCheck, Info } from 'lucide-react';
 import { formatCurrency, formatToPercentage } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
 import { useHomePortfolioData } from './useHomePortfolioData';
@@ -13,11 +13,13 @@ import AssetPortfolioCard from './AssetPortfolioCard';
 import DepositCard from './DepositCard';
 import CapitalGainsCard from './CapitalGainsCard';
 import DashboardSkeleton from './DashboardSkeleton';
+import HomeInfoSheet from './HomeInfoSheet';
 
 const Chart = dynamic(() => import('./Chart'), { ssr: false });
 
 export default function Home() {
   const [copied, setCopied] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const {
     userName,
     cgData,
@@ -35,6 +37,11 @@ export default function Home() {
     goldXirr,
     cryptoXirr,
     overallXirr,
+    stockCagr,
+    mfCagr,
+    goldCagr,
+    cryptoCagr,
+    overallCagr,
     polarCategories,
     investedData,
     currentValueData,
@@ -63,17 +70,34 @@ export default function Home() {
     <div className="p-4">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-6 text-center">Portfolio Dashboard</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={copied ? 'Copied Portfolio Prompt' : 'Copy Portfolio Prompt'}
-          title={copied ? 'Copied!' : 'Copy AI-ready portfolio prompt'}
-          onClick={handleCopyPrompt}
-          className="rounded-full"
-        >
-          {copied ? <CopyCheck className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="About this dashboard"
+            title="About this dashboard"
+            onClick={() => setInfoOpen(true)}
+            className="rounded-full"
+          >
+            <Info className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={copied ? 'Copied Portfolio Prompt' : 'Copy Portfolio Prompt'}
+            title={copied ? 'Copied!' : 'Copy AI-ready portfolio prompt'}
+            onClick={handleCopyPrompt}
+            className="rounded-full"
+          >
+            {copied ? (
+              <CopyCheck className="h-5 w-5 text-green-500" />
+            ) : (
+              <Copy className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
       </div>
+      <HomeInfoSheet open={infoOpen} onOpenChange={setInfoOpen} />
 
       {/* Summary stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
@@ -109,6 +133,13 @@ export default function Home() {
             overallXirr !== null && overallXirr >= 0 ? 'text-green-600' : 'text-red-600'
           }
         />
+        <SummaryStatCard
+          label="Overall CAGR %"
+          value={overallCagr !== null ? `${overallCagr.toFixed(2)}%` : 'N/A'}
+          valueClassName={
+            overallCagr !== null && overallCagr >= 0 ? 'text-green-600' : 'text-red-600'
+          }
+        />
       </div>
 
       {/* Chart + Stocks/Gold/MF/Crypto cards */}
@@ -127,6 +158,7 @@ export default function Home() {
             title="Stocks Portfolio"
             summary={portfolioSummary.stocks}
             xirr={stockXirr}
+            cagr={stockCagr}
             hasData={stockPortfolioData.length > 0}
             emptyMessage="No stock investments found"
           />
@@ -134,6 +166,7 @@ export default function Home() {
             title="Gold Portfolio"
             summary={portfolioSummary.gold}
             xirr={goldXirr}
+            cagr={goldCagr}
             hasData={goldPortfolioData.length > 0 && goldPortfolioData[0].totalInvested > 0}
             emptyMessage="No gold investments found"
           />
@@ -143,6 +176,7 @@ export default function Home() {
             title="Mutual Funds Portfolio"
             summary={portfolioSummary.mutualFunds}
             xirr={mfXirr}
+            cagr={mfCagr}
             hasData={mfPortfolioData.length > 0}
             emptyMessage="No mutual fund investments found"
           />
@@ -150,6 +184,7 @@ export default function Home() {
             title="Crypto Portfolio"
             summary={portfolioSummary.crypto}
             xirr={cryptoXirr}
+            cagr={cryptoCagr}
             hasData={cryptoPortfolioData.length > 0}
             emptyMessage="No crypto investments found"
           />
