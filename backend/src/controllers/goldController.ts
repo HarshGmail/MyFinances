@@ -145,6 +145,10 @@ export async function deleteAllUserGoldTransactions(req: Request, res: Response)
 
 const TROY_OZ_TO_GRAM = 31.1035;
 const SAFEGOLD_MARKUP = 1.09;
+// SafeGold's effective per-gram price is ~4.6% above what the Yahoo-derived
+// rate (with SAFEGOLD_MARKUP) gives. Applied at read time so existing cache
+// rows stay valid; remove to revert.
+const SAFEGOLD_LIVE_BUMP = 1.046;
 const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0' };
 
 // Fetches gold (USD/oz) + USD/INR from Yahoo Finance for a date range,
@@ -282,7 +286,12 @@ export async function getSafeGoldRates(req: Request, res: Response) {
       }
     }
 
-    res.status(200).json({ success: true, data });
+    const adjusted = data.map((row) => ({
+      date: row.date,
+      rate: (parseFloat(row.rate) * SAFEGOLD_LIVE_BUMP).toString(),
+    }));
+
+    res.status(200).json({ success: true, data: adjusted });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching gold rates');
     res.status(500).json({ success: false, message: 'Failed to fetch gold rates' });

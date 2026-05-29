@@ -1,8 +1,14 @@
 import { useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import Highcharts from 'highcharts';
 import { Expense, UserProfile, MonthlyInvestmentSummaryItem } from '@/api/dataInterface';
 import { MonthlyData, FIXED_EXPENSE_TAGS } from './types';
+import {
+  getFinancialMonthKey,
+  getRecentFinancialMonthKeys,
+  getSalaryMonthForFinancialMonth,
+  financialMonthKeyToLabelDate,
+} from '@/utils/financialMonth';
 
 interface UseDashboardDataParams {
   user: UserProfile | undefined;
@@ -59,6 +65,18 @@ function getPaymentForMonth(month: Date, user: UserProfile) {
   return { totalPaid: effectiveSalary, baseAmount: effectiveSalary, bonus: 0, arrears: 0 };
 }
 
+// FM(M) is funded by the paycheck of (M-1), which credits at the start of FM(M).
+// Resolve the salary lookup to that earlier calendar month.
+function getSalaryForFinancialMonth(fmKey: string, user: UserProfile): number {
+  const salaryMonthDate = financialMonthKeyToLabelDate(getSalaryMonthForFinancialMonth(fmKey));
+  return getSalaryForMonth(salaryMonthDate, user);
+}
+
+function getPaymentForFinancialMonth(fmKey: string, user: UserProfile) {
+  const salaryMonthDate = financialMonthKeyToLabelDate(getSalaryMonthForFinancialMonth(fmKey));
+  return getPaymentForMonth(salaryMonthDate, user);
+}
+
 export function useDashboardData({
   user,
   expenses,
@@ -68,19 +86,14 @@ export function useDashboardData({
   const monthlyAnalysis = useMemo(() => {
     if (!user) return [];
 
-    const endDate = new Date();
-    const startDate = subMonths(endDate, 11);
-    const months = eachMonthOfInterval({ start: startDate, end: endDate });
+    const fmKeys = getRecentFinancialMonthKeys(12);
 
-    const monthlyData: MonthlyData[] = months.map((month) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
-      const monthStr = format(month, 'MMM yyyy');
-      const monthKey = format(month, 'yyyy-MM');
+    const monthlyData: MonthlyData[] = fmKeys.map((monthKey) => {
+      const labelDate = financialMonthKeyToLabelDate(monthKey);
+      const monthStr = format(labelDate, 'MMM yyyy');
 
-      const effectiveSalary = getSalaryForMonth(month, user);
-      const payment = getPaymentForMonth(month, user);
+      const effectiveSalary = getSalaryForFinancialMonth(monthKey, user);
+      const payment = getPaymentForFinancialMonth(monthKey, user);
 
       // Pull pre-aggregated investment totals from backend summary
       const summaryItem = monthlyInvestmentSummary?.find((s) => s.monthKey === monthKey);
@@ -104,10 +117,9 @@ export function useDashboardData({
       const expensesByCategory: Record<string, number> = {};
 
       expenses?.forEach((exp) => {
-        // Only count this expense from the month it was created (timestamp fix)
         if (exp.createdAt) {
-          const expCreatedDate = startOfMonth(new Date(exp.createdAt));
-          if (expCreatedDate > monthEnd) return;
+          const createdFmKey = getFinancialMonthKey(new Date(exp.createdAt));
+          if (createdFmKey > monthKey) return;
         }
 
         let monthlyAmount = exp.expenseAmount;
@@ -139,7 +151,7 @@ export function useDashboardData({
       const savingsRate = payment.totalPaid > 0 ? (totalInvestments / payment.totalPaid) * 100 : 0;
 
       return {
-        month,
+        month: labelDate,
         monthStr,
         salary: effectiveSalary,
         actualPaid: payment.totalPaid,

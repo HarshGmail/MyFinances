@@ -268,6 +268,11 @@ export function DashboardTab({
         </Drawer>
       </div>
 
+      <p className="text-xs text-muted-foreground italic">
+        Months align to your salary cycle — each month runs from the last working day of the
+        previous month through the day before the next salary credit.
+      </p>
+
       {/* Current Month Overview */}
       {currentMonthData && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

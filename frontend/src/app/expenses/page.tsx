@@ -53,7 +53,7 @@ export default function ExpensesPage() {
     monthlyInvestmentSummary,
     theme,
   });
-  const tracker = useTrackerData({ expenseTransactions, theme });
+  const tracker = useTrackerData({ expenseTransactions, theme, user });
 
   if (isLoading) {
     return (

@@ -1,10 +1,6 @@
 import { useMemo } from 'react';
 import {
   format,
-  startOfMonth,
-  endOfMonth,
-  eachMonthOfInterval,
-  subMonths,
   startOfWeek,
   endOfWeek,
   startOfDay,
@@ -13,11 +9,19 @@ import {
   subDays,
 } from 'date-fns';
 import Highcharts from 'highcharts';
-import { ExpenseTransaction } from '@/api/dataInterface';
+import { ExpenseTransaction, UserProfile } from '@/api/dataInterface';
+import {
+  getFinancialMonthBoundaries,
+  getFinancialMonthKey,
+  getCurrentFinancialMonthKey,
+  getRecentFinancialMonthKeys,
+  financialMonthKeyToLabelDate,
+} from '@/utils/financialMonth';
 
 interface UseTrackerDataParams {
   expenseTransactions: ExpenseTransaction[] | undefined;
   theme: string;
+  user?: UserProfile;
 }
 
 export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataParams) {
@@ -30,8 +34,9 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
     const todayEnd = endOfDay(now);
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
+    const { start: fmStart, end: fmEnd } = getFinancialMonthBoundaries(
+      getCurrentFinancialMonthKey()
+    );
 
     const inRange = (date: Date, start: Date, end: Date) => date >= start && date <= end;
 
@@ -43,7 +48,7 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
         .filter((t) => inRange(new Date(t.date), weekStart, weekEnd))
         .reduce((s, t) => s + t.amount, 0),
       thisMonth: txs
-        .filter((t) => inRange(new Date(t.date), monthStart, monthEnd))
+        .filter((t) => inRange(new Date(t.date), fmStart, fmEnd))
         .reduce((s, t) => s + t.amount, 0),
       total: txs.reduce((s, t) => s + t.amount, 0),
     };
@@ -155,19 +160,15 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
   }, [txs, textColor]);
 
   const monthlyOptions = useMemo(() => {
-    const now = new Date();
-    const months = eachMonthOfInterval({ start: subMonths(now, 5), end: now });
+    const fmKeys = getRecentFinancialMonthKeys(6);
 
-    const data = months.map((m) => {
-      const ms = startOfMonth(m);
-      const me = endOfMonth(m);
-      return txs
-        .filter((t) => {
-          const d = new Date(t.date);
-          return d >= ms && d <= me;
-        })
-        .reduce((s, t) => s + t.amount, 0);
+    const totalsByFm: Record<string, number> = {};
+    for (const key of fmKeys) totalsByFm[key] = 0;
+    txs.forEach((t) => {
+      const key = getFinancialMonthKey(new Date(t.date));
+      if (key in totalsByFm) totalsByFm[key] += t.amount;
     });
+    const data = fmKeys.map((k) => totalsByFm[k]);
 
     return {
       chart: { type: 'column', backgroundColor: 'transparent', height: 280 },
@@ -176,7 +177,7 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
         style: { color: textColor, fontSize: '16px', fontWeight: '600' },
       },
       xAxis: {
-        categories: months.map((m) => format(m, 'MMM yyyy')),
+        categories: fmKeys.map((k) => format(financialMonthKeyToLabelDate(k), 'MMM yyyy')),
         labels: { style: { color: textColor } },
       },
       yAxis: {

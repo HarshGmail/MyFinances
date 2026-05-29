@@ -4,6 +4,7 @@ import database from '../database';
 import { expenseSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
+import { getFinancialMonthKey, getRecentFinancialMonthKeys } from '../utils/financialMonth';
 
 export async function addExpense(req: Request, res: Response) {
   try {
@@ -204,37 +205,41 @@ export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
     const userId = new ObjectId(user.userId);
     const db = database.getDb();
 
+    // Buckets are financial months, not calendar months. A transaction near
+    // the end of a calendar month can roll into the next FM, so widen the
+    // fetch window by ~10 days on both sides; out-of-range txns are dropped
+    // implicitly when keying into monthlyMap.
     const endDate = new Date();
+    const fetchEndDate = new Date(endDate.getTime() + 10 * 24 * 60 * 60 * 1000);
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - months + 1);
     startDate.setDate(1);
     startDate.setHours(0, 0, 0, 0);
+    const fetchStartDate = new Date(startDate.getTime() - 10 * 24 * 60 * 60 * 1000);
 
-    // Fetch all investment transactions in parallel
     const [stocks, gold, crypto, mf, rd] = await Promise.all([
       db
         .collection('stocks')
-        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .find({ userId, date: { $gte: fetchStartDate, $lte: fetchEndDate } })
         .toArray(),
       db
         .collection('digitalGold')
-        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .find({ userId, date: { $gte: fetchStartDate, $lte: fetchEndDate } })
         .toArray(),
       db
         .collection('crypto')
-        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .find({ userId, date: { $gte: fetchStartDate, $lte: fetchEndDate } })
         .toArray(),
       db
         .collection('mutualFunds')
-        .find({ userId, date: { $gte: startDate, $lte: endDate } })
+        .find({ userId, date: { $gte: fetchStartDate, $lte: fetchEndDate } })
         .toArray(),
       db
         .collection('recurringDeposits')
-        .find({ userId, dateOfCreation: { $gte: startDate, $lte: endDate } })
+        .find({ userId, dateOfCreation: { $gte: fetchStartDate, $lte: fetchEndDate } })
         .toArray(),
     ]);
 
-    // Initialize monthly buckets for the full range
     type InvestmentBucket = {
       stocks: number;
       gold: number;
@@ -243,15 +248,12 @@ export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
       rd: number;
     };
     const monthlyMap: Record<string, InvestmentBucket> = {};
-    for (let i = 0; i < months; i++) {
-      const d = new Date(endDate);
-      d.setMonth(d.getMonth() - i);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    for (const key of getRecentFinancialMonthKeys(months)) {
       monthlyMap[key] = { stocks: 0, gold: 0, crypto: 0, mutualFunds: 0, rd: 0 };
     }
 
     const addToMonth = (date: Date, bucket: keyof InvestmentBucket, amount: number) => {
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const key = getFinancialMonthKey(date);
       if (monthlyMap[key]) monthlyMap[key][bucket] += amount;
     };
 

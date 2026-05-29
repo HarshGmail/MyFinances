@@ -420,6 +420,9 @@ export function TrackerTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{formatCurrency(stats.thisMonth)}</div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Salary-cycle month, not calendar month
+            </p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-purple-500">
