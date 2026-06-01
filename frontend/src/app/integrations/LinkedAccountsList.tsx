@@ -97,13 +97,13 @@ export default function LinkedAccountsList({
         )}
         {accounts.map((account) => (
           <div key={account.email} className="border rounded-lg p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 shrink-0">
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
-                <div>
-                  <div className="font-medium text-sm">{account.email}</div>
+                <div className="min-w-0">
+                  <div className="font-medium text-sm break-all">{account.email}</div>
                   <div className="text-xs text-muted-foreground">
                     {account.lastSyncAt
                       ? `Last synced ${format(new Date(account.lastSyncAt), 'PPp')}`
@@ -111,7 +111,7 @@ export default function LinkedAccountsList({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
                 <Button
                   size="sm"
                   variant="outline"
@@ -136,16 +136,16 @@ export default function LinkedAccountsList({
               </div>
             </div>
 
-            <div className="space-y-1.5 pl-11">
+            <div className="space-y-1.5 sm:pl-11">
               <Label className="text-xs text-muted-foreground">SafeGold sender email</Label>
               {editingAccount === account.email ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Input
                     value={senderEdits[account.email] ?? ''}
                     onChange={(e) =>
                       setSenderEdits((prev) => ({ ...prev, [account.email]: e.target.value }))
                     }
-                    className="text-xs h-7"
+                    className="text-xs h-7 min-w-0 flex-1"
                     placeholder="estatements@safegold.in"
                   />
                   <Button
@@ -172,8 +172,8 @@ export default function LinkedAccountsList({
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <code className="text-xs bg-muted px-2 py-0.5 rounded">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="text-xs bg-muted px-2 py-0.5 rounded break-all min-w-0">
                     {senderEdits[account.email] || 'estatements@safegold.in'}
                   </code>
                   <Button

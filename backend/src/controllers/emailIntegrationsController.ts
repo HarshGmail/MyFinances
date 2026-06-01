@@ -17,6 +17,11 @@ import {
   waitForPdfJob,
 } from '../services/pdfParsingClient';
 import { decrypt } from '../utils/encryption';
+import {
+  loadCustomPdfPasswords,
+  encryptCustomPdfPasswords,
+  sanitizeCustomPdfPasswords,
+} from '../utils/customPasswords';
 import config from '../config';
 import logger from '../utils/logger';
 
@@ -235,6 +240,60 @@ export async function updateSettings(req: Request, res: Response) {
   }
 }
 
+// ─── Custom PDF Passwords ─────────────────────────────────────────────────────
+// User-level passwords tried (in addition to the derived defaults) when opening
+// password-protected PDFs across all parse flows. Stored AES-256-GCM encrypted.
+
+export async function getCustomPasswords(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const passwords = await loadCustomPdfPasswords(user.userId);
+    res.json({ success: true, data: { passwords } });
+  } catch (err) {
+    logger.error({ err }, 'Get custom passwords error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function updateCustomPasswords(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    let passwords: string[];
+    try {
+      passwords = sanitizeCustomPdfPasswords(req.body?.passwords);
+    } catch (validationErr) {
+      res.status(400).json({
+        success: false,
+        message: validationErr instanceof Error ? validationErr.message : 'Invalid passwords',
+      });
+      return;
+    }
+
+    const db = database.getDb();
+    await db
+      .collection('users')
+      .updateOne(
+        { _id: new ObjectId(user.userId) },
+        { $set: { customPdfPasswords: encryptCustomPdfPasswords(passwords) } }
+      );
+
+    res.json({ success: true, data: { passwords } });
+  } catch (err) {
+    logger.error({ err }, 'Update custom passwords error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export async function syncEmails(req: Request, res: Response) {
@@ -358,6 +417,7 @@ async function runSyncInBackground(
     userDoc.name as string,
     userDoc.phone as string | undefined
   );
+  const customPasswords = await loadCustomPdfPasswords(userId);
 
   const errors: string[] = [];
   const allMFTransactions: ReturnType<typeof parseCdslMFTransactions> = [];
@@ -384,8 +444,10 @@ async function runSyncInBackground(
 
       const afterDate: Date | undefined = (integration.lastSyncAt as Date | null) ?? undefined;
       const accountTag = integration.email as string;
-      const cdslPasswords = cdslPassword ? [cdslPassword, ''] : [''];
-      const sgPasswords = safegoldPassword ? [safegoldPassword, ''] : [''];
+      // Derived default first (most likely), then user custom passwords, then
+      // the empty password (for unprotected PDFs). Deduped, empties stripped.
+      const cdslPasswords = buildPasswordList([cdslPassword, ...customPasswords]);
+      const sgPasswords = buildPasswordList([safegoldPassword, ...customPasswords]);
       const gmailClient = new GmailClient(integration.refreshToken as string);
 
       logger.info(
@@ -416,6 +478,7 @@ async function runSyncInBackground(
               );
               const rustJobId = await submitPdfJobByIds('cdsl_cas', fileIds);
               const rustResult = await waitForPdfJob(rustJobId);
+              const mfCount = rustResult?.transactions?.length ?? 0;
               if (rustResult?.transactions) {
                 const mfTxs = (rustResult.transactions as RustMfTx[]).map((tx) => ({
                   date: new Date(tx.date),
@@ -431,8 +494,24 @@ async function runSyncInBackground(
                   '[Sync] CDSL parsed via Rust service'
                 );
               }
+              if (mfCount === 0) {
+                // 0 transactions from N PDFs usually means the password was wrong.
+                errors.push(
+                  `[${accountTag}] CDSL: parsed ${cdslPdfs.length} PDF(s) but found 0 transactions. ` +
+                    `If these are password-protected, the password may be incorrect. ` +
+                    describeAttemptedPasswords(cdslPasswords, {
+                      pan: cdslPassword,
+                      custom: customPasswords,
+                    })
+                );
+              }
             } catch (rustErr) {
-              const msg = `[${accountTag}] CDSL Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
+              const msg =
+                `[${accountTag}] CDSL Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}. ` +
+                describeAttemptedPasswords(cdslPasswords, {
+                  pan: cdslPassword,
+                  custom: customPasswords,
+                });
               errors.push(msg);
               logger.error(
                 { err: rustErr, account: accountTag },
@@ -475,6 +554,7 @@ async function runSyncInBackground(
               const fileIds = await Promise.all(sgPdfs.map((pdf) => uploadPdf(pdf, sgPasswords)));
               const rustJobId = await submitPdfJobByIds('safe_gold', fileIds);
               const rustResult = await waitForPdfJob(rustJobId);
+              const sgCount = rustResult?.transactions?.length ?? 0;
               if (rustResult?.transactions) {
                 const goldTxs = (rustResult.transactions as RustGoldTx[]).map((tx) => ({
                   date: new Date(tx.date),
@@ -491,8 +571,25 @@ async function runSyncInBackground(
                   '[Sync] SafeGold parsed via Rust service'
                 );
               }
+              if (sgCount === 0) {
+                errors.push(
+                  `[${accountTag}] SafeGold: parsed ${sgPdfs.length} PDF(s) but found 0 transactions. ` +
+                    `If these are password-protected, the password may be incorrect. ` +
+                    describeAttemptedPasswords(sgPasswords, {
+                      derived: safegoldPassword,
+                      derivedLabel: 'first 4 of name + last 4 of phone',
+                      custom: customPasswords,
+                    })
+                );
+              }
             } catch (rustErr) {
-              const msg = `[${accountTag}] SafeGold statement Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
+              const msg =
+                `[${accountTag}] SafeGold statement Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}. ` +
+                describeAttemptedPasswords(sgPasswords, {
+                  derived: safegoldPassword,
+                  derivedLabel: 'first 4 of name + last 4 of phone',
+                  custom: customPasswords,
+                });
               errors.push(msg);
               logger.error(
                 { err: rustErr, account: accountTag },
@@ -531,7 +628,9 @@ async function runSyncInBackground(
         if (sgInvoicePdfs.length > 0) {
           if (useRustService) {
             try {
-              const fileIds = await Promise.all(sgInvoicePdfs.map((pdf) => uploadPdf(pdf, [])));
+              const fileIds = await Promise.all(
+                sgInvoicePdfs.map((pdf) => uploadPdf(pdf, buildPasswordList(customPasswords)))
+              );
               const rustJobId = await submitPdfJobByIds('safe_gold_invoice', fileIds);
               const rustResult = await waitForPdfJob(rustJobId);
               if (rustResult?.transactions) {
@@ -809,61 +908,78 @@ async function canonicalizeMFNames(
   ]);
   const existingNames = [...new Set([...mfNames, ...infoNames])] as string[];
 
-  return Promise.all(
-    txns.map(async (tx) => {
-      // 1. Try local DB match (user may have entered a different short name)
-      let bestName = '';
-      let bestScore = 0;
-      for (const name of existingNames) {
-        const score = fundNameSimilarity(tx.fundName, name);
-        if (score > bestScore) {
-          bestScore = score;
-          bestName = name;
-        }
-      }
+  // Resolve each *unique* incoming fund name exactly once. An irregular investor
+  // has many transactions for the same fund; resolving per-transaction (and worse,
+  // concurrently via Promise.all) made every transaction race past the existsInfo
+  // check and insert its own duplicate mutualFundsInfo row. Deduping the inputs and
+  // running sequentially guarantees one info row per fund.
+  const uniqueNames = [...new Set(txns.map((tx) => tx.fundName))];
 
-      if (bestScore >= 0.6) {
-        if (bestName !== tx.fundName) {
-          logger.info(
-            `[Email Import] Fund name mapped (local): "${tx.fundName}" → "${bestName}" (score: ${bestScore.toFixed(2)})`
-          );
-        }
-        return { ...tx, fundName: bestName };
-      }
+  // input CDSL name → resolved canonical name
+  const canonicalByInput = new Map<string, string>();
+  // canonical name → scheme code, for funds that need a mutualFundsInfo row created
+  const infoToCreate = new Map<string, number>();
 
-      // 2. Brand new fund — look up correct name from MFAPI so NAV fetches work
-      const mfapiMatch = await lookupMFAPIScheme(tx.fundName);
-      if (mfapiMatch) {
+  for (const inputName of uniqueNames) {
+    // 1. Try local DB match (user may have entered a different short name)
+    let bestName = '';
+    let bestScore = 0;
+    for (const name of existingNames) {
+      const score = fundNameSimilarity(inputName, name);
+      if (score > bestScore) {
+        bestScore = score;
+        bestName = name;
+      }
+    }
+
+    if (bestScore >= 0.6) {
+      if (bestName !== inputName) {
         logger.info(
-          `[Email Import] Fund name mapped (MFAPI): "${tx.fundName}" → "${mfapiMatch.schemeName}"`
+          `[Email Import] Fund name mapped (local): "${inputName}" → "${bestName}" (score: ${bestScore.toFixed(2)})`
         );
-
-        // Auto-create mutualFundsInfo so NAV history is immediately fetchable
-        const existsInfo = await db
-          .collection('mutualFundsInfo')
-          .findOne({ userId, fundName: mfapiMatch.schemeName });
-        if (!existsInfo) {
-          await db.collection('mutualFundsInfo').insertOne({
-            userId,
-            fundName: mfapiMatch.schemeName,
-            schemeNumber: mfapiMatch.schemeCode,
-            sipAmount: 0,
-            platform: 'CDSL',
-            date: new Date(),
-          });
-          logger.info(
-            `[Email Import] Auto-created mutualFundsInfo for "${mfapiMatch.schemeName}" (scheme: ${mfapiMatch.schemeCode})`
-          );
-        }
-
-        return { ...tx, fundName: mfapiMatch.schemeName };
       }
+      canonicalByInput.set(inputName, bestName);
+      continue;
+    }
 
-      // 3. No match anywhere — keep CDSL name as fallback
-      logger.info(`[Email Import] No MFAPI match for "${tx.fundName}" — keeping CDSL name`);
-      return tx;
-    })
-  );
+    // 2. Brand new fund — look up correct name from MFAPI so NAV fetches work
+    const mfapiMatch = await lookupMFAPIScheme(inputName);
+    if (mfapiMatch) {
+      logger.info(
+        `[Email Import] Fund name mapped (MFAPI): "${inputName}" → "${mfapiMatch.schemeName}"`
+      );
+      canonicalByInput.set(inputName, mfapiMatch.schemeName);
+      infoToCreate.set(mfapiMatch.schemeName, mfapiMatch.schemeCode);
+      // Treat as existing so later unique names that resolve to the same fund map locally
+      existingNames.push(mfapiMatch.schemeName);
+      continue;
+    }
+
+    // 3. No match anywhere — keep CDSL name as fallback
+    logger.info(`[Email Import] No MFAPI match for "${inputName}" — keeping CDSL name`);
+    canonicalByInput.set(inputName, inputName);
+  }
+
+  // Auto-create one mutualFundsInfo per new fund so NAV history is immediately
+  // fetchable. Sequential + deduped by canonical name → never inserts duplicates.
+  for (const [fundName, schemeNumber] of infoToCreate) {
+    const existsInfo = await db.collection('mutualFundsInfo').findOne({ userId, fundName });
+    if (!existsInfo) {
+      await db.collection('mutualFundsInfo').insertOne({
+        userId,
+        fundName,
+        schemeNumber,
+        sipAmount: 0,
+        platform: 'CDSL',
+        date: new Date(),
+      });
+      logger.info(
+        `[Email Import] Auto-created mutualFundsInfo for "${fundName}" (scheme: ${schemeNumber})`
+      );
+    }
+  }
+
+  return txns.map((tx) => ({ ...tx, fundName: canonicalByInput.get(tx.fundName) ?? tx.fundName }));
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -888,6 +1004,42 @@ function derivesSafeGoldPassword(name: string, phone: string | undefined): strin
   const first4 = name.replace(/\s+/g, '').slice(0, 4).toUpperCase();
   const last4 = phone.slice(-4);
   return first4 + last4;
+}
+
+/**
+ * Builds the ordered list of passwords to try: the given non-empty candidates
+ * (deduped, in order) followed by the empty password for unprotected PDFs.
+ */
+function buildPasswordList(candidates: string[]): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const c of candidates) {
+    if (c && !seen.has(c)) {
+      seen.add(c);
+      list.push(c);
+    }
+  }
+  list.push(''); // always attempt no-password for unprotected PDFs
+  return list;
+}
+
+/**
+ * Renders the attempted passwords for a failure message so the user can see
+ * exactly which password was being formed and tried. Per the user's request,
+ * the full password values are shown (this is the owner's own data).
+ */
+function describeAttemptedPasswords(
+  attempted: string[],
+  ctx: { pan?: string; derived?: string; derivedLabel?: string; custom: string[] }
+): string {
+  const labelled = attempted.map((p) => {
+    if (!p) return '(no password)';
+    if (ctx.pan && p === ctx.pan) return `"${p}" (your PAN)`;
+    if (ctx.derived && p === ctx.derived) return `"${p}" (${ctx.derivedLabel ?? 'derived'})`;
+    if (ctx.custom.includes(p)) return `"${p}" (custom)`;
+    return `"${p}"`;
+  });
+  return `Tried ${labelled.length} password(s): ${labelled.join(', ')}`;
 }
 
 async function deduplicateMF(

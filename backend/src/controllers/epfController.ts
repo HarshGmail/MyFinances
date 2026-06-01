@@ -4,7 +4,7 @@ import database from '../database';
 import { epfSchema } from '../schemas/epf';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
-import { extractTextFromPdf } from '../services/pdfParser';
+import { extractTextFromPdf, PdfPasswordError } from '../services/pdfParser';
 import { parseEpfPassbook, groupIntoSegments, EpfSegment } from '../services/epfPassbookParser';
 import {
   isPdfServiceAvailable,
@@ -12,6 +12,7 @@ import {
   waitForPdfJob,
   warmupPdfService,
 } from '../services/pdfParsingClient';
+import { loadCustomPdfPasswords } from '../utils/customPasswords';
 
 export async function addEpfAccount(req: Request, res: Response) {
   try {
@@ -257,6 +258,10 @@ export async function parseEpfPassbooks(req: Request, res: Response) {
     const collection = db.collection('epfAccounts');
     const existingAccounts = await collection.find({ userId: new ObjectId(user.userId) }).toArray();
 
+    // Custom passwords are tried (in addition to no-password) when the passbook
+    // PDF is password-protected.
+    const customPasswords = await loadCustomPdfPasswords(user.userId);
+
     let segments: EpfSegment[] = [];
     let establishmentName = '';
     let uan = '';
@@ -267,7 +272,7 @@ export async function parseEpfPassbooks(req: Request, res: Response) {
       try {
         // ── Rust service path ────────────────────────────────────────────────
         const buffers = files.map((f) => Buffer.from(f.data, 'base64'));
-        const jobId = await submitPdfJob('epf_passbook', buffers, []);
+        const jobId = await submitPdfJob('epf_passbook', buffers, customPasswords);
         const result = await waitForPdfJob(jobId);
 
         const txns = (result?.transactions ?? []) as Array<{
@@ -331,7 +336,7 @@ export async function parseEpfPassbooks(req: Request, res: Response) {
       >();
       for (const file of files) {
         const buffer = Buffer.from(file.data, 'base64');
-        const text = await extractTextFromPdf(buffer, []);
+        const text = await extractTextFromPdf(buffer, customPasswords);
         const parsed = parseEpfPassbook(text);
         if (parsed.establishmentName) establishmentName = parsed.establishmentName;
         if (parsed.uan) uan = parsed.uan;
@@ -380,6 +385,22 @@ export async function parseEpfPassbooks(req: Request, res: Response) {
 
     res.status(200).json({ success: true, data: { segments: result, uan, establishmentName } });
   } catch (error) {
+    if (error instanceof PdfPasswordError) {
+      const attempted = error.attemptedPasswords.map((p) => (p ? `"${p}"` : '(no password)'));
+      logger.warn(
+        { attempted: error.attemptedPasswords },
+        'Parse EPF passbooks: all passwords failed'
+      );
+      res.status(422).json({
+        success: false,
+        message:
+          'Could not open the passbook PDF — all passwords failed. ' +
+          'If it is password-protected, add the correct password under Custom PDF passwords.',
+        attemptedPasswords: error.attemptedPasswords,
+        attemptedPasswordsLabel: `Tried ${attempted.length} password(s): ${attempted.join(', ')}`,
+      });
+      return;
+    }
     logger.error({ err: error }, 'Parse EPF passbooks error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }

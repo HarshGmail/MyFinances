@@ -94,7 +94,13 @@ export function EpfPassbookImportDialog({ open, onOpenChange }: Props) {
       setChecked(initial);
       setPhase('confirm');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to parse passbook');
+      // apiRequest throws the raw JSON body, so read message/attempted passwords
+      // off a plain object (not just Error instances).
+      const e = err as { message?: string; attemptedPasswordsLabel?: string };
+      const base = e?.message ?? (err instanceof Error ? err.message : 'Failed to parse passbook');
+      toast.error(e?.attemptedPasswordsLabel ? `${base} ${e.attemptedPasswordsLabel}` : base, {
+        duration: e?.attemptedPasswordsLabel ? 12000 : undefined,
+      });
     }
   }
 

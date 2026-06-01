@@ -104,3 +104,22 @@ export function useEmailUpdateSettingsMutation() {
     },
   });
 }
+
+async function updateCustomPdfPasswords(passwords: string[]): Promise<{ passwords: string[] }> {
+  const response = await apiRequest({
+    endpoint: '/email-integration/custom-passwords',
+    method: 'PUT',
+    body: { passwords },
+  });
+  return response.data;
+}
+
+export function useUpdateCustomPdfPasswordsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateCustomPdfPasswords,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom-pdf-passwords'] });
+    },
+  });
+}

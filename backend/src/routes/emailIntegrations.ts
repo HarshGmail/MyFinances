@@ -11,6 +11,8 @@ import {
   cancelSync,
   importTransactions,
   wakePdfParser,
+  getCustomPasswords,
+  updateCustomPasswords,
 } from '../controllers/emailIntegrationsController';
 import { authenticateToken } from '../middleware';
 
@@ -23,6 +25,8 @@ router.get('/wake', authenticateToken, wakePdfParser);
 router.delete('/disconnect', authenticateToken, disconnect);
 router.post('/reset-sync', authenticateToken, resetSync);
 router.put('/settings', authenticateToken, updateSettings);
+router.get('/custom-passwords', authenticateToken, getCustomPasswords);
+router.put('/custom-passwords', authenticateToken, updateCustomPasswords);
 router.post('/sync', authenticateToken, syncEmails);
 router.get('/sync-status/:jobId', authenticateToken, getSyncJobStatus);
 router.post('/sync/:jobId/cancel', authenticateToken, cancelSync);

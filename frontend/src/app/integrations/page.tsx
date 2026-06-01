@@ -42,9 +42,9 @@ export default function IntegrationsPage() {
   const { data: profile, isLoading } = useUserProfileQuery();
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Integrations</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Integrations</h1>
         <p className="text-muted-foreground mt-1">
           Connect external services to automate and enhance your finance tracking.
         </p>

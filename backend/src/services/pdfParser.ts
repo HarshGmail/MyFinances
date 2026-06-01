@@ -2,6 +2,20 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PDFParse, PasswordException, VerbosityLevel } = require('pdf-parse');
 
+/**
+ * Thrown when every candidate password fails to open an encrypted PDF.
+ * Carries the exact list of passwords that were tried so the caller can
+ * surface them to the user (so they can see the password being formed).
+ */
+export class PdfPasswordError extends Error {
+  readonly attemptedPasswords: string[];
+  constructor(attemptedPasswords: string[]) {
+    super('Unable to open PDF: all passwords failed');
+    this.name = 'PdfPasswordError';
+    this.attemptedPasswords = attemptedPasswords;
+  }
+}
+
 export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): Promise<string> {
   const passwordsToTry = passwords.length > 0 ? passwords : [''];
 
@@ -41,5 +55,5 @@ export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): P
     }
   }
 
-  throw new Error('Unable to open PDF: all passwords failed');
+  throw new PdfPasswordError(passwordsToTry);
 }

@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { EmailSyncPreview as EmailSyncPreviewType } from '@/api/dataInterface';
 import LinkedAccountsList from './LinkedAccountsList';
 import EmailSyncPreviewCard from './EmailSyncPreview';
+import CustomPasswordsCard from './CustomPasswordsCard';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
 
@@ -205,6 +206,8 @@ export default function EmailIntegration({
         isSyncing={isSyncing}
       />
 
+      <CustomPasswordsCard />
+
       {connected && (missingPhone || missingPan) && (
         <div className="flex items-start gap-3 p-4 rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 text-sm">
           <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
@@ -229,9 +232,9 @@ export default function EmailIntegration({
         <>
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="text-base">Sync Emails</CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {isSyncing && (
                     <Button
                       variant="outline"
@@ -244,7 +247,11 @@ export default function EmailIntegration({
                       {isCancelling ? 'Stopping…' : 'Stop'}
                     </Button>
                   )}
-                  <Button onClick={handleSync} disabled={isSyncing || !canSync} className="gap-2">
+                  <Button
+                    onClick={handleSync}
+                    disabled={isSyncing || !canSync}
+                    className="gap-2 flex-1 sm:flex-none"
+                  >
                     <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
                     {isSyncing ? 'Syncing…' : 'Sync Now'}
                   </Button>
@@ -263,7 +270,7 @@ export default function EmailIntegration({
                     Sync warnings
                   </div>
                   {preview.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-yellow-700 dark:text-yellow-400">
+                    <p key={i} className="text-xs text-yellow-700 dark:text-yellow-400 break-words">
                       {e}
                     </p>
                   ))}

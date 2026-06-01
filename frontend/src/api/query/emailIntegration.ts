@@ -13,6 +13,20 @@ export function useEmailIntegrationStatusQuery() {
   });
 }
 
+export function useCustomPdfPasswordsQuery() {
+  return useQuery<{ passwords: string[] }>({
+    queryKey: ['custom-pdf-passwords'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: '/email-integration/custom-passwords',
+        method: 'GET',
+      });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useSyncJobStatusQuery(jobId: string | null) {
   return useQuery<SyncJobStatus>({
     queryKey: ['sync-job-status', jobId],
