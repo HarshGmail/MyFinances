@@ -11,6 +11,7 @@ import {
   deleteStockTransaction,
   deleteAllUserStockTransactions,
   getStocksPortfolio,
+  getStockPrices,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -42,6 +43,9 @@ router.get('/portfolio-analytics', getPortfolioAnalytics);
 
 // GET /stocks/portfolio - Grouped portfolio with live prices, summary and raw transactions
 router.get('/portfolio', getStocksPortfolio);
+
+// GET /stocks/prices?symbol=X&symbol=Y - Fetch current prices for specific stocks
+router.get('/prices', getStockPrices);
 
 router.delete('/transaction/:id', deleteStockTransaction);
 router.delete('/all', deleteAllUserStockTransactions);

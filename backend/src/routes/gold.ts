@@ -21,6 +21,9 @@ router.get('/transactions', getGoldTransactions);
 // GET /gold/safe-gold-rates - Public endpoint for SafeGold rates
 router.get('/safe-gold-rates', getSafeGoldRates);
 
+// GET /gold/rates - MCP-optimized endpoint for gold rates (same as safe-gold-rates)
+router.get('/rates', getSafeGoldRates);
+
 router.put('/transaction/:id', updateGoldTransaction);
 router.delete('/transaction/:id', deleteGoldTransaction);
 router.delete('/all', deleteAllUserGoldTransactions);

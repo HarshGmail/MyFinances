@@ -418,6 +418,68 @@ export async function getStocksPortfolio(req: Request, res: Response) {
   }
 }
 
+export async function getStockPrices(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const symbols = req.query.symbol;
+    if (!symbols) {
+      res.status(400).json({ success: false, message: 'symbol query param required (array)' });
+      return;
+    }
+
+    const symbolList = Array.isArray(symbols) ? symbols : [symbols];
+    const normalizedSymbols = (symbolList as string[])
+      .map((s) => s.trim().toUpperCase().replace(/\.(NS|BO|BSE|NSE|MCX)$/i, ''))
+      .filter((s) => s.length > 0);
+
+    if (!normalizedSymbols.length) {
+      res.status(200).json({ success: true, data: {} });
+      return;
+    }
+
+    const rawPriceData = await StocksService.fetchNSEQuotes(normalizedSymbols);
+    const result: Record<string, any> = {};
+
+    for (const symbol of normalizedSymbols) {
+      const chartResult = rawPriceData[symbol]?.chart?.result?.[0];
+      if (!chartResult) {
+        result[symbol] = null;
+        continue;
+      }
+
+      const meta = chartResult.meta;
+      const currentPrice = meta?.regularMarketPrice ?? null;
+      const closes: (number | null)[] = chartResult.indicators?.quote?.[0]?.close ?? [];
+      const lastTwoCloses = closes.filter((v) => v !== null).slice(-2);
+      const previousClose =
+        lastTwoCloses.length >= 2
+          ? lastTwoCloses[lastTwoCloses.length - 2]
+          : (meta?.regularMarketPreviousClose ?? meta?.chartPreviousClose ?? null);
+
+      const oneDayChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : 0;
+      const oneDayChangePercent =
+        previousClose && previousClose > 0 ? ((oneDayChange / previousClose) * 100).toFixed(2) : '0';
+
+      result[symbol] = {
+        currentPrice: currentPrice ?? 0,
+        oneDayChange: parseFloat(oneDayChange.toFixed(2)),
+        oneDayChangePercent: parseFloat(oneDayChangePercent),
+        currency: 'INR',
+      };
+    }
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    logger.error({ err: error }, 'Fetch stock prices error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 export async function getStockFinancials(req: Request, res: Response) {
   try {
     const { symbol } = req.query;

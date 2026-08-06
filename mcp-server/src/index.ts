@@ -16,6 +16,7 @@ import { registerSavingsTools } from './tools/savings.js';
 import { registerCapitalGainsTools } from './tools/capitalGains.js';
 import { registerPortfolioTools } from './tools/portfolio.js';
 import { registerProfileTools } from './tools/profile.js';
+import { registerPriceTools } from './tools/prices.js';
 import oauthRouter from './oauth.js';
 import { requestLogger, log, logError } from './logger.js';
 
@@ -34,6 +35,7 @@ function createMcpServer(client: ReturnType<typeof createBackendClient>): McpSer
   registerCapitalGainsTools(server, client);
   registerPortfolioTools(server, client);
   registerProfileTools(server, client);
+  registerPriceTools(server, client);
   return server;
 }
 

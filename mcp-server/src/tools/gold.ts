@@ -22,7 +22,7 @@ export function registerGoldTools(server: McpServer, client: BackendClient): voi
     'gold_get_summary',
     {
       description:
-        'Per-platform digital gold summary aggregated from raw transactions: grams_held, total_invested, total_proceeds, net_invested, avg_buy_price_per_gram, total_tax_paid, txn_count. Does NOT include live gold rates — backend currently has no MCP route for that.',
+        'Per-platform digital gold summary aggregated from raw transactions: grams_held, total_invested, total_proceeds, net_invested, avg_buy_price_per_gram, total_tax_paid, txn_count. Does NOT include current value — use prices_get_gold_rates for live rates.',
       inputSchema: z.object({}),
     },
     async () => {

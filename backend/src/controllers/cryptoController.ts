@@ -175,6 +175,35 @@ export async function fetchMultipleCoinBalances(req: Request, res: Response) {
   }
 }
 
+export async function getCryptoPrices(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { coinNames } = req.body;
+    if (!Array.isArray(coinNames) || !coinNames.length) {
+      res.status(400).json({ success: false, message: 'coinNames array required' });
+      return;
+    }
+
+    const coinData = await coindcxService.getCurrentPrices(coinNames);
+    res.status(200).json({
+      success: true,
+      data: coinData,
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error({ err: error }, 'Error while fetching crypto prices');
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching crypto prices',
+    });
+  }
+}
+
 export async function getCoinCandles(req: Request, res: Response) {
   try {
     const { symbol, interval = '1d', limit = '365', startTime, endTime } = req.query;

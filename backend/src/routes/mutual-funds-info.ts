@@ -14,4 +14,7 @@ router.get('/infoFetch', getMutualFundInfo);
 // POST /mutual-funds-info/nav-history - Fetch NAV history for multiple scheme numbers
 router.post('/nav-history', getMfapiNavHistory);
 
+// POST /funds/nav-batch - MCP-optimized endpoint for NAV history (same as nav-history)
+router.post('/nav-batch', getMfapiNavHistory);
+
 export default router;

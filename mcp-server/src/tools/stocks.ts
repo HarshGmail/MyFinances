@@ -22,7 +22,7 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
     'stocks_get_summary',
     {
       description:
-        'Per-symbol summary aggregated from raw transactions: units_held, total_invested, total_proceeds, net_invested, avg_buy_price, txn_count. Does NOT include live prices or current value — use stocks_get_portfolio for that. This is the cheapest tool token-wise; prefer it for "how much did I invest in X" or "how many shares of Y do I hold" questions.',
+        'Per-symbol summary aggregated from raw transactions: units_held, total_invested, total_proceeds, net_invested, avg_buy_price, txn_count. Does NOT include live prices or current value — use stocks_get_portfolio_status for that. This is the cheapest tool token-wise; prefer it for "how much did I invest in X" or "how many shares of Y do I hold" questions.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -33,10 +33,27 @@ export function registerStockTools(server: McpServer, client: BackendClient): vo
   );
 
   server.registerTool(
+    'stocks_get_portfolio_status',
+    {
+      description:
+        'Current stock portfolio holdings with live prices & P&L (OPTIMIZED). Returns symbol, shares held, avg buy price, invested amount, current price, current value, P&L, P&L %, and 1-day change for each holding. FAST: lightweight response (no raw data). Use this instead of stocks_get_portfolio. WARNING: calls Yahoo Finance in real-time and may take 5-10 seconds. If this tool fails or times out, retry it once.',
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const data = await client.get<any>('/stocks/portfolio');
+      const response = {
+        portfolio: data?.data?.portfolio || [],
+        summary: data?.data?.summary || {},
+      };
+      return { content: [{ type: 'text' as const, text: compactJSON(response) }] };
+    }
+  );
+
+  server.registerTool(
     'stocks_get_portfolio',
     {
       description:
-        'Current stock portfolio with LIVE NSE prices, current value, P&L, and 1-day change for each holding. WARNING: calls Yahoo Finance in real-time and may take 10-30 seconds. Use stocks_get_summary instead if you only need transaction-side metrics. If this tool fails or times out, retry it once.',
+        '[DEPRECATED] Use stocks_get_portfolio_status instead. This returns bloated response with raw Yahoo Finance data. Kept for backward compatibility.',
       inputSchema: z.object({}),
     },
     async () => {
