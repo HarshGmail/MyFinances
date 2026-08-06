@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   ChartNoAxesCombined,
   Calculator,
@@ -33,10 +33,16 @@ interface DesktopNavProps {
   user: any;
 }
 
+type Section = 'stocks' | 'gold' | 'mutual-funds' | 'crypto' | null;
+
 export function DesktopNav({ user }: DesktopNavProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   if (!user) return null;
+
+  const currentSection = getActiveSection(pathname);
+  const sectionTabs = getSectionTabs(currentSection);
 
   return (
     <div className="hidden md:flex">
@@ -47,7 +53,9 @@ export function DesktopNav({ user }: DesktopNavProps) {
             <NavigationMenuLink asChild>
               <Link
                 href="/home"
-                className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded"
+                className={`flex flex-row items-center px-4 py-2 text-sm font-medium rounded ${
+                  pathname === '/home' ? 'bg-accent' : 'hover:bg-accent'
+                }`}
               >
                 <ChartNoAxesCombined className="w-4 h-4 mr-2" />
                 Home
@@ -59,7 +67,9 @@ export function DesktopNav({ user }: DesktopNavProps) {
             <NavigationMenuLink asChild>
               <Link
                 href="/expenses"
-                className="flex flex-row items-center px-4 py-2 text-sm font-medium hover:bg-accent rounded"
+                className={`flex flex-row items-center px-4 py-2 text-sm font-medium rounded ${
+                  pathname === '/expenses' ? 'bg-accent' : 'hover:bg-accent'
+                }`}
               >
                 <Calculator className="w-4 h-4 mr-2" />
                 Expenses
@@ -67,51 +77,74 @@ export function DesktopNav({ user }: DesktopNavProps) {
             </NavigationMenuLink>
           </NavigationMenuItem>
 
-          {/* Stocks - Hidden on tablets */}
-          <NavigationMenuItem className="hidden xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/stocks')}>
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Stocks
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <DesktopDropdownMenu items={STOCKS_ITEMS} />
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+          {/* Show section tabs only when in that section */}
+          {sectionTabs ? (
+            <>
+              {sectionTabs.map((tab) => (
+                <NavigationMenuItem key={tab.path}>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href={tab.path}
+                      className={`flex flex-row items-center px-4 py-2 text-sm font-medium rounded ${
+                        pathname === tab.path ? 'bg-accent' : 'hover:bg-accent'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span className="ml-2">{tab.title}</span>
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* Stocks - Hidden on tablets */}
+              <NavigationMenuItem className="hidden xl:flex">
+                <NavigationMenuTrigger onClick={() => router.push('/stocks')}>
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Stocks
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <DesktopDropdownMenu items={STOCKS_ITEMS} />
+                </NavigationMenuContent>
+              </NavigationMenuItem>
 
-          {/* Gold - Hidden on tablets */}
-          <NavigationMenuItem className="hidden xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/gold')}>
-              <Coins className="w-4 h-4 mr-2" />
-              Gold
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <DesktopDropdownMenu items={GOLD_ITEMS} />
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+              {/* Gold - Hidden on tablets */}
+              <NavigationMenuItem className="hidden xl:flex">
+                <NavigationMenuTrigger onClick={() => router.push('/gold')}>
+                  <Coins className="w-4 h-4 mr-2" />
+                  Gold
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <DesktopDropdownMenu items={GOLD_ITEMS} />
+                </NavigationMenuContent>
+              </NavigationMenuItem>
 
-          {/* Mutual Funds - Hidden on smaller desktops */}
-          <NavigationMenuItem className="hidden 2xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/mutual-funds')}>
-              <PieChart className="w-4 h-4 mr-2" />
-              Mutual Funds
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <DesktopDropdownMenu items={MF_ITEMS} />
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+              {/* Mutual Funds - Hidden on smaller desktops */}
+              <NavigationMenuItem className="hidden 2xl:flex">
+                <NavigationMenuTrigger onClick={() => router.push('/mutual-funds')}>
+                  <PieChart className="w-4 h-4 mr-2" />
+                  Mutual Funds
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <DesktopDropdownMenu items={MF_ITEMS} />
+                </NavigationMenuContent>
+              </NavigationMenuItem>
 
-          {/* Crypto - Hidden on smaller desktops */}
-          <NavigationMenuItem className="hidden 2xl:flex">
-            <NavigationMenuTrigger onClick={() => router.push('/crypto/portfolio')}>
-              <Bitcoin className="w-4 h-4 mr-2" />
-              Crypto
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <DesktopDropdownMenu items={CRYPTO_ITEMS} />
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+              {/* Crypto - Hidden on smaller desktops */}
+              <NavigationMenuItem className="hidden 2xl:flex">
+                <NavigationMenuTrigger onClick={() => router.push('/crypto/portfolio')}>
+                  <Bitcoin className="w-4 h-4 mr-2" />
+                  Crypto
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <DesktopDropdownMenu items={CRYPTO_ITEMS} />
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </>
+          )}
 
-          {/* More Dropdown - Dynamic items based on screen size */}
+          {/* More Dropdown - Always visible, filtered based on current section */}
           <NavigationMenuItem>
             <NavigationMenuTrigger>
               <MoreHorizontal className="w-4 h-4 mr-2" />
@@ -119,53 +152,61 @@ export function DesktopNav({ user }: DesktopNavProps) {
             </NavigationMenuTrigger>
             <NavigationMenuContent>
               <ul className="grid w-[200px] gap-1 p-2">
-                {/* Stocks & Gold on tablets */}
-                <li className="xl:hidden">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/stocks/portfolio"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                      Stocks
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li className="xl:hidden">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/gold/portfolio"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Coins className="w-4 h-4" />
-                      Gold
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
+                {/* Stocks & Gold on tablets - hide if already showing in navbar */}
+                {currentSection !== 'stocks' && (
+                  <li className="xl:hidden">
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/stocks/portfolio"
+                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                      >
+                        <TrendingUp className="w-4 h-4" />
+                        Stocks
+                      </Link>
+                    </NavigationMenuLink>
+                  </li>
+                )}
+                {currentSection !== 'gold' && (
+                  <li className="xl:hidden">
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/gold/portfolio"
+                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                      >
+                        <Coins className="w-4 h-4" />
+                        Gold
+                      </Link>
+                    </NavigationMenuLink>
+                  </li>
+                )}
 
-                {/* MF & Crypto on smaller desktops */}
-                <li className="2xl:hidden">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/mutual-funds/dashboard"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <PieChart className="w-4 h-4" />
-                      Mutual Funds
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li className="2xl:hidden">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/crypto/portfolio"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Bitcoin className="w-4 h-4" />
-                      Crypto
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
+                {/* MF & Crypto on smaller desktops - hide if already showing in navbar */}
+                {currentSection !== 'mutual-funds' && (
+                  <li className="2xl:hidden">
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/mutual-funds/dashboard"
+                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                      >
+                        <PieChart className="w-4 h-4" />
+                        Mutual Funds
+                      </Link>
+                    </NavigationMenuLink>
+                  </li>
+                )}
+                {currentSection !== 'crypto' && (
+                  <li className="2xl:hidden">
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/crypto/portfolio"
+                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                      >
+                        <Bitcoin className="w-4 h-4" />
+                        Crypto
+                      </Link>
+                    </NavigationMenuLink>
+                  </li>
+                )}
 
                 {/* Always visible in More */}
                 <li>
@@ -305,3 +346,28 @@ const CRYPTO_ITEMS = [
   },
   { title: 'Transactions', icon: <Receipt className="w-4 h-4" />, path: '/crypto/transactions' },
 ];
+
+function getActiveSection(pathname: string): Section {
+  if (pathname.startsWith('/stocks')) return 'stocks';
+  if (pathname.startsWith('/gold')) return 'gold';
+  if (pathname.startsWith('/mutual-funds')) return 'mutual-funds';
+  if (pathname.startsWith('/crypto')) return 'crypto';
+  return null;
+}
+
+function getSectionTabs(
+  section: Section
+): Array<{ title: string; icon: React.ReactNode; path: string }> | null {
+  switch (section) {
+    case 'stocks':
+      return STOCKS_ITEMS;
+    case 'gold':
+      return GOLD_ITEMS;
+    case 'mutual-funds':
+      return MF_ITEMS;
+    case 'crypto':
+      return CRYPTO_ITEMS;
+    default:
+      return null;
+  }
+}
