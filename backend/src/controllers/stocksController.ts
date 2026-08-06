@@ -434,7 +434,12 @@ export async function getStockPrices(req: Request, res: Response) {
 
     const symbolList = Array.isArray(symbols) ? symbols : [symbols];
     const normalizedSymbols = (symbolList as string[])
-      .map((s) => s.trim().toUpperCase().replace(/\.(NS|BO|BSE|NSE|MCX)$/i, ''))
+      .map((s) =>
+        s
+          .trim()
+          .toUpperCase()
+          .replace(/\.(NS|BO|BSE|NSE|MCX)$/i, '')
+      )
       .filter((s) => s.length > 0);
 
     if (!normalizedSymbols.length) {
@@ -461,9 +466,12 @@ export async function getStockPrices(req: Request, res: Response) {
           ? lastTwoCloses[lastTwoCloses.length - 2]
           : (meta?.regularMarketPreviousClose ?? meta?.chartPreviousClose ?? null);
 
-      const oneDayChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : 0;
+      const oneDayChange =
+        currentPrice !== null && previousClose !== null ? currentPrice - previousClose : 0;
       const oneDayChangePercent =
-        previousClose && previousClose > 0 ? ((oneDayChange / previousClose) * 100).toFixed(2) : '0';
+        previousClose && previousClose > 0
+          ? ((oneDayChange / previousClose) * 100).toFixed(2)
+          : '0';
 
       result[symbol] = {
         currentPrice: currentPrice ?? 0,

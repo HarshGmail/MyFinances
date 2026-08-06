@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
@@ -19,6 +20,7 @@ import {
   PictureInPicture2,
   Plug,
   BarChart3,
+  ChevronRight,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -35,6 +37,23 @@ interface DesktopNavProps {
 
 type Section = 'stocks' | 'gold' | 'mutual-funds' | 'crypto' | null;
 
+type NavItem = { title: string; icon: React.ReactNode; path: string };
+
+/**
+ * Removes the 6px gap between a trigger and its dropdown. The gap is dead space
+ * that lets Radix close the menu while the pointer travels into the content.
+ */
+const CONTENT_NO_GAP = 'group-data-[viewport=false]/navigation-menu:mt-0';
+
+/**
+ * The "More" panel additionally needs overflow-visible, otherwise the panel
+ * clips the submenu flyouts that sit outside its own bounds.
+ */
+const MORE_CONTENT = `${CONTENT_NO_GAP} group-data-[viewport=false]/navigation-menu:overflow-visible`;
+
+/** Menu row shared by the "More" panel links and its submenu flyouts. */
+const MENU_ROW = 'flex flex-row items-center gap-2 rounded px-3 py-2 text-sm hover:bg-accent';
+
 export function DesktopNav({ user }: DesktopNavProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,6 +62,12 @@ export function DesktopNav({ user }: DesktopNavProps) {
 
   const currentSection = getActiveSection(pathname);
   const sectionTabs = getSectionTabs(currentSection);
+
+  // Inside a section, the other sections' top-level triggers are not rendered at
+  // all, so their "More" entries must stay visible at every breakpoint.
+  const inSection = sectionTabs !== null;
+  const hideAtXl = inSection ? '' : 'xl:hidden';
+  const hideAt2xl = inSection ? '' : '2xl:hidden';
 
   return (
     <div className="hidden md:flex">
@@ -84,7 +109,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
                 {getSectionIcon(currentSection)}
                 {getSectionLabel(currentSection)}
               </NavigationMenuTrigger>
-              <NavigationMenuContent>
+              <NavigationMenuContent className={CONTENT_NO_GAP}>
                 <DesktopDropdownMenu items={sectionTabs} />
               </NavigationMenuContent>
             </NavigationMenuItem>
@@ -96,7 +121,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Stocks
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
+                <NavigationMenuContent className={CONTENT_NO_GAP}>
                   <DesktopDropdownMenu items={STOCKS_ITEMS} />
                 </NavigationMenuContent>
               </NavigationMenuItem>
@@ -107,7 +132,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
                   <Coins className="w-4 h-4 mr-2" />
                   Gold
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
+                <NavigationMenuContent className={CONTENT_NO_GAP}>
                   <DesktopDropdownMenu items={GOLD_ITEMS} />
                 </NavigationMenuContent>
               </NavigationMenuItem>
@@ -118,7 +143,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
                   <PieChart className="w-4 h-4 mr-2" />
                   Mutual Funds
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
+                <NavigationMenuContent className={CONTENT_NO_GAP}>
                   <DesktopDropdownMenu items={MF_ITEMS} />
                 </NavigationMenuContent>
               </NavigationMenuItem>
@@ -129,7 +154,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
                   <Bitcoin className="w-4 h-4 mr-2" />
                   Crypto
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
+                <NavigationMenuContent className={CONTENT_NO_GAP}>
                   <DesktopDropdownMenu items={CRYPTO_ITEMS} />
                 </NavigationMenuContent>
               </NavigationMenuItem>
@@ -142,132 +167,58 @@ export function DesktopNav({ user }: DesktopNavProps) {
               <MoreHorizontal className="w-4 h-4 mr-2" />
               More
             </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul className="grid w-[200px] gap-1 p-2">
-                {/* Stocks & Gold on tablets - hide if already showing in navbar or inside a section */}
-                {!currentSection && (
-                  <>
-                    <li className="xl:hidden">
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/stocks/portfolio"
-                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                        >
-                          <TrendingUp className="w-4 h-4" />
-                          Stocks
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li className="xl:hidden">
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/gold/portfolio"
-                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                        >
-                          <Coins className="w-4 h-4" />
-                          Gold
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </>
+            <NavigationMenuContent className={MORE_CONTENT}>
+              <div className="w-[240px] p-1">
+                {/* Section submenus - hidden when reachable from the navbar itself */}
+                {currentSection !== 'stocks' && (
+                  <MoreSubMenu
+                    label="Stocks"
+                    icon={<TrendingUp className="w-4 h-4" />}
+                    items={STOCKS_ITEMS}
+                    className={hideAtXl}
+                  />
                 )}
 
-                {/* MF & Crypto on smaller desktops - hide if already showing in navbar or inside a section */}
-                {!currentSection && (
-                  <>
-                    <li className="2xl:hidden">
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/mutual-funds/dashboard"
-                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                        >
-                          <PieChart className="w-4 h-4" />
-                          Mutual Funds
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li className="2xl:hidden">
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/crypto/portfolio"
-                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                        >
-                          <Bitcoin className="w-4 h-4" />
-                          Crypto
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </>
+                {currentSection !== 'gold' && (
+                  <MoreSubMenu
+                    label="Gold"
+                    icon={<Coins className="w-4 h-4" />}
+                    items={GOLD_ITEMS}
+                    className={hideAtXl}
+                  />
                 )}
 
-                {/* Always visible in More */}
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/epf"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Building2 className="w-4 h-4" />
-                      EPF
+                {currentSection !== 'mutual-funds' && (
+                  <MoreSubMenu
+                    label="Mutual Funds"
+                    icon={<PieChart className="w-4 h-4" />}
+                    items={MF_ITEMS}
+                    className={hideAt2xl}
+                  />
+                )}
+
+                {currentSection !== 'crypto' && (
+                  <MoreSubMenu
+                    label="Crypto"
+                    icon={<Bitcoin className="w-4 h-4" />}
+                    items={CRYPTO_ITEMS}
+                    className={hideAt2xl}
+                  />
+                )}
+
+                {/* Divider - only meaningful while at least one submenu is visible */}
+                <div className={`my-1 border-t border-border ${hideAt2xl}`} />
+
+                {/* Always visible options */}
+                {MORE_ITEMS.map((item) => (
+                  <NavigationMenuLink key={item.path} asChild>
+                    <Link href={item.path} className={MENU_ROW}>
+                      {item.icon}
+                      {item.title}
                     </Link>
                   </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/rd"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <PiggyBank className="w-4 h-4" />
-                      Recurring Deposits
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/fd"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Wallet className="w-4 h-4" />
-                      Fixed Deposits
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/goals"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Goal className="w-4 h-4" />
-                      Goals
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/popup"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <PictureInPicture2 className="w-4 h-4" />
-                      Popup Settings
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/integrations"
-                      className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                    >
-                      <Plug className="w-4 h-4" />
-                      Integrations
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
+                ))}
+              </div>
             </NavigationMenuContent>
           </NavigationMenuItem>
         </NavigationMenuList>
@@ -276,15 +227,11 @@ export function DesktopNav({ user }: DesktopNavProps) {
   );
 }
 
-function DesktopDropdownMenu({
-  items,
-}: {
-  items: Array<{ title: string; icon: React.ReactNode; path: string }>;
-}) {
+function DesktopDropdownMenu({ items }: { items: NavItem[] }) {
   return (
     <ul className="grid w-[200px] gap-1 p-2">
-      {items.map((item, index) => (
-        <li key={index}>
+      {items.map((item) => (
+        <li key={item.path}>
           <NavigationMenuLink asChild>
             <Link
               href={item.path}
@@ -299,6 +246,95 @@ function DesktopDropdownMenu({
     </ul>
   );
 }
+
+/**
+ * Submenu row inside the "More" panel with a flyout opening to its left.
+ *
+ * Radix's NavigationMenu keeps a single open value per root, so nesting a
+ * NavigationMenuTrigger inside NavigationMenuContent makes hovering the nested
+ * row close the parent panel. This keeps the row as plain markup and drives the
+ * flyout from local hover state instead, with a close delay so the pointer can
+ * travel between the row and the flyout.
+ */
+function MoreSubMenu({
+  label,
+  icon,
+  items,
+  className = '',
+}: {
+  label: string;
+  icon: React.ReactNode;
+  items: NavItem[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
+
+  useEffect(() => cancelClose, []);
+
+  return (
+    <div
+      className={`relative ${className}`}
+      onPointerEnter={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onPointerLeave={scheduleClose}
+    >
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`${MENU_ROW} w-full justify-between ${open ? 'bg-accent' : ''}`}
+      >
+        <span className="flex flex-row items-center gap-2">
+          {icon}
+          {label}
+        </span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
+
+      {open && (
+        // The wrapper's padding is the visual gap while staying inside the
+        // hover area, so the pointer never crosses dead space.
+        <div className="absolute top-0 right-full z-50 pr-1.5">
+          <div className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+            {items.map((item) => (
+              <NavigationMenuLink key={item.path} asChild>
+                <Link href={item.path} className={MENU_ROW} onClick={() => setOpen(false)}>
+                  {item.icon}
+                  {item.title}
+                </Link>
+              </NavigationMenuLink>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const MORE_ITEMS: NavItem[] = [
+  { title: 'EPF', icon: <Building2 className="w-4 h-4" />, path: '/epf' },
+  { title: 'Recurring Deposits', icon: <PiggyBank className="w-4 h-4" />, path: '/rd' },
+  { title: 'Fixed Deposits', icon: <Wallet className="w-4 h-4" />, path: '/fd' },
+  { title: 'Goals', icon: <Goal className="w-4 h-4" />, path: '/goals' },
+  { title: 'Popup Settings', icon: <PictureInPicture2 className="w-4 h-4" />, path: '/popup' },
+  { title: 'Integrations', icon: <Plug className="w-4 h-4" />, path: '/integrations' },
+];
 
 const STOCKS_ITEMS = [
   { title: 'Portfolio', icon: <Briefcase className="w-4 h-4" />, path: '/stocks/portfolio' },
@@ -347,9 +383,7 @@ function getActiveSection(pathname: string): Section {
   return null;
 }
 
-function getSectionTabs(
-  section: Section
-): Array<{ title: string; icon: React.ReactNode; path: string }> | null {
+function getSectionTabs(section: Section): NavItem[] | null {
   switch (section) {
     case 'stocks':
       return STOCKS_ITEMS;
