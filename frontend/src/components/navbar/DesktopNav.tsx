@@ -77,25 +77,17 @@ export function DesktopNav({ user }: DesktopNavProps) {
             </NavigationMenuLink>
           </NavigationMenuItem>
 
-          {/* Show section tabs only when in that section */}
+          {/* Show section dropdown when in that section */}
           {sectionTabs ? (
-            <>
-              {sectionTabs.map((tab) => (
-                <NavigationMenuItem key={tab.path}>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href={tab.path}
-                      className={`flex flex-row items-center px-4 py-2 text-sm font-medium rounded ${
-                        pathname === tab.path ? 'bg-accent' : 'hover:bg-accent'
-                      }`}
-                    >
-                      {tab.icon}
-                      <span className="ml-2">{tab.title}</span>
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              ))}
-            </>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger>
+                {getSectionIcon(currentSection)}
+                {getSectionLabel(currentSection)}
+              </NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <DesktopDropdownMenu items={sectionTabs} />
+              </NavigationMenuContent>
+            </NavigationMenuItem>
           ) : (
             <>
               {/* Stocks - Hidden on tablets */}
@@ -152,60 +144,60 @@ export function DesktopNav({ user }: DesktopNavProps) {
             </NavigationMenuTrigger>
             <NavigationMenuContent>
               <ul className="grid w-[200px] gap-1 p-2">
-                {/* Stocks & Gold on tablets - hide if already showing in navbar */}
-                {currentSection !== 'stocks' && (
-                  <li className="xl:hidden">
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="/stocks/portfolio"
-                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                      >
-                        <TrendingUp className="w-4 h-4" />
-                        Stocks
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                )}
-                {currentSection !== 'gold' && (
-                  <li className="xl:hidden">
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="/gold/portfolio"
-                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                      >
-                        <Coins className="w-4 h-4" />
-                        Gold
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
+                {/* Stocks & Gold on tablets - hide if already showing in navbar or inside a section */}
+                {!currentSection && (
+                  <>
+                    <li className="xl:hidden">
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/stocks/portfolio"
+                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                        >
+                          <TrendingUp className="w-4 h-4" />
+                          Stocks
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li className="xl:hidden">
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/gold/portfolio"
+                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                        >
+                          <Coins className="w-4 h-4" />
+                          Gold
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  </>
                 )}
 
-                {/* MF & Crypto on smaller desktops - hide if already showing in navbar */}
-                {currentSection !== 'mutual-funds' && (
-                  <li className="2xl:hidden">
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="/mutual-funds/dashboard"
-                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                      >
-                        <PieChart className="w-4 h-4" />
-                        Mutual Funds
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                )}
-                {currentSection !== 'crypto' && (
-                  <li className="2xl:hidden">
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href="/crypto/portfolio"
-                        className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
-                      >
-                        <Bitcoin className="w-4 h-4" />
-                        Crypto
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
+                {/* MF & Crypto on smaller desktops - hide if already showing in navbar or inside a section */}
+                {!currentSection && (
+                  <>
+                    <li className="2xl:hidden">
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/mutual-funds/dashboard"
+                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                        >
+                          <PieChart className="w-4 h-4" />
+                          Mutual Funds
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li className="2xl:hidden">
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/crypto/portfolio"
+                          className="flex-row items-center gap-2 p-2 hover:bg-accent rounded"
+                        >
+                          <Bitcoin className="w-4 h-4" />
+                          Crypto
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  </>
                 )}
 
                 {/* Always visible in More */}
@@ -369,5 +361,35 @@ function getSectionTabs(
       return CRYPTO_ITEMS;
     default:
       return null;
+  }
+}
+
+function getSectionIcon(section: Section): React.ReactNode {
+  switch (section) {
+    case 'stocks':
+      return <TrendingUp className="w-4 h-4 mr-2" />;
+    case 'gold':
+      return <Coins className="w-4 h-4 mr-2" />;
+    case 'mutual-funds':
+      return <PieChart className="w-4 h-4 mr-2" />;
+    case 'crypto':
+      return <Bitcoin className="w-4 h-4 mr-2" />;
+    default:
+      return null;
+  }
+}
+
+function getSectionLabel(section: Section): string {
+  switch (section) {
+    case 'stocks':
+      return 'Stocks';
+    case 'gold':
+      return 'Gold';
+    case 'mutual-funds':
+      return 'Mutual Funds';
+    case 'crypto':
+      return 'Crypto';
+    default:
+      return '';
   }
 }
