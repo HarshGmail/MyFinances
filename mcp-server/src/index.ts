@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'crypto';
 import { exchangeIngestToken, createBackendClient } from './backendClient.js';
-import { mcpAuthMiddleware } from './auth.js';
+import { mcpAuthMiddleware, setAuthChallengeHeader } from './auth.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerStockTools } from './tools/stocks.js';
 import { registerGoalTools } from './tools/goals.js';
@@ -21,6 +21,8 @@ import oauthRouter from './oauth.js';
 import { requestLogger, log, logError } from './logger.js';
 
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
+const SESSION_IDLE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const SESSION_SWEEP_INTERVAL_MS = 30 * 60 * 1000;
 
 // Factory: fresh McpServer per session, bound to that user's backend client
 function createMcpServer(client: ReturnType<typeof createBackendClient>): McpServer {
@@ -40,7 +42,27 @@ function createMcpServer(client: ReturnType<typeof createBackendClient>): McpSer
 }
 
 // Session map: sessionId → { server, transport }
-const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+type Session = {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+  lastSeenAt: number;
+};
+
+const sessions = new Map<string, Session>();
+
+function touch(session: Session): void {
+  session.lastSeenAt = Date.now();
+}
+
+setInterval(() => {
+  const idleSince = Date.now() - SESSION_IDLE_TIMEOUT_MS;
+  for (const [id, session] of sessions) {
+    if (session.lastSeenAt < idleSince) {
+      log('MCP', `Evicting idle session: ${id}`);
+      void session.transport.close().catch(() => {});
+    }
+  }
+}, SESSION_SWEEP_INTERVAL_MS);
 
 const app = express();
 
@@ -83,6 +105,7 @@ app.post('/mcp', async (req, res) => {
         res.status(404).json({ error: 'Session not found' });
         return;
       }
+      touch(session);
       await session.transport.handleRequest(req, res, req.body);
       return;
     }
@@ -104,20 +127,30 @@ app.post('/mcp', async (req, res) => {
       log('MCP', 'Ingest token exchange succeeded');
     } catch (err) {
       logError('MCP', 'Ingest token exchange failed', err);
+      setAuthChallengeHeader(res, 'invalid_token');
       res.status(401).json({ error: 'Invalid ingest token' });
       return;
     }
 
-    const client = createBackendClient(jwt);
+    let activeTransport: StreamableHTTPServerTransport | null = null;
+
+    const client = createBackendClient(ingestToken, {
+      initialJwt: jwt,
+      onIngestTokenRejected: () => {
+        log('MCP', 'Ingest token was revoked — closing session');
+        void activeTransport?.close().catch(() => {});
+      },
+    });
     const server = createMcpServer(client);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
-        sessions.set(id, { server, transport });
+        sessions.set(id, { server, transport, lastSeenAt: Date.now() });
         log('MCP', `Session created: ${id} (active: ${sessions.size})`);
       },
     });
+    activeTransport = transport;
 
     transport.onclose = () => {
       const id = transport.sessionId;
@@ -148,6 +181,7 @@ app.get('/mcp', async (req, res) => {
     res.status(404).json({ error: 'Session not found' });
     return;
   }
+  touch(session);
   await session.transport.handleRequest(req, res);
 });
 

@@ -15,6 +15,7 @@
 
 import { Router, Request, Response } from 'express';
 import { createHash, randomBytes } from 'crypto';
+import { exchangeIngestToken, isIngestTokenRejected } from './backendClient.js';
 import { log, logError } from './logger.js';
 
 const SITE_URL = (process.env.SITE_URL ?? 'https://mcp.my-finances.site').replace(/\/$/, '');
@@ -84,7 +85,7 @@ router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Respo
     token_endpoint: `${SITE_URL}/oauth/token`,
     registration_endpoint: `${SITE_URL}/oauth/register`,
     response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
   });
@@ -179,9 +180,60 @@ router.post('/oauth/authorize', (req: Request, res: Response) => {
   res.json({ redirect_url: redirectUrl.toString() });
 });
 
+function respondWithToken(res: Response, ingestToken: string): void {
+  // Always bind the token to the exact MCP endpoint URL so Claude.ai sends it
+  // on requests to https://mcp.my-finances.site/mcp (not just the base URL)
+  const tokenResource = `${SITE_URL}/mcp`;
+  res.json({
+    access_token: ingestToken,
+    token_type: 'Bearer', // capital B required by RFC 6750
+    refresh_token: ingestToken,
+    scope: 'claudeai',
+    resource: tokenResource,
+  });
+}
+
+async function handleRefreshGrant(refreshToken: string | undefined, res: Response): Promise<void> {
+  const token = refreshToken?.trim();
+  if (!token) {
+    res.status(400).json({ error: 'invalid_request', error_description: 'refresh_token required' });
+    return;
+  }
+
+  try {
+    await exchangeIngestToken(token);
+  } catch (err) {
+    if (isIngestTokenRejected(err)) {
+      logError('OAuth', 'Refresh rejected — ingest token was regenerated', err);
+      res
+        .status(400)
+        .json({ error: 'invalid_grant', error_description: 'Ingest token was revoked' });
+      return;
+    }
+    logError('OAuth', 'Refresh could not be verified — backend unreachable', err);
+    res
+      .status(503)
+      .json({ error: 'temporarily_unavailable', error_description: 'Backend unreachable' });
+    return;
+  }
+
+  log('OAuth', 'Refresh grant succeeded — reissuing access_token');
+  respondWithToken(res, token);
+}
+
 // POST /oauth/token — exchange code for access_token
-router.post('/oauth/token', (req: Request, res: Response) => {
-  const { grant_type, code, code_verifier } = req.body as Record<string, string>;
+router.post('/oauth/token', async (req: Request, res: Response) => {
+  const { grant_type, code, code_verifier, refresh_token } = req.body as Record<string, string>;
+
+  if (grant_type === 'refresh_token') {
+    try {
+      await handleRefreshGrant(refresh_token, res);
+    } catch (err) {
+      logError('OAuth', 'Refresh grant unhandled error', err);
+      if (!res.headersSent) res.status(500).json({ error: 'server_error' });
+    }
+    return;
+  }
 
   if (grant_type !== 'authorization_code') {
     res.status(400).json({ error: 'unsupported_grant_type' });
@@ -221,17 +273,9 @@ router.post('/oauth/token', (req: Request, res: Response) => {
 
   pendingCodes.delete(code);
 
-  // Always bind the token to the exact MCP endpoint URL so Claude.ai sends it
-  // on requests to https://mcp.my-finances.site/mcp (not just the base URL)
-  const tokenResource = `${SITE_URL}/mcp`;
-  log('OAuth', `Token exchange succeeded — issuing access_token bound to ${tokenResource}`);
+  log('OAuth', `Token exchange succeeded — issuing access_token bound to ${SITE_URL}/mcp`);
 
-  res.json({
-    access_token: pending.ingestToken,
-    token_type: 'Bearer', // capital B required by RFC 6750
-    expires_in: 2592000,
-    resource: tokenResource,
-  });
+  respondWithToken(res, pending.ingestToken);
 });
 
 export default router;

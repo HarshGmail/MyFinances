@@ -109,6 +109,8 @@ async function startServer() {
       .collection('passwordResetTokens')
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+    await database.getDb().collection('users').createIndex({ ingestToken: 1 }, { sparse: true });
+
     // Start the server
     app.listen(port, '0.0.0.0', () => {
       logger.info(`Server running at http://localhost:${port}`);
