@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { format } from 'date-fns';
-import { User, Mail, Calendar, Clock, Phone } from 'lucide-react';
+import { User, Mail, Calendar, Clock, Phone, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -175,12 +177,28 @@ export default function ProfilePage() {
               </CardTitle>
               <p className="text-sm text-muted-foreground">Manage your account security settings</p>
             </CardHeader>
-            <CardContent className="flex justify-between items-center p-4">
-              <div>
-                <div className="text-sm font-medium">Password</div>
-                <p className="text-sm text-muted-foreground">Last changed long ago</p>
+            <CardContent className="space-y-3 p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-sm font-medium">Password</div>
+                  <p className="text-sm text-muted-foreground">Last changed long ago</p>
+                </div>
+                <ChangePasswordDialog />
               </div>
-              <ChangePasswordDialog />
+              <div className="flex justify-between items-center gap-3 border-t pt-3">
+                <div>
+                  <div className="text-sm font-medium">Vault</div>
+                  <p className="text-sm text-muted-foreground">
+                    PIN-locked store for bank, card and policy details
+                  </p>
+                </div>
+                <Button asChild size="sm" variant="outline" className="gap-2 shrink-0">
+                  <Link href="/vault">
+                    <Lock className="h-4 w-4" />
+                    Open Vault
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

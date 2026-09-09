@@ -6,7 +6,12 @@ const DEMO_EMAIL = 'testuser@gmail.com';
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'DELETE', 'PATCH']);
 
 // POSTs that are data fetches, not mutations — must be allowed for demo users
-const DEMO_ALLOWED_PATHS = ['/api/auth/', '/api/crypto/getCoinPrices', '/api/funds/nav-history'];
+const DEMO_ALLOWED_PATHS = [
+  '/api/auth/',
+  '/api/crypto/getCoinPrices',
+  '/api/funds/nav-history',
+  '/api/vault/unlock',
+];
 
 export function blockDemoMutations(req: Request, res: Response, next: NextFunction): void {
   // Only check mutation HTTP methods

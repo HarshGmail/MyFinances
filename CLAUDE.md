@@ -105,6 +105,20 @@ frontend/src/
 │   ├── goals/                Investment goals
 │   ├── profile/              User profile + salary history (Phone + PAN Number fields; PAN has show/hide toggle)
 │   ├── integrations/         3 tabs: UPI Auto-Track, Claude MCP, Email Import
+│   ├── vault/                PIN-locked, end-to-end encrypted secrets store
+│   │   ├── page.tsx                Orchestrator — Unsupported / Setup / Locked / Unlocked
+│   │   ├── useVaultSession.ts      Owns the CryptoKey, decrypted items, idle auto-lock
+│   │   ├── vaultTypes.ts           Category → field-descriptor table (drives forms, cards, copy text)
+│   │   ├── PinInput.tsx            6-box segmented numeric PIN input
+│   │   ├── VaultSetup.tsx          First run: choose PIN + unrecoverability acknowledgement
+│   │   ├── VaultLocked.tsx         PIN entry, wrong-PIN state, lockout countdown
+│   │   ├── VaultShell.tsx          Unlocked frame: header, rail, item list, dialogs
+│   │   ├── CategoryRail.tsx        Left rail on md+, scrollable pills on mobile
+│   │   ├── VaultItemCard.tsx       Masked values, per-field reveal, click-to-copy, copy-all
+│   │   ├── VaultItemDialog.tsx     Add/edit form; custom fields via useFieldArray
+│   │   ├── ChangePinDialog.tsx     Re-encrypts all items client-side, then one atomic rekey
+│   │   ├── DestroyVaultDialog.tsx  Type-to-confirm irreversible wipe
+│   │   └── VaultUnsupported.tsx    Insecure-context explainer
 │   └── popup/                Browser extension popup
 ├── api/
 │   ├── configs/
@@ -134,7 +148,9 @@ frontend/src/
     ├── xirr.ts               XIRR via newton-raphson-method
     ├── numbers.ts            formatCurrency, formatToPercentage, formatToTwoDecimals
     ├── chartHelpers.ts       Highcharts helpers
-    └── text.ts               getProfitLossColor, etc.
+    ├── text.ts               getProfitLossColor, etc.
+    ├── useUrlState.ts        URL-persisted state (tabs, filters) via router.replace
+    └── vaultCrypto.ts        WebCrypto PBKDF2 + AES-GCM for the vault (client-side only)
 ```
 
 ---
@@ -169,7 +185,8 @@ backend/src/
 ├── schemas/              Zod validation schemas
 │   └── emailIntegration.ts   Zod schema for emailIntegrations collection
 └── utils/
-    └── encryption.ts     AES-256-GCM encrypt/decrypt for PAN and refresh tokens
+    ├── encryption.ts     AES-256-GCM encrypt/decrypt for PAN, refresh tokens, vault ciphertext
+    └── vaultLockout.ts    computeLockoutMs() backoff ladder for failed vault unlocks
 ```
 
 ### All API Route Prefixes
@@ -192,6 +209,7 @@ backend/src/
 | `/api/inflation` | Inflation rate data |
 | `/api/ingest` | SMS-based transaction ingestion |
 | `/api/email-integration` | Email import (Gmail OAuth, CDSL eCAS + SafeGold PDF parsing) |
+| `/api/vault` | End-to-end encrypted secrets vault (meta, unlock, items, rekey, destroy) |
 | `/api` (verify) | Token verification |
 
 ---
@@ -333,6 +351,13 @@ totalUnits = txs.reduce((sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits
 ### UserProfile — sensitive fields
 `UserProfile` includes `phone` (stored as plaintext) and `panNumber` (stored AES-256-GCM encrypted in DB; returned masked to the frontend — only the last 4 characters are revealed). The profile page exposes a show/hide toggle for the PAN field.
 
+### vaults collection — the one thing the server cannot read
+One document per user (unique index on `userId`), holding a plaintext `salt`, a `verifier` blob, `kdf: { algo, iterations }`, `keyEpoch`, an `items[]` array of `{ id, category, ciphertext, createdAt, updatedAt }`, plus `failedAttempts` / `lockedUntil` for unlock throttling.
+
+Unlike PAN and Gmail tokens — which the server encrypts and can therefore also decrypt — vault entries are encrypted **in the browser** under a key derived from the user's 6-digit PIN (PBKDF2-SHA256, 310k iterations, AES-256-GCM). The server wraps that ciphertext in a *second* `encrypt()` layer before storing it. The PIN never leaves the device, so there is no server-side path to the plaintext and no recovery for a forgotten PIN.
+
+Full design, threat model and rationale: **`docs/Vault_Architecture.md`**. Read it before changing anything under `frontend/src/app/vault/`, `frontend/src/utils/vaultCrypto.ts`, or `backend/src/controllers/vaultController.ts`.
+
 ### emailIntegrations collection
 MongoDB collection storing per-user Gmail integration state:
 ```
@@ -427,3 +452,13 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 25. **EPF Rust service fallback on error** — `parseEpfPassbooks` tries the Rust service first. If it throws for any reason (429, timeout, service down), it logs a warning and falls back to the TypeScript `epfPassbookParser.ts` parser automatically. The `usedRustService` flag gates which path ran.
 
 26. **Portfolio analytics uses a single batch backend call** — `GET /api/stocks/portfolio-analytics` fetches the user's transactions, extracts unique symbols, runs `StocksService.fetchFinancials()` for all in parallel, and returns `Record<symbol, StockFinancials>` in one response. The frontend hook `usePortfolioAnalyticsQuery()` (10 min staleTime) makes this single call. The analytics page also uses `useStocksPortfolioQuery()` for investment weights (portfolio beta weighting, scorecard sort).
+
+27. **Vault plaintext must never enter the TanStack Query cache** — `lib/queryPersister.ts` persists query state to IndexedDB, gated by the opt-in `PERSISTENT_QUERY_KEYS` whitelist in `providers.tsx`. The real protection is structural, not that list: decrypted vault content never goes through the query layer at all. Items are fetched imperatively by `useVaultSession` and decrypted into component state, so even if a vault key were added to the whitelist it would persist ciphertext. **Never add a vault query key to `PERSISTENT_QUERY_KEYS`.**
+
+28. **Never `await` a decrypt inside a clipboard handler** — Safari (desktop and iOS) allows `navigator.clipboard.writeText` only within the task that handled the user gesture. Any `await` first — including `await decryptItem(...)` — silently breaks the copy on iOS. This is why vault items are decrypted eagerly into state on unlock and `buildItemCopyText()` in `vaultTypes.ts` is synchronous.
+
+29. **The vault server cannot validate the PIN, so throttling guards the verifier instead** — `GET /api/vault/meta` deliberately omits the verifier blob; `POST /api/vault/unlock` is a separate counted call that pessimistically increments `failedAttempts` *before* returning it, and the client calls `/unlock/confirm` only after `verifyPin` succeeds. A client that never confirms stays throttled, so it fails closed. `/api/vault/unlock` is in `DEMO_ALLOWED_PATHS` because it and `/unlock/confirm` are semantically reads.
+
+30. **Vault array upserts branch on `modifiedCount`, not `matchedCount`** — `arrayFilters` with no matching element returns `matchedCount: 1, modifiedCount: 0` (the document matched, the element didn't), so the `$push` fallback in `upsertVaultItem` keys off `modifiedCount`. Getting this backwards silently no-ops every create. Relatedly, `rekeyVault` must stay a single atomic `updateOne` — a partial rekey leaves items under two different keys with one verifier, which is unrecoverable.
+
+31. **Vault needs a secure context** — `crypto.subtle`, `crypto.randomUUID` and `navigator.clipboard` are undefined on insecure origins. `https://` and `localhost`/`127.0.0.1` qualify; `http://192.168.x.x:3000` does not, so LAN testing from a phone shows `VaultUnsupported.tsx`. Use `next dev --experimental-https` or a tunnel. Also note that rotating `ENCRYPTION_KEY` breaks every existing vault (plus stored PANs and Gmail tokens) — there is no re-wrap migration.

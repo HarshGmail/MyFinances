@@ -4,7 +4,7 @@ export const metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'March 24, 2026';
+  const lastUpdated = 'September 9, 2026';
   const appName = 'My Finances';
   const appUrl = 'https://www.my-finances.site';
   const contactEmail = 'mharshvardhan1681@gmail.com';
@@ -51,6 +51,39 @@ export default function PrivacyPage() {
             You may optionally provide your phone number and PAN number to enable PDF password
             derivation for email imports. Your PAN number is encrypted using AES-256-GCM before
             being stored and is never logged or transmitted in plain text.
+          </p>
+
+          <h3 className="font-medium text-foreground mt-4 mb-1">Vault (optional)</h3>
+          <p>
+            The Vault is an optional, PIN-locked store for details such as bank accounts, credit
+            cards, insurance policies and logins. It works differently from everything else in the
+            app: your entries are encrypted{' '}
+            <strong className="text-foreground">inside your own browser</strong> using a key derived
+            from your PIN (PBKDF2-SHA256, 310,000 iterations) before anything is sent to us.
+          </p>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>Your vault PIN is never transmitted to or stored on our servers.</li>
+            <li>
+              We receive and store only the encrypted result, which we encrypt a second time with a
+              server-side AES-256-GCM key before writing it to the database.
+            </li>
+            <li>
+              We cannot read your vault contents, and we cannot recover them for you. Support cannot
+              unlock a vault.
+            </li>
+            <li>
+              Because of this, a forgotten PIN means the data is permanently unreadable. The only
+              remedy is to destroy the vault and start again.
+            </li>
+            <li>
+              Repeated failed unlock attempts are rate-limited on our side, which requires us to
+              store a failure count and lockout timestamp against your account.
+            </li>
+          </ul>
+          <p className="mt-3">
+            A 6-digit PIN is short by design, for usability. It protects your entries from anyone
+            who obtains database access alone; it is not intended to withstand an attacker who has
+            also obtained our server-side encryption key.
           </p>
 
           <h3 className="font-medium text-foreground mt-4 mb-1">Gmail access (optional)</h3>
@@ -111,6 +144,10 @@ export default function PrivacyPage() {
           <ul className="list-disc list-inside space-y-2">
             <li>All data is stored in a private MongoDB database.</li>
             <li>Sensitive fields (PAN number, Gmail refresh token) are AES-256-GCM encrypted.</li>
+            <li>
+              Vault entries are end-to-end encrypted in your browser with your PIN, then encrypted
+              again server-side. We hold no key capable of reading them.
+            </li>
             <li>Authentication uses JWT tokens stored in httpOnly cookies.</li>
             <li>All communication between client and server uses HTTPS.</li>
             <li>
@@ -158,6 +195,11 @@ export default function PrivacyPage() {
             Your data is retained as long as your account exists. You can delete individual
             transaction types at any time from the Profile page (Data Management section). To
             permanently delete your account and all associated data, contact us at the email below.
+          </p>
+          <p className="mt-3">
+            Your vault can be erased at any time with &ldquo;Destroy vault&rdquo;, which deletes
+            every entry along with the salt used to derive your key. This is immediate and
+            irreversible.
           </p>
         </section>
 

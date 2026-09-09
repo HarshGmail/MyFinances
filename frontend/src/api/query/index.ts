@@ -14,3 +14,4 @@ export * from './stocks';
 export * from './userGoals';
 export * from './capitalGains';
 export * from './emailIntegration';
+export * from './vault';

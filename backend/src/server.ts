@@ -28,6 +28,7 @@ import {
   capitalGainsRouter,
   emailIntegrationsRouter,
   webhooksRouter,
+  vaultRouter,
 } from './routes';
 import { requestLogger, blockDemoMutations, errorHandler } from './middleware';
 import logger from './utils/logger';
@@ -85,6 +86,7 @@ app.use('/api/webhooks', webhooksRouter);
 app.use('/api/chatgpt', chatgptRouter);
 app.use('/api/capital-gains', capitalGainsRouter);
 app.use('/api/email-integration', emailIntegrationsRouter);
+app.use('/api/vault', vaultRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/api/health', (req, res) => {
@@ -97,9 +99,21 @@ app.get('/api/health', (req, res) => {
 // Global error handler — must be the last middleware so it catches errors from all routes above
 app.use(errorHandler);
 
+const ENCRYPTION_KEY_PATTERN = /^[0-9a-f]{64}$/i;
+
+function warnIfEncryptionKeyUnusable() {
+  if (!ENCRYPTION_KEY_PATTERN.test(config.ENCRYPTION_KEY ?? '')) {
+    logger.error(
+      'ENCRYPTION_KEY is missing or not a 64-character hex string — the vault, PAN storage and email integration will fail at runtime'
+    );
+  }
+}
+
 // Initialize server
 async function startServer() {
   try {
+    warnIfEncryptionKeyUnusable();
+
     // Connect to MongoDB
     await database.connect();
 
@@ -110,6 +124,8 @@ async function startServer() {
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
     await database.getDb().collection('users').createIndex({ ingestToken: 1 }, { sparse: true });
+
+    await database.getDb().collection('vaults').createIndex({ userId: 1 }, { unique: true });
 
     // Start the server
     app.listen(port, '0.0.0.0', () => {

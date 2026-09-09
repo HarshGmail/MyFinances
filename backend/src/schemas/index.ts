@@ -11,3 +11,4 @@ export * from './recurringDeposits';
 export * from './stocks';
 export * from './user';
 export * from './userGoals';
+export * from './vault';

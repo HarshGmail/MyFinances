@@ -21,6 +21,11 @@ import {
   ChevronRight,
   Star,
   PlayCircle,
+  ShieldCheck,
+  Lock,
+  CreditCard,
+  KeyRound,
+  Copy,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -48,6 +53,11 @@ const FEATURES = [
     icon: Target,
     title: 'Investment Goals',
     desc: 'Define financial goals and track progress toward them as your portfolio grows.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Encrypted Vault',
+    desc: 'Keep bank, card, insurance and login details behind a PIN — encrypted in your browser, unreadable to us.',
   },
   {
     icon: BarChart3,
@@ -212,6 +222,88 @@ export default function Auth() {
               <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Vault ────────────────────────────────────────── */}
+      <section className="px-6 py-16 max-w-6xl mx-auto">
+        <div className="rounded-2xl border bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent p-8 md:p-12 flex flex-col md:flex-row-reverse gap-10 items-center">
+          <div className="flex-1 min-w-0">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-500 text-xs font-medium mb-4">
+              <ShieldCheck className="h-3 w-3" />
+              Vault · End-to-end encrypted
+            </div>
+            <h2 className="text-3xl font-bold mb-3">The details you keep in Notes</h2>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              Account numbers, IFSC codes, card expiry and CVV, policy numbers, net-banking logins —
+              locked behind a 6-digit PIN. Add your own custom fields to anything, tap a value to
+              copy it, and the whole entry copies as clean shareable text.
+            </p>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              Your PIN never leaves your device. Everything is encrypted in your browser before it
+              reaches us, so we store nothing we could read — and nobody can unlock it for you,
+              including us.
+            </p>
+            <div className="flex flex-wrap gap-2 mb-6">
+              {[
+                { icon: Landmark, label: 'Bank Details' },
+                { icon: CreditCard, label: 'Credit Cards' },
+                { icon: ShieldCheck, label: 'Insurance' },
+                { icon: KeyRound, label: 'Logins' },
+              ].map(({ icon: Icon, label }) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-muted/40 text-xs font-medium"
+                >
+                  <Icon className="h-3.5 w-3.5 text-emerald-500" />
+                  {label}
+                </span>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={openAuth}>
+              Get started
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <div className="flex-1 w-full">
+            <div className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">HDFC Bank</div>
+                    <div className="text-xs text-muted-foreground">Millennia</div>
+                  </div>
+                </div>
+                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="space-y-2.5">
+                {[
+                  { label: 'Card Number', value: '•••••••••••• 4821', masked: true },
+                  { label: 'Name on Card', value: 'Harsh G', masked: false },
+                  { label: 'Expiry', value: '09/29', masked: false },
+                  { label: 'CVV', value: '•••', masked: true },
+                  { label: 'Offers', value: '10% Swiggy · 5% Amazon', masked: false },
+                ].map(({ label, value, masked }) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {label}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-sm font-mono truncate">
+                      {value}
+                      {masked && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-3">
+              Tap any value to copy it straight to your clipboard
+            </p>
+          </div>
         </div>
       </section>
 

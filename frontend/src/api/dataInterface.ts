@@ -667,6 +667,68 @@ export interface UserProfile {
   };
 }
 
+export type VaultCategory = 'bank' | 'card' | 'insurance' | 'other';
+
+export interface VaultCustomField {
+  label: string;
+  value: string;
+  secret: boolean;
+}
+
+export interface VaultInitPayload {
+  salt: string;
+  verifier: string;
+  iterations: number;
+}
+
+export interface VaultItemContent {
+  fields: Record<string, string>;
+  customFields: VaultCustomField[];
+}
+
+export interface VaultItemPayload {
+  itemId: string;
+  category: VaultCategory;
+  ciphertext: string;
+}
+
+export interface VaultItemRecord {
+  id: string;
+  category: VaultCategory;
+  ciphertext: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VaultKdf {
+  algo: string;
+  iterations: number;
+}
+
+export interface VaultMeta {
+  exists: boolean;
+  salt?: string;
+  kdf?: VaultKdf;
+  keyEpoch?: number;
+  lockedUntil?: string | null;
+  attemptsRemaining?: number;
+}
+
+export interface VaultRekeyPayload {
+  salt: string;
+  verifier: string;
+  iterations: number;
+  items: { id: string; category: VaultCategory; ciphertext: string; createdAt: string }[];
+}
+
+export interface VaultUnlockResponse {
+  salt: string;
+  verifier: string;
+  kdf: VaultKdf;
+  keyEpoch: number;
+  attemptsRemaining: number;
+}
+
 export type WorldBankApiResponse = [WorldBankMeta, WorldBankDataPoint[]];
 
 export interface WorldBankCountryRef {
