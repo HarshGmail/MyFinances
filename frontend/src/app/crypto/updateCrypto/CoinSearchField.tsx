@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Control, UseFormSetValue } from 'react-hook-form';
+import { Control, FieldValues, Path, UseFormSetValue } from 'react-hook-form';
 import { debounce } from 'lodash';
 import {
   FormControl,
@@ -20,23 +20,23 @@ import {
 } from '@/components/ui/command';
 import { useSearchCryptoQuery } from '@/api/query';
 
-interface CoinSearchFieldProps {
-  control: Control<any>;
-  setValue: UseFormSetValue<any>;
+interface CoinSearchFieldProps<T extends FieldValues> {
+  control: Control<T>;
+  setValue: UseFormSetValue<T>;
   coinNameInput: string;
   setCoinNameInput: (val: string) => void;
   showSuggestions: boolean;
   setShowSuggestions: (show: boolean) => void;
 }
 
-export function CoinSearchField({
+export function CoinSearchField<T extends FieldValues>({
   control,
   setValue,
   coinNameInput,
   setCoinNameInput,
   showSuggestions,
   setShowSuggestions,
-}: CoinSearchFieldProps) {
+}: CoinSearchFieldProps<T>) {
   const { data: coinSuggestions } = useSearchCryptoQuery(coinNameInput);
 
   const debouncedSetInput = useMemo(
@@ -49,7 +49,7 @@ export function CoinSearchField({
       <FormLabel className="self-center">Coin Name</FormLabel>
       <FormField
         control={control}
-        name="coinName"
+        name={'coinName' as Path<T>}
         render={({ field }) => (
           <FormItem className="w-full">
             <FormControl>
@@ -61,7 +61,7 @@ export function CoinSearchField({
                     field.onChange(e);
                     debouncedSetInput(e.target.value);
                     setShowSuggestions(true);
-                    setValue('coinSymbol', '');
+                    setValue('coinSymbol' as Path<T>, '' as never);
                   }}
                   onFocus={() => setShowSuggestions(true)}
                   autoComplete="off"
@@ -87,8 +87,8 @@ export function CoinSearchField({
                                   key={coin.id}
                                   value={coin.name.toLowerCase()}
                                   onSelect={() => {
-                                    setValue('coinName', coin.name);
-                                    setValue('coinSymbol', coin.symbol);
+                                    setValue('coinName' as Path<T>, coin.name as never);
+                                    setValue('coinSymbol' as Path<T>, coin.symbol as never);
                                     setCoinNameInput(coin.name);
                                     setShowSuggestions(false);
                                   }}
