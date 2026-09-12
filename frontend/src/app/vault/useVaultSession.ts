@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { VaultCategory, VaultItemContent } from '@/api/dataInterface';
+import { VaultCategory, VaultItemContent, WrappedWalletKey } from '@/api/dataInterface';
 import { useVaultMetaQuery } from '@/api/query';
 import {
   confirmVaultUnlock,
@@ -12,6 +12,7 @@ import {
   useInitVaultMutation,
   useRekeyVaultMutation,
   useSaveVaultItemMutation,
+  useSaveVaultKeyPairMutation,
 } from '@/api/mutations';
 import {
   VAULT_KDF_ITERATIONS,
@@ -21,8 +22,10 @@ import {
   deriveKey,
   encryptItem,
   generateSalt,
+  generateUserKeyPair,
   isVaultCryptoAvailable,
   newItemId,
+  unwrapKeyWithPrivateKey,
   verifyPin,
 } from '@/utils/vaultCrypto';
 import { VaultDecryptedItem } from './vaultTypes';
@@ -40,13 +43,17 @@ export function useVaultSession() {
   const { mutateAsync: deleteVaultItem } = useDeleteVaultItemMutation();
   const { mutateAsync: rekeyVault } = useRekeyVaultMutation();
   const { mutateAsync: destroyVault } = useDestroyVaultMutation();
+  const { mutateAsync: saveKeyPair } = useSaveVaultKeyPairMutation();
 
   const [cryptoAvailable, setCryptoAvailable] = useState<boolean | null>(null);
   const [key, setKey] = useState<CryptoKey | null>(null);
   const [items, setItems] = useState<VaultDecryptedItem[]>([]);
   const [damagedIds, setDamagedIds] = useState<string[]>([]);
   const [isBusy, setIsBusy] = useState(false);
+  const [privateKeyJwk, setPrivateKeyJwk] = useState<JsonWebKey | null>(null);
+  const [publicKeyJwk, setPublicKeyJwk] = useState<JsonWebKey | null>(null);
   const lastActivityRef = useRef(Date.now());
+  const walletKeysRef = useRef(new Map<string, CryptoKey>());
 
   useEffect(() => {
     setCryptoAvailable(isVaultCryptoAvailable());
@@ -56,6 +63,9 @@ export function useVaultSession() {
     setKey(null);
     setItems([]);
     setDamagedIds([]);
+    setPrivateKeyJwk(null);
+    setPublicKeyJwk(null);
+    walletKeysRef.current.clear();
   }, []);
 
   const loadItems = useCallback(async (vaultKey: CryptoKey) => {
@@ -91,9 +101,19 @@ export function useVaultSession() {
         const salt = generateSalt();
         const derivedKey = await deriveKey(pin, salt, VAULT_KDF_ITERATIONS);
         const verifier = await createVerifier(derivedKey);
-        await initVault({ salt, verifier, iterations: VAULT_KDF_ITERATIONS });
+        const keyPair = await generateUserKeyPair();
+        const wrappedPrivateKey = await encryptItem(derivedKey, keyPair.privateKey);
+        await initVault({
+          salt,
+          verifier,
+          iterations: VAULT_KDF_ITERATIONS,
+          publicKey: keyPair.publicKey,
+          wrappedPrivateKey,
+        });
         setItems([]);
         setDamagedIds([]);
+        setPrivateKeyJwk(keyPair.privateKey);
+        setPublicKeyJwk(keyPair.publicKey);
         setKey(derivedKey);
         lastActivityRef.current = Date.now();
       } finally {
@@ -101,6 +121,33 @@ export function useVaultSession() {
       }
     },
     [initVault]
+  );
+
+  const ensureSharingKeys = useCallback(
+    async (
+      vaultKey: CryptoKey,
+      storedPublicKey: JsonWebKey | null,
+      storedWrapped: string | null
+    ) => {
+      if (storedPublicKey && storedWrapped) {
+        try {
+          const privateKey = await decryptItem<JsonWebKey>(vaultKey, storedWrapped);
+          setPrivateKeyJwk(privateKey);
+          setPublicKeyJwk(storedPublicKey);
+          return;
+        } catch {
+          setPrivateKeyJwk(null);
+          setPublicKeyJwk(null);
+          return;
+        }
+      }
+      const keyPair = await generateUserKeyPair();
+      const wrappedPrivateKey = await encryptItem(vaultKey, keyPair.privateKey);
+      await saveKeyPair({ publicKey: keyPair.publicKey, wrappedPrivateKey });
+      setPrivateKeyJwk(keyPair.privateKey);
+      setPublicKeyJwk(keyPair.publicKey);
+    },
+    [saveKeyPair]
   );
 
   const unlock = useCallback(
@@ -116,13 +163,14 @@ export function useVaultSession() {
         }
         await confirmVaultUnlock();
         await loadItems(derivedKey);
+        await ensureSharingKeys(derivedKey, session.publicKey, session.wrappedPrivateKey);
         setKey(derivedKey);
         lastActivityRef.current = Date.now();
       } finally {
         setIsBusy(false);
       }
     },
-    [loadItems, refetchMeta]
+    [loadItems, refetchMeta, ensureSharingKeys]
   );
 
   const saveItem = useCallback(
@@ -162,6 +210,9 @@ export function useVaultSession() {
         const salt = generateSalt();
         const nextKey = await deriveKey(newPin, salt, VAULT_KDF_ITERATIONS);
         const verifier = await createVerifier(nextKey);
+        const rewrappedPrivateKey = privateKeyJwk
+          ? await encryptItem(nextKey, privateKeyJwk)
+          : null;
         const reencryptedItems = await Promise.all(
           items.map(async (item) => ({
             id: item.id,
@@ -174,6 +225,7 @@ export function useVaultSession() {
           salt,
           verifier,
           iterations: VAULT_KDF_ITERATIONS,
+          wrappedPrivateKey: rewrappedPrivateKey,
           items: reencryptedItems,
         });
         setKey(nextKey);
@@ -182,7 +234,24 @@ export function useVaultSession() {
         setIsBusy(false);
       }
     },
-    [key, items, rekeyVault]
+    [key, items, rekeyVault, privateKeyJwk]
+  );
+
+  const resolveWalletKey = useCallback(
+    async (walletId: string, wrappedWalletKey: WrappedWalletKey | null, keyEpoch: number) => {
+      const cacheKey = `${walletId}:${keyEpoch}`;
+      const cached = walletKeysRef.current.get(cacheKey);
+      if (cached) return cached;
+      if (!wrappedWalletKey || !privateKeyJwk) return null;
+      try {
+        const walletKey = await unwrapKeyWithPrivateKey(wrappedWalletKey, privateKeyJwk);
+        walletKeysRef.current.set(cacheKey, walletKey);
+        return walletKey;
+      } catch {
+        return null;
+      }
+    },
+    [privateKeyJwk]
   );
 
   const destroy = useCallback(async () => {
@@ -224,6 +293,10 @@ export function useVaultSession() {
     isBusy,
     lockedUntil: meta?.lockedUntil ?? null,
     attemptsRemaining: meta?.attemptsRemaining,
+    publicKeyJwk,
+    privateKeyJwk,
+    hasSharingKeys: Boolean(publicKeyJwk && privateKeyJwk),
+    resolveWalletKey,
     createVault,
     unlock,
     lock,

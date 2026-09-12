@@ -40,6 +40,9 @@ export default function VaultPage() {
           items={session.items}
           damagedIds={session.damagedIds}
           isBusy={session.isBusy}
+          publicKeyJwk={session.publicKeyJwk}
+          hasSharingKeys={session.hasSharingKeys}
+          resolveWalletKey={session.resolveWalletKey}
           onLock={session.lock}
           onSave={session.saveItem}
           onRemove={session.removeItem}

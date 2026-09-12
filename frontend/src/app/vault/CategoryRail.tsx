@@ -1,19 +1,33 @@
 'use client';
 
-import { VaultCategory } from '@/api/dataInterface';
 import { Badge } from '@/components/ui/badge';
-import { VAULT_CATEGORIES } from './vaultTypes';
+import { VAULT_CATEGORIES, VaultTabId, WALLETS_TAB } from './vaultTypes';
 
 interface CategoryRailProps {
-  selected: VaultCategory;
-  onSelect: (category: VaultCategory) => void;
+  selected: VaultTabId;
+  onSelect: (tab: VaultTabId) => void;
   counts: Record<string, number>;
 }
+
+const RAIL_ENTRIES = [
+  ...VAULT_CATEGORIES.map(({ id, label, icon, description }) => ({
+    id: id as VaultTabId,
+    label,
+    icon,
+    description,
+  })),
+  {
+    id: WALLETS_TAB.id as VaultTabId,
+    label: WALLETS_TAB.label,
+    icon: WALLETS_TAB.icon,
+    description: WALLETS_TAB.description,
+  },
+];
 
 export function CategoryRail({ selected, onSelect, counts }: CategoryRailProps) {
   return (
     <nav className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
-      {VAULT_CATEGORIES.map(({ id, label, icon: Icon, description }) => {
+      {RAIL_ENTRIES.map(({ id, label, icon: Icon, description }) => {
         const isSelected = selected === id;
         const count = counts[id] ?? 0;
         return (

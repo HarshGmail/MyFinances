@@ -679,6 +679,13 @@ export interface VaultInitPayload {
   salt: string;
   verifier: string;
   iterations: number;
+  publicKey?: JsonWebKey;
+  wrappedPrivateKey?: string;
+}
+
+export interface VaultKeyPairPayload {
+  publicKey: JsonWebKey;
+  wrappedPrivateKey: string;
 }
 
 export interface VaultItemContent {
@@ -718,6 +725,7 @@ export interface VaultRekeyPayload {
   salt: string;
   verifier: string;
   iterations: number;
+  wrappedPrivateKey?: string | null;
   items: { id: string; category: VaultCategory; ciphertext: string; createdAt: string }[];
 }
 
@@ -726,10 +734,110 @@ export interface VaultUnlockResponse {
   verifier: string;
   kdf: VaultKdf;
   keyEpoch: number;
+  publicKey: JsonWebKey | null;
+  wrappedPrivateKey: string | null;
   attemptsRemaining: number;
 }
 
+export interface WalletCreatePayload {
+  encryptedName: string;
+  wrappedWalletKey: WrappedWalletKey;
+}
+
+export interface WalletDetailResponse {
+  id: string;
+  encryptedName: string | null;
+  wrappedWalletKey: WrappedWalletKey | null;
+  keyEpoch: number;
+  role: WalletRole;
+  isOwner: boolean;
+  items: WalletItemRecord[];
+}
+
+export interface WalletInviteInfo {
+  walletId: string;
+  ownerName: string;
+  itemCount: number;
+  isOwner: boolean;
+  membershipStatus: WalletMemberStatus | null;
+}
+
+export interface WalletInviteResponse {
+  id: string;
+  token: string;
+  expiresAt: string;
+  maxUses: number;
+}
+
+export interface WalletItemPayload {
+  walletId: string;
+  itemId: string;
+  category: VaultCategory;
+  ciphertext: string;
+  sourceItemId?: string | null;
+}
+
+export interface WalletItemRecord {
+  id: string;
+  category: VaultCategory;
+  ciphertext: string | null;
+  sourceItemId: string | null;
+  addedBy: string;
+  addedByName: string;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletMemberRecord {
+  userId: string;
+  name: string;
+  email: string;
+  role: WalletRole;
+  status: WalletMemberStatus;
+  isMe: boolean;
+  requestedAt: string;
+  approvedAt: string | null;
+}
+
+export type WalletMemberStatus = 'pending' | 'active';
+
+export type WalletRole = 'owner' | 'member';
+
+export interface WalletRotatePayload {
+  walletId: string;
+  encryptedName: string;
+  items: {
+    id: string;
+    category: VaultCategory;
+    ciphertext: string;
+    sourceItemId?: string | null;
+    createdAt: string;
+  }[];
+  members: { userId: string; wrappedWalletKey: WrappedWalletKey }[];
+}
+
+export interface WalletSummary {
+  id: string;
+  encryptedName: string | null;
+  wrappedWalletKey: WrappedWalletKey | null;
+  keyEpoch: number;
+  memberKeyEpoch: number;
+  role: WalletRole;
+  isOwner: boolean;
+  ownerName: string;
+  itemCount: number;
+  memberCount: number;
+  pendingCount: number;
+  updatedAt: string;
+}
+
 export type WorldBankApiResponse = [WorldBankMeta, WorldBankDataPoint[]];
+
+export interface WrappedWalletKey {
+  epk: JsonWebKey;
+  wrapped: string;
+}
 
 export interface WorldBankCountryRef {
   id: string; // e.g., "IN"

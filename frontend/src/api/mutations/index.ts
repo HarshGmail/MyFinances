@@ -18,3 +18,4 @@ export * from './userGoals';
 export * from './deleteAll';
 export * from './emailIntegration';
 export * from './vault';
+export * from './wallets';

@@ -9,6 +9,8 @@ import {
   deleteVaultItem,
   rekeyVault,
   destroyVault,
+  saveVaultKeyPair,
+  getVaultPublicKey,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -22,6 +24,8 @@ router.post('/unlock/confirm', confirmVaultUnlock);
 router.get('/items', getVaultItems);
 router.put('/items/:itemId', upsertVaultItem);
 router.delete('/items/:itemId', deleteVaultItem);
+router.post('/keypair', saveVaultKeyPair);
+router.get('/public-key/:userId', getVaultPublicKey);
 router.post('/rekey', rekeyVault);
 router.delete('/', destroyVault);
 

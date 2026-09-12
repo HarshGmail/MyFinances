@@ -26,6 +26,7 @@ import {
   CreditCard,
   KeyRound,
   Copy,
+  Users,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -58,6 +59,11 @@ const FEATURES = [
     icon: ShieldCheck,
     title: 'Encrypted Vault',
     desc: 'Keep bank, card, insurance and login details behind a PIN — encrypted in your browser, unreadable to us.',
+  },
+  {
+    icon: Users,
+    title: 'Shared Wallets',
+    desc: 'Pool selected card details with friends so everyone knows which card earns the discount where.',
   },
   {
     icon: BarChart3,
@@ -239,11 +245,22 @@ export default function Auth() {
               locked behind a 6-digit PIN. Add your own custom fields to anything, tap a value to
               copy it, and the whole entry copies as clean shareable text.
             </p>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Your PIN never leaves your device. Everything is encrypted in your browser before it
               reaches us, so we store nothing we could read — and nobody can unlock it for you,
               including us.
             </p>
+            <div className="rounded-lg border bg-muted/30 p-4 mb-6">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Users className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-semibold">Shared wallets</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Pool cards with friends to see whose gets the discount where. Share a wallet by
+                link, tick exactly which fields they can see, and approve each person who asks to
+                join. Remove someone and the wallet re-keys itself.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2 mb-6">
               {[
                 { icon: Landmark, label: 'Bank Details' },

@@ -13,6 +13,9 @@ const saltField = z.string().min(16).max(64);
 const verifierField = z.string().min(1).max(10_000);
 const iterationsField = z.number().int().min(100_000).max(1_000_000);
 
+export const publicKeySchema = z.record(z.unknown());
+export const wrappedPrivateKeyField = z.string().min(1).max(10_000);
+
 export const vaultItemSchema = z.object({
   id: z.string().uuid(),
   category: z.enum(VAULT_CATEGORIES),
@@ -31,6 +34,8 @@ export const vaultSchema = z.object({
     iterations: iterationsField,
   }),
   keyEpoch: z.number().int().nonnegative(),
+  publicKey: publicKeySchema.nullable(),
+  wrappedPrivateKey: wrappedPrivateKeyField.nullable(),
   items: z.array(vaultItemSchema).max(VAULT_MAX_ITEMS),
   failedAttempts: z.number().int().nonnegative(),
   lockedUntil: z.date().nullable(),
@@ -42,6 +47,13 @@ export const vaultInitBodySchema = z.object({
   salt: saltField,
   verifier: verifierField,
   iterations: iterationsField,
+  publicKey: publicKeySchema.optional(),
+  wrappedPrivateKey: wrappedPrivateKeyField.optional(),
+});
+
+export const vaultKeyPairBodySchema = z.object({
+  publicKey: publicKeySchema,
+  wrappedPrivateKey: wrappedPrivateKeyField,
 });
 
 export const vaultItemBodySchema = z.object({
@@ -53,6 +65,7 @@ export const vaultRekeyBodySchema = z.object({
   salt: saltField,
   verifier: verifierField,
   iterations: iterationsField,
+  wrappedPrivateKey: wrappedPrivateKeyField.nullable().optional(),
   items: z
     .array(
       z.object({

@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { KeyRound, Lock, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { VaultCategory, VaultItemContent } from '@/api/dataInterface';
+import { VaultCategory, VaultItemContent, WalletSummary } from '@/api/dataInterface';
+import { useWalletsQuery } from '@/api/query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -21,17 +22,31 @@ import { DestroyVaultDialog } from './DestroyVaultDialog';
 import { VaultItemCard } from './VaultItemCard';
 import { VaultItemDialog, VaultItemFormValues } from './VaultItemDialog';
 import {
-  VAULT_CATEGORY_IDS,
+  VAULT_TAB_IDS,
   VaultDecryptedItem,
+  VaultTabId,
+  WALLETS_TAB_ID,
+  buildSharedProjection,
   emptyContentFor,
   getCategoryDef,
   getItemTitle,
 } from './vaultTypes';
+import { ShareToWalletDialog } from './wallets/ShareToWalletDialog';
+import { WalletsSection } from './wallets/WalletsSection';
+import { useWalletActions } from './wallets/useWalletActions';
+import { useWalletNames } from './wallets/useWalletNames';
 
 interface VaultShellProps {
   items: VaultDecryptedItem[];
   damagedIds: string[];
   isBusy: boolean;
+  publicKeyJwk: JsonWebKey | null;
+  hasSharingKeys: boolean;
+  resolveWalletKey: (
+    walletId: string,
+    wrappedWalletKey: WalletSummary['wrappedWalletKey'],
+    keyEpoch: number
+  ) => Promise<CryptoKey | null>;
   onLock: () => void;
   onSave: (category: VaultCategory, content: VaultItemContent, itemId?: string) => Promise<void>;
   onRemove: (itemId: string) => Promise<void>;
@@ -67,22 +82,40 @@ export function VaultShell({
   items,
   damagedIds,
   isBusy,
+  publicKeyJwk,
+  hasSharingKeys,
+  resolveWalletKey,
   onLock,
   onSave,
   onRemove,
   onChangePin,
   onDestroy,
 }: VaultShellProps) {
-  const [category, setCategory] = useUrlState<VaultCategory>(
+  const [activeTab, setActiveTab] = useUrlState<VaultTabId>(
     'tab',
     'bank',
-    VAULT_CATEGORY_IDS as readonly VaultCategory[]
+    VAULT_TAB_IDS as readonly VaultTabId[]
   );
+  const isWalletsTab = activeTab === WALLETS_TAB_ID;
+  const category = (isWalletsTab ? 'bank' : activeTab) as VaultCategory;
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VaultDecryptedItem | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<VaultDecryptedItem | null>(null);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isDestroyOpen, setIsDestroyOpen] = useState(false);
+  const [sharingItem, setSharingItem] = useState<VaultDecryptedItem | null>(null);
+
+  const {
+    data: wallets,
+    isLoading: isLoadingWallets,
+    refetch: refetchWallets,
+  } = useWalletsQuery(hasSharingKeys);
+  const walletNames = useWalletNames(wallets, resolveWalletKey);
+  const walletActions = useWalletActions({
+    publicKeyJwk,
+    resolveWalletKey,
+    refetchWallets,
+  });
 
   const form = useForm<VaultItemFormValues>({ defaultValues: toFormValues('bank') });
   const definition = getCategoryDef(category);
@@ -97,6 +130,27 @@ export function VaultShell({
     () => items.filter((item) => item.category === category),
     [items, category]
   );
+
+  const walletOptions = useMemo(
+    () =>
+      (wallets ?? []).map((summary) => ({
+        summary,
+        name: walletNames[summary.id] ?? 'Wallet',
+      })),
+    [wallets, walletNames]
+  );
+
+  const handleShareToWallet = async (walletId: string, selectedFieldNames: string[]) => {
+    if (!sharingItem) return;
+    const target = wallets?.find((entry) => entry.id === walletId);
+    if (!target) throw new Error('That wallet is no longer available');
+    const projection = buildSharedProjection(
+      sharingItem.category,
+      sharingItem.content,
+      selectedFieldNames
+    );
+    await walletActions.shareItemToWallet(target, sharingItem.category, projection, sharingItem.id);
+  };
 
   const openAddDialog = () => {
     setEditingItem(null);
@@ -185,46 +239,64 @@ export function VaultShell({
 
       <div className="flex flex-col md:flex-row gap-6">
         <div className="w-full md:w-56 shrink-0">
-          <CategoryRail selected={category} onSelect={setCategory} counts={counts} />
+          <CategoryRail
+            selected={activeTab}
+            onSelect={setActiveTab}
+            counts={{ ...counts, [WALLETS_TAB_ID]: wallets?.length ?? 0 }}
+          />
         </div>
 
         <div className="flex-1 min-w-0 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">{definition.label}</h2>
-              <p className="text-sm text-muted-foreground">{definition.description}</p>
-            </div>
-            <Button size="sm" className="gap-1.5 shrink-0" onClick={openAddDialog}>
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
-          </div>
-
-          {visibleItems.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <definition.icon className="h-10 w-10 mx-auto text-muted-foreground/50" />
-                <p className="mt-3 font-medium">No {definition.label.toLowerCase()} yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Add your first {definition.singular.toLowerCase()} to keep it encrypted here.
-                </p>
-                <Button size="sm" className="mt-4 gap-1.5" onClick={openAddDialog}>
-                  <Plus className="h-4 w-4" />
-                  Add {definition.singular}
-                </Button>
-              </CardContent>
-            </Card>
+          {isWalletsTab ? (
+            <WalletsSection
+              wallets={wallets}
+              names={walletNames}
+              isLoading={isLoadingWallets}
+              hasSharingKeys={hasSharingKeys}
+              isPending={walletActions.isWalletBusy}
+              onCreate={walletActions.createWallet}
+            />
           ) : (
-            <div className="space-y-4">
-              {visibleItems.map((item) => (
-                <VaultItemCard
-                  key={item.id}
-                  item={item}
-                  onEdit={openEditDialog}
-                  onDelete={setPendingDeletion}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">{definition.label}</h2>
+                  <p className="text-sm text-muted-foreground">{definition.description}</p>
+                </div>
+                <Button size="sm" className="gap-1.5 shrink-0" onClick={openAddDialog}>
+                  <Plus className="h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+
+              {visibleItems.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <definition.icon className="h-10 w-10 mx-auto text-muted-foreground/50" />
+                    <p className="mt-3 font-medium">No {definition.label.toLowerCase()} yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Add your first {definition.singular.toLowerCase()} to keep it encrypted here.
+                    </p>
+                    <Button size="sm" className="mt-4 gap-1.5" onClick={openAddDialog}>
+                      <Plus className="h-4 w-4" />
+                      Add {definition.singular}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {visibleItems.map((item) => (
+                    <VaultItemCard
+                      key={item.id}
+                      item={item}
+                      onEdit={openEditDialog}
+                      onDelete={setPendingDeletion}
+                      onShare={hasSharingKeys ? setSharingItem : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -237,6 +309,17 @@ export function VaultShell({
         form={form}
         onSubmit={handleSubmit}
         isPending={isBusy}
+      />
+
+      <ShareToWalletDialog
+        open={Boolean(sharingItem)}
+        onOpenChange={(next) => {
+          if (!next) setSharingItem(null);
+        }}
+        item={sharingItem}
+        wallets={walletOptions}
+        onShare={handleShareToWallet}
+        isPending={walletActions.isWalletBusy}
       />
 
       <ChangePinDialog

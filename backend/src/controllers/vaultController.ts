@@ -10,6 +10,7 @@ import {
   VAULT_MAX_ITEMS,
   vaultInitBodySchema,
   vaultItemBodySchema,
+  vaultKeyPairBodySchema,
   vaultRekeyBodySchema,
 } from '../schemas/vault';
 import logger from '../utils/logger';
@@ -31,6 +32,8 @@ interface VaultDocument {
   verifier: string;
   kdf: { algo: string; iterations: number };
   keyEpoch: number;
+  publicKey: Record<string, unknown> | null;
+  wrappedPrivateKey: string | null;
   items: StoredVaultItem[];
   failedAttempts: number;
   lockedUntil: Date | null;
@@ -115,6 +118,8 @@ export async function initVault(req: Request, res: Response) {
       verifier: encrypt(parsed.verifier),
       kdf: { algo: VAULT_KDF_ALGO, iterations: parsed.iterations },
       keyEpoch: 0,
+      publicKey: parsed.publicKey ?? null,
+      wrappedPrivateKey: parsed.wrappedPrivateKey ?? null,
       items: [],
       failedAttempts: 0,
       lockedUntil: null,
@@ -177,6 +182,8 @@ export async function unlockVault(req: Request, res: Response) {
         verifier: decrypt(vault.verifier),
         kdf: vault.kdf,
         keyEpoch: vault.keyEpoch,
+        publicKey: vault.publicKey ?? null,
+        wrappedPrivateKey: vault.wrappedPrivateKey ?? null,
         attemptsRemaining: Math.max(0, VAULT_MAX_FREE_ATTEMPTS - attemptsAfterThisOne),
       },
     });
@@ -365,6 +372,7 @@ export async function rekeyVault(req: Request, res: Response) {
           salt: parsed.salt,
           verifier: encrypt(parsed.verifier),
           kdf: { algo: VAULT_KDF_ALGO, iterations: parsed.iterations },
+          wrappedPrivateKey: parsed.wrappedPrivateKey ?? null,
           items: rewrappedItems,
           keyEpoch: (vault.keyEpoch ?? 0) + 1,
           failedAttempts: 0,
@@ -396,6 +404,68 @@ export async function destroyVault(req: Request, res: Response) {
     res.status(200).json({ success: true, message: 'Vault destroyed' });
   } catch (error) {
     logger.error({ err: error }, 'Destroy vault error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function saveVaultKeyPair(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      respondUnauthenticated(res);
+      return;
+    }
+    const parsed = vaultKeyPairBodySchema.parse(req.body);
+    const collection = vaultsCollection();
+    const result = await collection.updateOne(
+      { userId: new ObjectId(user.userId), publicKey: null },
+      {
+        $set: {
+          publicKey: parsed.publicKey,
+          wrappedPrivateKey: parsed.wrappedPrivateKey,
+          updatedAt: new Date(),
+        },
+      }
+    );
+    if (result.matchedCount === 0) {
+      res.status(409).json({ success: false, message: 'Sharing keys already set up' });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Sharing keys saved' });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      respondInvalidPayload(res);
+      return;
+    }
+    logger.error({ err: error }, 'Save vault key pair error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function getVaultPublicKey(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      respondUnauthenticated(res);
+      return;
+    }
+    const { userId } = req.params;
+    if (!ObjectId.isValid(userId)) {
+      res.status(400).json({ success: false, message: 'Invalid user ID' });
+      return;
+    }
+    const collection = vaultsCollection();
+    const vault = await collection.findOne(
+      { userId: new ObjectId(userId) },
+      { projection: { publicKey: 1 } }
+    );
+    if (!vault?.publicKey) {
+      res.status(404).json({ success: false, message: 'This user has not set up sharing keys' });
+      return;
+    }
+    res.status(200).json({ success: true, data: { userId, publicKey: vault.publicKey } });
+  } catch (error) {
+    logger.error({ err: error }, 'Fetch vault public key error');
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

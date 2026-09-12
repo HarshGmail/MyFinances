@@ -29,6 +29,7 @@ import {
   emailIntegrationsRouter,
   webhooksRouter,
   vaultRouter,
+  walletsRouter,
 } from './routes';
 import { requestLogger, blockDemoMutations, errorHandler } from './middleware';
 import logger from './utils/logger';
@@ -87,6 +88,7 @@ app.use('/api/chatgpt', chatgptRouter);
 app.use('/api/capital-gains', capitalGainsRouter);
 app.use('/api/email-integration', emailIntegrationsRouter);
 app.use('/api/vault', vaultRouter);
+app.use('/api/wallets', walletsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/api/health', (req, res) => {
@@ -126,6 +128,15 @@ async function startServer() {
     await database.getDb().collection('users').createIndex({ ingestToken: 1 }, { sparse: true });
 
     await database.getDb().collection('vaults').createIndex({ userId: 1 }, { unique: true });
+
+    await database
+      .getDb()
+      .collection('walletMembers')
+      .createIndex({ walletId: 1, userId: 1 }, { unique: true });
+
+    await database.getDb().collection('walletMembers').createIndex({ userId: 1, status: 1 });
+
+    await database.getDb().collection('walletInvites').createIndex({ token: 1 }, { unique: true });
 
     // Start the server
     app.listen(port, '0.0.0.0', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Eye, EyeOff, Pencil, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -19,6 +19,7 @@ interface VaultItemCardProps {
   item: VaultDecryptedItem;
   onEdit: (item: VaultDecryptedItem) => void;
   onDelete: (item: VaultDecryptedItem) => void;
+  onShare?: (item: VaultDecryptedItem) => void;
 }
 
 function copyToClipboard(value: string, label: string) {
@@ -28,7 +29,7 @@ function copyToClipboard(value: string, label: string) {
     .catch(() => toast.error(`Could not copy ${label.toLowerCase()}`));
 }
 
-export function VaultItemCard({ item, onEdit, onDelete }: VaultItemCardProps) {
+export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCardProps) {
   const [revealedFields, setRevealedFields] = useState<string[]>([]);
   const definition = getCategoryDef(item.category);
   const CategoryIcon = definition.icon;
@@ -64,6 +65,16 @@ export function VaultItemCard({ item, onEdit, onDelete }: VaultItemCardProps) {
             >
               <Copy className="h-4 w-4" />
             </Button>
+            {onShare && (
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Share to a wallet"
+                onClick={() => onShare(item)}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button size="sm" variant="ghost" title="Edit" onClick={() => onEdit(item)}>
               <Pencil className="h-4 w-4" />
             </Button>

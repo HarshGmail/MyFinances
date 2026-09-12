@@ -24,19 +24,19 @@ ourFinance/
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend framework | Next.js 16 App Router (`'use client'` on all data pages) |
-| UI components | shadcn/ui + Tailwind CSS |
-| Charts | Highcharts + highcharts-react-official |
-| Data fetching | TanStack Query v5 |
-| Global state | Zustand (`useAppStore` — user, theme, filters) |
-| Form validation | react-hook-form + zod |
-| Backend framework | Express.js |
-| Database | MongoDB (direct driver, no ORM) |
-| Auth | JWT — cookie-based (`credentials: 'include'` on all fetch calls) |
-| Validation | Zod schemas in backend |
-| External APIs | Yahoo Finance (stocks), SafeGold API (gold), CoinDCX (crypto), MFAPI (MF NAV), Gmail API (email import) |
+| Layer              | Technology                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| Frontend framework | Next.js 16 App Router (`'use client'` on all data pages)                                                |
+| UI components      | shadcn/ui + Tailwind CSS                                                                                |
+| Charts             | Highcharts + highcharts-react-official                                                                  |
+| Data fetching      | TanStack Query v5                                                                                       |
+| Global state       | Zustand (`useAppStore` — user, theme, filters)                                                          |
+| Form validation    | react-hook-form + zod                                                                                   |
+| Backend framework  | Express.js                                                                                              |
+| Database           | MongoDB (direct driver, no ORM)                                                                         |
+| Auth               | JWT — cookie-based (`credentials: 'include'` on all fetch calls)                                        |
+| Validation         | Zod schemas in backend                                                                                  |
+| External APIs      | Yahoo Finance (stocks), SafeGold API (gold), CoinDCX (crypto), MFAPI (MF NAV), Gmail API (email import) |
 
 ---
 
@@ -118,7 +118,18 @@ frontend/src/
 │   │   ├── VaultItemDialog.tsx     Add/edit form; custom fields via useFieldArray
 │   │   ├── ChangePinDialog.tsx     Re-encrypts all items client-side, then one atomic rekey
 │   │   ├── DestroyVaultDialog.tsx  Type-to-confirm irreversible wipe
-│   │   └── VaultUnsupported.tsx    Insecure-context explainer
+│   │   ├── VaultUnsupported.tsx    Insecure-context explainer
+│   │   ├── wallets/                Shared wallets (fifth rail tab)
+│   │   │   ├── WalletsSection.tsx      List of wallets you own or joined
+│   │   │   ├── WalletRow.tsx           One row: name, counts, role, pending badge
+│   │   │   ├── [walletId]/page.tsx     Wallet detail — entries via VaultItemCard
+│   │   │   ├── CreateWalletDialog.tsx  Generates WK, wraps it to your own public key
+│   │   │   ├── ShareWalletDialog.tsx   Invite link with the #k= key fragment
+│   │   │   ├── WalletMembersDialog.tsx Members, join requests, remove + rotate
+│   │   │   ├── ShareToWalletDialog.tsx Per-field checkbox picker
+│   │   │   ├── useWalletActions.ts     Create, share, invite, approve, rotate
+│   │   │   └── useWalletNames.ts       Decrypts wallet names for the list
+│   │   └── join/[token]/page.tsx   Invite landing page (reads #k= before any router call)
 │   └── popup/                Browser extension popup
 ├── api/
 │   ├── configs/
@@ -185,32 +196,33 @@ backend/src/
 ├── schemas/              Zod validation schemas
 │   └── emailIntegration.ts   Zod schema for emailIntegrations collection
 └── utils/
-    ├── encryption.ts     AES-256-GCM encrypt/decrypt for PAN, refresh tokens, vault ciphertext
+    ├── encryption.ts     AES-256-GCM encrypt/decrypt for PAN, refresh tokens, vault/wallet ciphertext
     └── vaultLockout.ts    computeLockoutMs() backoff ladder for failed vault unlocks
 ```
 
 ### All API Route Prefixes
 
-| Prefix | Domain |
-|---|---|
-| `/api/auth` | Login, signup |
-| `/api/stocks` | Stock transactions + NSE quotes + Yahoo Finance search + financials + portfolio analytics |
-| `/api/gold` | Gold transactions + SafeGold rates |
-| `/api/crypto` | Crypto transactions + CoinDCX prices + candle data |
-| `/api/mutual-funds` | MF transactions |
-| `/api/funds` | MF info (scheme numbers) + batch NAV history |
-| `/api/epf` | EPF accounts + timeline |
-| `/api/fixed-deposit` | FD management |
-| `/api/recurring-deposit` | RD management |
-| `/api/expenses` | Recurring expense categories |
-| `/api/expense-transactions` | Daily expense log |
-| `/api/goals` | Investment goals |
-| `/api/targets` | Asset allocation targets |
-| `/api/inflation` | Inflation rate data |
-| `/api/ingest` | SMS-based transaction ingestion |
-| `/api/email-integration` | Email import (Gmail OAuth, CDSL eCAS + SafeGold PDF parsing) |
-| `/api/vault` | End-to-end encrypted secrets vault (meta, unlock, items, rekey, destroy) |
-| `/api` (verify) | Token verification |
+| Prefix                      | Domain                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `/api/auth`                 | Login, signup                                                                             |
+| `/api/stocks`               | Stock transactions + NSE quotes + Yahoo Finance search + financials + portfolio analytics |
+| `/api/gold`                 | Gold transactions + SafeGold rates                                                        |
+| `/api/crypto`               | Crypto transactions + CoinDCX prices + candle data                                        |
+| `/api/mutual-funds`         | MF transactions                                                                           |
+| `/api/funds`                | MF info (scheme numbers) + batch NAV history                                              |
+| `/api/epf`                  | EPF accounts + timeline                                                                   |
+| `/api/fixed-deposit`        | FD management                                                                             |
+| `/api/recurring-deposit`    | RD management                                                                             |
+| `/api/expenses`             | Recurring expense categories                                                              |
+| `/api/expense-transactions` | Daily expense log                                                                         |
+| `/api/goals`                | Investment goals                                                                          |
+| `/api/targets`              | Asset allocation targets                                                                  |
+| `/api/inflation`            | Inflation rate data                                                                       |
+| `/api/ingest`               | SMS-based transaction ingestion                                                           |
+| `/api/email-integration`    | Email import (Gmail OAuth, CDSL eCAS + SafeGold PDF parsing)                              |
+| `/api/vault`                | End-to-end encrypted secrets vault (meta, unlock, items, rekey, destroy, keypair)         |
+| `/api/wallets`              | Shared wallets — members, invites, join requests, per-field shared entries                |
+| `/api` (verify)             | Token verification                                                                        |
 
 ---
 
@@ -263,6 +275,7 @@ Query invalidation on mutations: mutations call `queryClient.invalidateQueries({
 ### Home page (`home/page.tsx`) — the mega dashboard
 
 Fetches ALL asset types in parallel, then dependent price queries fire:
+
 - Round 1: stock txns, MF txns + MF info, gold txns, crypto txns, EPF, FD, RD (all parallel)
 - Round 2 (after grouping): `useNseQuoteQuery(stockNames)`, `useMfapiNavHistoryBatchQuery(schemeNumbers)`, `useCryptoCoinPricesQuery(validCoins)`, `useSafeGoldRatesQuery(dateRange)`
 - XIRR runs in useMemo after all data is available
@@ -270,6 +283,7 @@ Fetches ALL asset types in parallel, then dependent price queries fire:
 ### Stock Portfolio page (`stocks/portfolio/page.tsx`) — combined value chart
 
 **Chart change:** Replaced multi-line per-stock chart with single combined total portfolio value line.
+
 - Sums all stocks' holding values at each shared timestamp
 - Single series showing total portfolio net value over time
 - Removed per-stock selector dropdown
@@ -289,6 +303,7 @@ Makes **8 parallel API calls** on load — including ALL asset transaction types
 Comprehensive deep-dive page for individual stock analysis. Structured as a thin orchestrator (`page.tsx`, ~50 lines) routing to focused child components.
 
 **Component breakdown:**
+
 - `CompanySearchBar.tsx` — Pre-filled search input; on focus shows portfolio stocks; on typing 3+ chars fires global search via `useSearchStockByNameQuery()`
 - `CompanyHeader.tsx` — Company name, current price with trending icon, percent change with color coding, "Not in portfolio" badge if applicable
 - `PriceChart.tsx` — Highcharts line chart with interval selector (1D/1W/1M/3M/1Y). For 1D: filters to market hours (09:00–16:00) + latest trading day only. X-axis formatter applies IST offset (5.5 hours) for correct timezone display.
@@ -299,6 +314,7 @@ Comprehensive deep-dive page for individual stock analysis. Structured as a thin
 
 **Live Calculations feature:**
 Drawer displays actual API data + formula + result for 14+ metrics:
+
 - P/E ratios (Trailing & Forward)
 - Book ratios (P/B, PEG)
 - Margins (Gross, Operating, Net)
@@ -314,62 +330,84 @@ Example: "Current Stock Price: ₹2,500.00 ÷ EPS: ₹96.15 = **26.0**"
 
 ## Where Calculations Live
 
-| Calculation | Location | Notes |
-|---|---|---|
-| Portfolio grouping (by symbol/name) | Frontend useMemo | After fetching transactions |
-| P/L, P/L% | Frontend useMemo | After combining transactions + live prices |
-| XIRR | Frontend useMemo (`utils/xirr.ts`) | Uses newton-raphson-method library |
-| Compound interest (FD/RD/EPF) | Frontend useMemo | No external data needed |
-| MF NAV-based valuation | Frontend useMemo (`utils/portfolioCalculations.ts`) | After batch NAV fetch |
-| Monthly investment aggregation (expenses dashboard) | Frontend useMemo (`useDashboardData.ts`) | Filters all transaction arrays by date range |
-| Savings rate, discretionary spending | Frontend useMemo | Derived from salary history + investments + expenses |
-| Chart series construction | Frontend useMemo | Highcharts options built in useMemo, theme-aware |
-| Metric verdicts (stock detail) | Frontend function | `getVerdict(metric, value)` in `verdicts.ts` — qualitative interpretation of metric values |
-| Live calculations (stock detail) | Frontend function | `getMetricCalculation(metricLabel, financials)` in `verdicts.ts` — computes + formats calculation data for drawer |
-| NSE quote fetching | Backend service | `stocksService.ts` calls Yahoo Finance, 300ms delay between requests |
-| Stock financials (detail page) | Backend service | `stocksService.fetchFinancials(symbol)` fetches price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend independently |
-| CoinDCX price fetching | Backend service | `coindcxService.ts` |
-| SafeGold rate fetching | Backend controller | Calls SafeGold API |
+| Calculation                                         | Location                                            | Notes                                                                                                                                  |
+| --------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Portfolio grouping (by symbol/name)                 | Frontend useMemo                                    | After fetching transactions                                                                                                            |
+| P/L, P/L%                                           | Frontend useMemo                                    | After combining transactions + live prices                                                                                             |
+| XIRR                                                | Frontend useMemo (`utils/xirr.ts`)                  | Uses newton-raphson-method library                                                                                                     |
+| Compound interest (FD/RD/EPF)                       | Frontend useMemo                                    | No external data needed                                                                                                                |
+| MF NAV-based valuation                              | Frontend useMemo (`utils/portfolioCalculations.ts`) | After batch NAV fetch                                                                                                                  |
+| Monthly investment aggregation (expenses dashboard) | Frontend useMemo (`useDashboardData.ts`)            | Filters all transaction arrays by date range                                                                                           |
+| Savings rate, discretionary spending                | Frontend useMemo                                    | Derived from salary history + investments + expenses                                                                                   |
+| Chart series construction                           | Frontend useMemo                                    | Highcharts options built in useMemo, theme-aware                                                                                       |
+| Metric verdicts (stock detail)                      | Frontend function                                   | `getVerdict(metric, value)` in `verdicts.ts` — qualitative interpretation of metric values                                             |
+| Live calculations (stock detail)                    | Frontend function                                   | `getMetricCalculation(metricLabel, financials)` in `verdicts.ts` — computes + formats calculation data for drawer                      |
+| NSE quote fetching                                  | Backend service                                     | `stocksService.ts` calls Yahoo Finance, 300ms delay between requests                                                                   |
+| Stock financials (detail page)                      | Backend service                                     | `stocksService.fetchFinancials(symbol)` fetches price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend independently |
+| CoinDCX price fetching                              | Backend service                                     | `coindcxService.ts`                                                                                                                    |
+| SafeGold rate fetching                              | Backend controller                                  | Calls SafeGold API                                                                                                                     |
 
 ---
 
 ## Key Domain Concepts
 
 ### Expenses (two separate concepts — do not confuse)
+
 - **`/api/expenses`** → Recurring expense categories (rent, insurance, subscriptions). These are static entries with a `frequency` field (`one-time | daily | weekly | monthly | yearly`). Used in the financial dashboard to compute monthly expense burden.
 - **`/api/expense-transactions`** → Daily expense log (individual purchases). Used in the Tracker tab. Has `date`, `name`, `amount`, `category`.
 
 ### Transactions (credit/debit pattern)
+
 All asset transactions use `type: 'credit' | 'debit'`. Credits = buy/receive, Debits = sell/withdraw. Portfolio calculations always handle both:
+
 ```typescript
-totalUnits = txs.reduce((sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits : -tx.numOfUnits), 0)
+totalUnits = txs.reduce(
+  (sum, tx) => sum + (tx.type === "credit" ? tx.numOfUnits : -tx.numOfUnits),
+  0,
+);
 ```
 
 ### Salary history
+
 `UserProfile` has both `salaryHistory[]` (base salary effective dates) and `paymentHistory[]` (actual monthly payments with bonus/arrears). `useDashboardData` resolves the correct salary for any given month via `getSalaryForMonth()` and `getPaymentForMonth()`.
 
 ### UserProfile — sensitive fields
+
 `UserProfile` includes `phone` (stored as plaintext) and `panNumber` (stored AES-256-GCM encrypted in DB; returned masked to the frontend — only the last 4 characters are revealed). The profile page exposes a show/hide toggle for the PAN field.
 
 ### vaults collection — the one thing the server cannot read
+
 One document per user (unique index on `userId`), holding a plaintext `salt`, a `verifier` blob, `kdf: { algo, iterations }`, `keyEpoch`, an `items[]` array of `{ id, category, ciphertext, createdAt, updatedAt }`, plus `failedAttempts` / `lockedUntil` for unlock throttling.
 
-Unlike PAN and Gmail tokens — which the server encrypts and can therefore also decrypt — vault entries are encrypted **in the browser** under a key derived from the user's 6-digit PIN (PBKDF2-SHA256, 310k iterations, AES-256-GCM). The server wraps that ciphertext in a *second* `encrypt()` layer before storing it. The PIN never leaves the device, so there is no server-side path to the plaintext and no recovery for a forgotten PIN.
+Unlike PAN and Gmail tokens — which the server encrypts and can therefore also decrypt — vault entries are encrypted **in the browser** under a key derived from the user's 6-digit PIN (PBKDF2-SHA256, 310k iterations, AES-256-GCM). The server wraps that ciphertext in a _second_ `encrypt()` layer before storing it. The PIN never leaves the device, so there is no server-side path to the plaintext and no recovery for a forgotten PIN.
 
 Full design, threat model and rationale: **`docs/Vault_Architecture.md`**. Read it before changing anything under `frontend/src/app/vault/`, `frontend/src/utils/vaultCrypto.ts`, or `backend/src/controllers/vaultController.ts`.
 
+### wallets / walletMembers / walletInvites collections — shared wallets
+
+A wallet is a named set of entries shared with other users, surfaced as a fifth tab on the vault's own category rail. Each wallet has its own random AES-256-GCM key (WK); the wallet name and every entry are encrypted under it, and the server wraps all of that in its usual second layer.
+
+Because removing a member rotates WK and the owner cannot reach anyone's PIN-derived key, **every user has an ECDH P-256 keypair** — public key plaintext on their vault doc, private key encrypted under their vault key. WK is wrapped per member with ECDH-ES (ephemeral key + HKDF-SHA256 → AES-GCM), so the owner wraps to their own public key by the same code path as to anyone else's.
+
+Invite links carry WK in the **URL fragment** (`/vault/join/<token>#k=…`), which browsers never transmit. Joining is request-then-approve; sharing an entry is a per-field projection, not the whole entry. See `docs/Vault_Architecture.md` Part 2.
+
 ### emailIntegrations collection
+
 MongoDB collection storing per-user Gmail integration state:
+
 ```
 { userId, email, refreshToken (AES-256-GCM encrypted), linkedAt, lastSyncAt, safegoldSender }
 ```
+
 - `safegoldSender` — configurable sender email used to filter SafeGold PDF emails (defaults to SafeGold's known sender)
 - `lastSyncAt` — null on first sync or after a full re-sync reset; used for incremental sync (only emails after this date are fetched)
 
 ### MF Scheme Numbers
+
 MF fund names in transactions don't carry scheme numbers. `MutualFundInfo` (from `/api/funds/infoFetch`) maps `fundName → schemeNumber`. Scheme numbers are needed for MFAPI NAV fetches. This is why MF pages need two queries before pricing is possible.
 
 ### FIXED_EXPENSE_TAGS
+
 Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills & Utilities']`. Expenses with these tags are counted as `fixedExpenses`; all others are `variableExpenses`.
 
 ---
@@ -389,13 +427,13 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 ## External API Notes
 
-| API | Via | Rate limiting |
-|---|---|---|
-| Yahoo Finance | Backend (`stocksService.ts`) | 300ms delay between symbol requests |
-| MFAPI (NAV history) | Frontend direct (batch POST via backend route) | Batch endpoint fetches all schemes in parallel |
-| SafeGold | Backend controller | Date-range based |
-| CoinDCX | Backend (`coindcxService.ts`) | POST with coin names array |
-| Gmail API | Backend (`gmailService.ts`) | Paginated fetch; incremental sync via `afterDate` |
+| API                 | Via                                            | Rate limiting                                     |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| Yahoo Finance       | Backend (`stocksService.ts`)                   | 300ms delay between symbol requests               |
+| MFAPI (NAV history) | Frontend direct (batch POST via backend route) | Batch endpoint fetches all schemes in parallel    |
+| SafeGold            | Backend controller                             | Date-range based                                  |
+| CoinDCX             | Backend (`coindcxService.ts`)                  | POST with coin names array                        |
+| Gmail API           | Backend (`gmailService.ts`)                    | Paginated fetch; incremental sync via `afterDate` |
 
 ---
 
@@ -457,8 +495,18 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 28. **Never `await` a decrypt inside a clipboard handler** — Safari (desktop and iOS) allows `navigator.clipboard.writeText` only within the task that handled the user gesture. Any `await` first — including `await decryptItem(...)` — silently breaks the copy on iOS. This is why vault items are decrypted eagerly into state on unlock and `buildItemCopyText()` in `vaultTypes.ts` is synchronous.
 
-29. **The vault server cannot validate the PIN, so throttling guards the verifier instead** — `GET /api/vault/meta` deliberately omits the verifier blob; `POST /api/vault/unlock` is a separate counted call that pessimistically increments `failedAttempts` *before* returning it, and the client calls `/unlock/confirm` only after `verifyPin` succeeds. A client that never confirms stays throttled, so it fails closed. `/api/vault/unlock` is in `DEMO_ALLOWED_PATHS` because it and `/unlock/confirm` are semantically reads.
+29. **The vault server cannot validate the PIN, so throttling guards the verifier instead** — `GET /api/vault/meta` deliberately omits the verifier blob; `POST /api/vault/unlock` is a separate counted call that pessimistically increments `failedAttempts` _before_ returning it, and the client calls `/unlock/confirm` only after `verifyPin` succeeds. A client that never confirms stays throttled, so it fails closed. `/api/vault/unlock` is in `DEMO_ALLOWED_PATHS` because it and `/unlock/confirm` are semantically reads.
 
 30. **Vault array upserts branch on `modifiedCount`, not `matchedCount`** — `arrayFilters` with no matching element returns `matchedCount: 1, modifiedCount: 0` (the document matched, the element didn't), so the `$push` fallback in `upsertVaultItem` keys off `modifiedCount`. Getting this backwards silently no-ops every create. Relatedly, `rekeyVault` must stay a single atomic `updateOne` — a partial rekey leaves items under two different keys with one verifier, which is unrecoverable.
 
 31. **Vault needs a secure context** — `crypto.subtle`, `crypto.randomUUID` and `navigator.clipboard` are undefined on insecure origins. `https://` and `localhost`/`127.0.0.1` qualify; `http://192.168.x.x:3000` does not, so LAN testing from a phone shows `VaultUnsupported.tsx`. Use `next dev --experimental-https` or a tunnel. Also note that rotating `ENCRYPTION_KEY` breaks every existing vault (plus stored PANs and Gmail tokens) — there is no re-wrap migration.
+
+32. **Every vault user has an ECDH P-256 keypair, and the vault PIN guards it** — the public key sits in plaintext on the vault document; the private key is encrypted under the vault key, so unlocking the vault is what yields it. `ensureSharingKeys` in `useVaultSession` backfills it on unlock for vaults created before shared wallets existed. **`rekeyVault` must re-wrap `wrappedPrivateKey` under the new vault key** — forgetting that orphans every wallet the user belongs to. `POST /api/vault/keypair` matches on `publicKey: null` so it can never clobber an existing keypair.
+
+33. **The wallet key rides in the URL fragment, never the path or query** — `/vault/join/<token>#k=<base64url>`. Browsers do not transmit the fragment, so it stays out of server logs, `Referer` headers and proxies. The join page must read `window.location.hash` in its first effect **before any router call**, because `useUrlState` uses `router.replace` and would drop it. Consequence worth stating plainly: the link is a bearer credential, and owner approval gates server-side access to the ciphertext rather than possession of the key.
+
+34. **Member removal rotates the wallet key, and the order of operations matters** — `removeMemberAndRotate` fetches every remaining member's public key and computes the new wraps _before_ removing the member, so a failed lookup leaves the wallet untouched instead of removing someone without rotating. The server also rejects a rotation whose `members` array does not cover every remaining active member. Rotation bumps `keyEpoch`, drops pending requests and revokes all invites. It cannot undo what an ex-member already read — the UI says so and suggests regenerating the CVV.
+
+35. **Wallet keys are cached by `walletId:keyEpoch`, not `walletId`** — the epoch is part of the cache key so a rotation elsewhere cannot serve a stale key from cache. The cache lives in `useVaultSession` and is cleared by the same `lock()` that clears the vault key, so wallet keys inherit the identical never-persisted, idle-locked lifetime.
+
+36. **Shared entries are per-field projections and are copies, not live links** — only ticked fields are encrypted into the wallet entry; the rest never leave the owner's vault. `VaultFieldDef.shareByDefault` ticks identifying fields by default and leaves `cardNumber`/`cvv`/`atmPin`/passwords unticked. Editing the vault entry does **not** update the shared copy (`sourceItemId` records the link); automatic propagation was rejected because it would silently re-share fields. Server-side, members may only edit entries where `addedBy` matches — enforced in the `arrayFilters`, not just hidden in the UI.

@@ -4,7 +4,7 @@ export const metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'September 9, 2026';
+  const lastUpdated = 'September 12, 2026';
   const appName = 'My Finances';
   const appUrl = 'https://www.my-finances.site';
   const contactEmail = 'mharshvardhan1681@gmail.com';
@@ -86,6 +86,50 @@ export default function PrivacyPage() {
             also obtained our server-side encryption key.
           </p>
 
+          <h3 className="font-medium text-foreground mt-4 mb-1">Shared wallets (optional)</h3>
+          <p>
+            A wallet lets you share selected details from your Vault with other {appName} users —
+            for example, pooling which credit card earns a discount where. Sharing is deliberate and
+            granular:
+          </p>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>
+              You choose which individual fields to share. Fields you do not tick are never
+              encrypted into the wallet and never leave your Vault. Card numbers, CVVs, ATM PINs and
+              passwords are unticked by default.
+            </li>
+            <li>
+              Each wallet has its own encryption key, generated in your browser. The wallet name and
+              every entry are encrypted with it before reaching us, so we cannot read a
+              wallet&rsquo;s contents any more than we can read your Vault.
+            </li>
+            <li>
+              Invite links carry that key in the part of the URL after the{' '}
+              <code className="bg-muted px-1 rounded text-xs">#</code>, which browsers never send to
+              a server. Treat an invite link like a key and share it only with people you intend to
+              let in. You approve each request before anyone can see the contents.
+            </li>
+            <li>
+              To make sharing work, each user gets a public/private key pair. The public half is
+              stored unencrypted so others can share with you; the private half is encrypted under
+              your Vault PIN.
+            </li>
+            <li>
+              Removing someone generates a fresh wallet key and re-encrypts everything, so they
+              cannot read anything from that point on. It cannot undo what they already viewed or
+              copied.
+            </li>
+            <li>
+              Members can see the name and email address of everyone else in a wallet, and who
+              contributed each entry.
+            </li>
+          </ul>
+          <p className="mt-3">
+            Sharing full credit card credentials generally breaches your card issuer&rsquo;s terms
+            and can void zero-liability fraud protection. That choice is yours to make; the defaults
+            are set to avoid it.
+          </p>
+
           <h3 className="font-medium text-foreground mt-4 mb-1">Gmail access (optional)</h3>
           <p>
             If you choose to connect your Gmail account, we request read-only access (
@@ -148,6 +192,10 @@ export default function PrivacyPage() {
               Vault entries are end-to-end encrypted in your browser with your PIN, then encrypted
               again server-side. We hold no key capable of reading them.
             </li>
+            <li>
+              Shared wallet entries are encrypted with a per-wallet key that only members hold, then
+              encrypted again server-side. Wallet names are encrypted too.
+            </li>
             <li>Authentication uses JWT tokens stored in httpOnly cookies.</li>
             <li>All communication between client and server uses HTTPS.</li>
             <li>
@@ -200,6 +248,11 @@ export default function PrivacyPage() {
             Your vault can be erased at any time with &ldquo;Destroy vault&rdquo;, which deletes
             every entry along with the salt used to derive your key. This is immediate and
             irreversible.
+          </p>
+          <p className="mt-3">
+            Deleting a wallet you own removes it for every member. Leaving or being removed from a
+            wallet revokes your access to it, and entries you contributed can be withdrawn by you at
+            any time.
           </p>
         </section>
 

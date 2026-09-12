@@ -4,7 +4,7 @@ The Vault is an optional, PIN-locked store for the credentials that surround a p
 bank accounts, credit cards, insurance policies, logins. It is the only part of the app the server
 cannot read.
 
-Everything else in MyFinances is encrypted *by* the server (PAN, Gmail refresh tokens) using
+Everything else in MyFinances is encrypted _by_ the server (PAN, Gmail refresh tokens) using
 `ENCRYPTION_KEY`, which means the server can also decrypt it. That is fine for a PAN used to open a
 CDSL PDF. It is not fine for a CVV. The Vault therefore uses a different model.
 
@@ -14,12 +14,12 @@ CDSL PDF. It is not fine for a CVV. The Vault therefore uses a different model.
 
 **What the Vault protects against**
 
-| Scenario | Outcome |
-|---|---|
-| Database dump leaks | Useless. Every entry is wrapped in server-side AES-256-GCM under `ENCRYPTION_KEY`, which is not in the database. |
-| Database dump **and** `ENCRYPTION_KEY` leak | The attacker now holds the browser-side ciphertext and must brute-force the PIN offline. |
-| A curious or compromised server operator reading Mongo | Cannot read vault contents. The PIN and the derived key never reach the server. |
-| Someone with your logged-in session but not your PIN | Cannot read the vault. They can request the verifier blob, but online attempts are rate-limited and locked out. |
+| Scenario                                               | Outcome                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Database dump leaks                                    | Useless. Every entry is wrapped in server-side AES-256-GCM under `ENCRYPTION_KEY`, which is not in the database. |
+| Database dump **and** `ENCRYPTION_KEY` leak            | The attacker now holds the browser-side ciphertext and must brute-force the PIN offline.                         |
+| A curious or compromised server operator reading Mongo | Cannot read vault contents. The PIN and the derived key never reach the server.                                  |
+| Someone with your logged-in session but not your PIN   | Cannot read the vault. They can request the verifier blob, but online attempts are rate-limited and locked out.  |
 
 **What it does not protect against**
 
@@ -27,11 +27,11 @@ CDSL PDF. It is not fine for a CVV. The Vault therefore uses a different model.
   iterations is ~3.1×10¹¹ hash operations to exhaust — roughly a day on a single modern GPU, less on
   rented hardware. Raising iterations buys linear attacker time and costs the user the same factor on
   every unlock. **The real boundary is the second server-side layer**, which means an attacker needs
-  the Mongo dump *and* `ENCRYPTION_KEY` before the PIN even becomes the obstacle. Do not describe the
+  the Mongo dump _and_ `ENCRYPTION_KEY` before the PIN even becomes the obstacle. Do not describe the
   Vault as "zero-knowledge, therefore unbreakable" — it is zero-knowledge with respect to the server
   operator's passive view, which is a genuine and worthwhile property, and a different claim.
 - **A compromised frontend.** Injected page code runs with the unlocked key in scope. `extractable:
-  false` on the derived key blocks `exportKey`, removing the cheapest exfiltration path, but code in
+false` on the derived key blocks `exportKey`, removing the cheapest exfiltration path, but code in
   the page can still call `encrypt`/`decrypt` with the handle.
 - **A forgotten PIN.** There is no reset, no recovery email, no admin override. The only remedy is
   Destroy Vault.
@@ -67,7 +67,7 @@ hex-encodes the result at ×2, so total expansion is ≈ ×2.75. Hex at the inne
 **Iteration count is stored per-vault** in `kdf.iterations` and read from the server at unlock. It is
 never hardcoded at the unlock path — if it were, bumping `VAULT_KDF_ITERATIONS` later would silently
 make every existing vault unopenable with no diagnosable error. The constant is used only when
-*creating* a vault.
+_creating_ a vault.
 
 ### Wrong PIN vs corrupt data
 
@@ -76,8 +76,8 @@ impossible to tell a wrong key from a flipped bit. The distinction is therefore 
 cryptographic:
 
 1. The **verifier blob is the single oracle for PIN correctness.** It is `encryptItem(key, { magic:
-   VAULT_VERIFIER_MAGIC, createdAt })`, written once at setup and rewritten only on PIN change, using
-   the *same* key and salt as the items. On unlock the client derives the key and calls `verifyPin`.
+VAULT_VERIFIER_MAGIC, createdAt })`, written once at setup and rewritten only on PIN change, using
+   the _same_ key and salt as the items. On unlock the client derives the key and calls `verifyPin`.
    - `false` → `VaultWrongPinError`. Stay locked, show "Incorrect PIN".
    - `true` → the key is proven correct.
 2. **After** the verifier passes, any item that fails to decrypt is by definition not a PIN problem.
@@ -143,23 +143,23 @@ in zod, and an atomic `{ 'items.500': { $exists: false } }` filter on the insert
 
 `backend/src/controllers/vaultController.ts`, mounted at `/api/vault`.
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/meta` | Projection excludes `items` **and `verifier`**. Returns `{ exists: false }` when there is no vault. |
-| POST | `/init` | 409 if a vault already exists — never silently overwrite. |
-| POST | `/unlock` | The throttled verifier dispenser. See below. |
-| POST | `/unlock/confirm` | Zeroes `failedAttempts`, clears `lockedUntil`. |
-| GET | `/items` | Per-item `decrypt` in its own try/catch; emits `ciphertext: null` on failure so a rotated `ENCRYPTION_KEY` degrades one entry instead of 500-ing the vault. |
-| PUT | `/items/:itemId` | `arrayFilters` update, then `$push` fallback. |
-| DELETE | `/items/:itemId` | `$pull`. |
-| POST | `/rekey` | One atomic `$set` of salt + verifier + all items + `keyEpoch + 1`. |
-| DELETE | `/` | Idempotent. |
+| Method | Path              | Notes                                                                                                                                                       |
+| ------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/meta`           | Projection excludes `items` **and `verifier`**. Returns `{ exists: false }` when there is no vault.                                                         |
+| POST   | `/init`           | 409 if a vault already exists — never silently overwrite.                                                                                                   |
+| POST   | `/unlock`         | The throttled verifier dispenser. See below.                                                                                                                |
+| POST   | `/unlock/confirm` | Zeroes `failedAttempts`, clears `lockedUntil`.                                                                                                              |
+| GET    | `/items`          | Per-item `decrypt` in its own try/catch; emits `ciphertext: null` on failure so a rotated `ENCRYPTION_KEY` degrades one entry instead of 500-ing the vault. |
+| PUT    | `/items/:itemId`  | `arrayFilters` update, then `$push` fallback.                                                                                                               |
+| DELETE | `/items/:itemId`  | `$pull`.                                                                                                                                                    |
+| POST   | `/rekey`          | One atomic `$set` of salt + verifier + all items + `keyEpoch + 1`.                                                                                          |
+| DELETE | `/`               | Idempotent.                                                                                                                                                 |
 
 ### Rate limiting
 
 **The server cannot validate the PIN.** It never sees the PIN and cannot decrypt the verifier's inner
-layer, so there is no "wrong password" event for it to count. Its only lever is that *the verifier
-blob is the brute-force oracle* — so it controls who gets it and how often.
+layer, so there is no "wrong password" event for it to count. Its only lever is that _the verifier
+blob is the brute-force oracle_ — so it controls who gets it and how often.
 
 That is why `GET /meta` deliberately omits the verifier and `POST /unlock` is a separate, counted
 call:
@@ -181,8 +181,8 @@ verifier attacks it offline at GPU speed, where no server counter applies.
 
 ### Two Mongo behaviours worth knowing
 
-- `arrayFilters` with no matching element returns `matchedCount: 1, modifiedCount: 0` — the *document*
-  matched, the *element* did not. The `$push` fallback therefore branches on `modifiedCount`. Getting
+- `arrayFilters` with no matching element returns `matchedCount: 1, modifiedCount: 0` — the _document_
+  matched, the _element_ did not. The `$push` fallback therefore branches on `modifiedCount`. Getting
   this backwards silently no-ops every create.
 - **Rekey must be a single `updateOne`.** A loop of per-item writes that fails midway leaves items
   encrypted under two different keys with only one verifier — permanently unrecoverable. The client
@@ -292,3 +292,169 @@ Manual, with both dev servers up and `ENCRYPTION_KEY` set:
 7. **Storage audit.** With the vault unlocked, DevTools → Application: no plaintext in localStorage,
    sessionStorage, or the `myfinances-cache-<userId>` IndexedDB store. Then the Network tab: no
    request or response body should contain a readable field value.
+
+---
+
+# Part 2 — Shared wallets
+
+A **wallet** is a named set of entries shared with other users of the app. Members contribute their
+own entries, so a friend group can pool cards and see which one earns a discount where. Wallets are a
+fifth tab on the vault's own category rail: unlock once, and Bank / Cards / Insurance / Others /
+Wallets are all available, because the key is already in memory.
+
+The zero-knowledge property is preserved. The server never sees a wallet key, a wallet name, or any
+entry — only double-wrapped ciphertext, exactly as with the personal vault.
+
+## 8. Why every user needs a keypair
+
+The requirement that forces this: **removing a member rotates the wallet key**, so the owner must
+re-wrap the new key _for every remaining member_. Under zero-knowledge the owner cannot reach anyone
+else's PIN-derived key, so there has to be a public key to wrap to.
+
+Each user therefore gets an **ECDH P-256 keypair** (P-256 rather than X25519 — WebCrypto support for
+X25519 is still patchy):
+
+- Generated at vault setup. The **public key is stored in plaintext** on the vault document and served
+  to other users by `GET /api/vault/public-key/:userId`. The **private key** is exported as a JWK and
+  stored as `wrappedPrivateKey`, encrypted under the vault key — so unlocking the vault yields it, and
+  nothing else does.
+- Vaults created before Part 2 are backfilled lazily: `ensureSharingKeys` in `useVaultSession` notices
+  a missing keypair on unlock, generates one, and `POST /api/vault/keypair` stores it. That endpoint
+  matches on `publicKey: null`, so it can never overwrite an existing keypair.
+- Changing the vault PIN re-wraps the private key under the new vault key in the same atomic rekey as
+  the items. Forgetting this would orphan every wallet the user belongs to.
+
+**Wrapping uses ECDH-ES.** To wrap wallet key WK for member M: generate an ephemeral keypair E, do
+`ECDH(E.priv, M.pub)` → HKDF-SHA256 (info `myfinances-wallet-key-wrap-v1`) → an AES-GCM key-encryption
+key, and store `{ epk: E.pubJwk, wrapped }`. M unwraps with `ECDH(M.priv, epk)`. The owner wraps to
+their own public key by the same path, so there is exactly one code path in both directions.
+
+## 9. Collections
+
+```jsonc
+// wallets
+{ _id, ownerId, encryptedName, keyEpoch,
+  items: [{ id, addedBy, category, ciphertext, sourceItemId, createdAt, updatedAt }],
+  createdAt, updatedAt }
+
+// walletMembers   — unique index on { walletId, userId }
+{ _id, walletId, userId, role: 'owner'|'member', status: 'pending'|'active',
+  wrappedWalletKey: { epk, wrapped }, keyEpoch, requestedAt, approvedAt }
+
+// walletInvites   — unique index on token
+{ _id, walletId, token, createdBy, expiresAt, maxUses, useCount, revoked, createdAt }
+```
+
+The **wallet name is encrypted under WK** as well, so the server holds nothing meaningful about a
+wallet. As with the vault, the server adds its own `encrypt()` layer over `encryptedName`, every
+`items[].ciphertext`, and every `wrappedWalletKey.wrapped`.
+
+## 10. The share flow
+
+Link shape:
+
+```
+https://…/vault/join/<inviteToken>#k=<base64url(WK)>
+```
+
+**The fragment is never sent in an HTTP request.** It stays out of server logs, `Referer` headers and
+proxies, so the wallet key reaches the recipient's browser without ever touching our infrastructure.
+`inviteToken` is an opaque random id that identifies the wallet and nothing else.
+
+1. Owner creates a wallet — the client generates WK, encrypts the name, wraps WK to the owner's own
+   public key, and POSTs.
+2. Owner generates an invite — the server returns a token; the client appends `#k=…` locally.
+3. The recipient opens the link while logged in. The page reads `window.location.hash` **in its first
+   effect, before any router call** — `useUrlState` uses `router.replace`, which would drop it. If
+   they have no vault they are routed through setup first.
+4. Their client wraps WK **to their own public key** and POSTs it — a `walletMembers` row is created
+   with `status: 'pending'`.
+5. The owner sees the request (name and email joined from `users` server-side) and approves; the
+   server flips the status to `active`.
+
+Approval requires no key material from the owner, because the requester self-wraps.
+
+**What approval does and does not do.** The requester holds WK from the moment they open the link, so
+approval gates _server-side access to the ciphertext_, not possession of the key. Without the
+ciphertext the key is inert, which makes it a real control — but it is not a retraction. This is why
+the share dialog tells the user to treat the link itself as a key.
+
+## 11. Per-field sharing
+
+Sharing entry X into wallet W builds a **projection** — only the ticked fields — and encrypts that
+projection under WK as a new wallet entry. Fields left unticked are never encrypted into it and
+therefore never leave the owner's vault in any form.
+
+`VaultFieldDef.shareByDefault` drives the initial ticks: identifying and useful fields (issuer,
+network, name on card, expiry, last four, offer notes) start ticked; `cardNumber`, `cvv`, `atmPin`,
+account numbers and passwords start unticked and carry a warning marker. Custom fields default to
+ticked unless the user marked them secret.
+
+**It is a copy, not a live link.** Editing the vault entry does not update the shared projection. The
+wallet entry stores `sourceItemId` so the relationship is known, and re-sharing pushes a new copy.
+Automatic propagation was rejected deliberately: it would silently re-share fields the user may have
+since changed their mind about.
+
+## 12. Permissions and rotation
+
+Every wallet entry records `addedBy`. Members may edit and delete only their own entries; the owner
+may additionally remove anyone's entry, remove members, rename, and delete the wallet. Everyone reads
+and copies everything. All of it is **enforced server-side** — the `addedBy` match is part of the
+`arrayFilters` on update, and delete re-checks ownership before pulling.
+
+Removing a member (`useWalletActions.removeMemberAndRotate`):
+
+1. Decrypt the wallet name and every entry under the current key.
+2. Generate WK', re-encrypt all of it.
+3. Fetch each remaining member's public key and wrap WK' for them.
+4. Remove the member, then POST the whole set to `/rotate`.
+
+**Order matters.** The public-key lookups happen _before_ the member is removed, so a failed lookup
+leaves the wallet untouched rather than removing someone without rotating. The server also refuses a
+rotation whose `members` array does not cover every remaining active member, which prevents a partial
+rotation locking someone out. Rotation bumps `keyEpoch`, drops pending requests, and revokes every
+outstanding invite — links must be reissued.
+
+Afterwards the UI says plainly that rotation cannot undo what was already seen, and suggests
+regenerating the CVV or changing the ATM PIN. That is the honest framing: cryptography can stop future
+reads, not retract past ones.
+
+## 13. Frontend
+
+```
+frontend/src/app/vault/
+├── wallets/
+│   ├── WalletsSection.tsx      The list inside the rail's wallets tab
+│   ├── WalletRow.tsx           One row: decrypted name, counts, role, pending badge
+│   ├── [walletId]/page.tsx     Wallet detail — entries via the shared VaultItemCard
+│   ├── CreateWalletDialog.tsx  Generates WK and wraps it to your own public key
+│   ├── ShareWalletDialog.tsx   Invite link with the #k= fragment built locally
+│   ├── WalletMembersDialog.tsx Members, pending requests, remove + rotate
+│   ├── ShareToWalletDialog.tsx The per-field checkbox picker
+│   ├── useWalletActions.ts     Create, share, invite, approve, remove + rotate
+│   └── useWalletNames.ts       Decrypts wallet names for the list
+└── join/[token]/page.tsx       Invite landing page (outside the rail)
+```
+
+Wallet keys live in a `Map<walletId:keyEpoch, CryptoKey>` inside `useVaultSession`, populated lazily
+and cleared by the same `lock()` that clears the vault key — so wallet keys inherit the identical
+never-persisted, idle-locked lifetime. The epoch is part of the cache key, so a rotation elsewhere
+cannot serve a stale key from cache.
+
+## 14. Additional risks
+
+- **A 6-digit PIN now also guards your wallet memberships.** The private key that unwraps every wallet
+  key is encrypted under it. The offline-attack caveat in §1 applies to shared wallets too.
+- **Sharing card credentials breaches your cardholder terms.** Every Indian issuer prohibits
+  disclosing the card number, CVV or PIN, and doing so generally voids zero-liability fraud
+  protection. The unticked-by-default secrets and the explicit warning in the share dialog reduce the
+  exposure; they do not remove it. Users who tick those boxes are making an informed choice and should
+  be told so, which the dialog does.
+- **The invite link is a bearer credential** for the wallet key. Approval gates the ciphertext, not the
+  key. Links expire (7 days) and are use-capped (5) by default, and any rotation revokes them all.
+- **`GET /wallets` is O(members) in round trips on the client** because each wallet name is decrypted
+  individually. Fine for the tens of wallets a person realistically has; revisit if that assumption
+  changes.
+- **A member whose vault is destroyed and recreated gets a new keypair**, so their existing wallet
+  memberships become unreadable. They must be removed and re-invited. There is no migration for this
+  and the UI does not currently detect it.

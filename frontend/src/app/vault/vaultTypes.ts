@@ -1,5 +1,5 @@
-import { CreditCard, KeyRound, Landmark, ShieldCheck, LucideIcon } from 'lucide-react';
-import { VaultCategory, VaultItemContent } from '@/api/dataInterface';
+import { CreditCard, KeyRound, Landmark, ShieldCheck, Wallet, LucideIcon } from 'lucide-react';
+import { VaultCategory, VaultCustomField, VaultItemContent } from '@/api/dataInterface';
 
 export interface VaultDecryptedItem {
   id: string;
@@ -152,6 +152,19 @@ export const VAULT_CATEGORIES: VaultCategoryDef[] = [
 
 export const VAULT_CATEGORY_IDS = VAULT_CATEGORIES.map((category) => category.id);
 
+export const WALLETS_TAB_ID = 'wallets';
+
+export type VaultTabId = VaultCategory | typeof WALLETS_TAB_ID;
+
+export const VAULT_TAB_IDS: VaultTabId[] = [...VAULT_CATEGORY_IDS, WALLETS_TAB_ID];
+
+export const WALLETS_TAB = {
+  id: WALLETS_TAB_ID,
+  label: 'Wallets',
+  icon: Wallet,
+  description: 'Entries you pool and share with friends',
+} as const;
+
 export function getCategoryDef(id: VaultCategory): VaultCategoryDef {
   return VAULT_CATEGORIES.find((category) => category.id === id) ?? VAULT_CATEGORIES[0];
 }
@@ -221,6 +234,66 @@ export function getPopulatedFields(
     }));
 
   return [...standard, ...custom];
+}
+
+export interface VaultShareableField {
+  name: string;
+  label: string;
+  value: string;
+  secret: boolean;
+  isCustom: boolean;
+  shareByDefault: boolean;
+}
+
+export function getShareableFields(
+  category: VaultCategory,
+  content: VaultItemContent
+): VaultShareableField[] {
+  const definition = getCategoryDef(category);
+  const standard = definition.fields
+    .filter((field) => (content.fields[field.name] ?? '').trim().length > 0)
+    .map((field) => ({
+      name: field.name,
+      label: field.label,
+      value: content.fields[field.name].trim(),
+      secret: Boolean(field.secret),
+      isCustom: false,
+      shareByDefault: Boolean(field.shareByDefault),
+    }));
+
+  const custom = content.customFields
+    .filter((field) => field.label.trim().length > 0 && field.value.trim().length > 0)
+    .map((field) => ({
+      name: `custom:${field.label.trim()}`,
+      label: field.label.trim(),
+      value: field.value.trim(),
+      secret: field.secret,
+      isCustom: true,
+      shareByDefault: !field.secret,
+    }));
+
+  return [...standard, ...custom];
+}
+
+export function buildSharedProjection(
+  category: VaultCategory,
+  content: VaultItemContent,
+  selectedNames: string[]
+): VaultItemContent {
+  const selected = new Set(selectedNames);
+  const fields: Record<string, string> = {};
+  const customFields: VaultCustomField[] = [];
+
+  for (const field of getShareableFields(category, content)) {
+    if (!selected.has(field.name)) continue;
+    if (field.isCustom) {
+      customFields.push({ label: field.label, value: field.value, secret: field.secret });
+    } else {
+      fields[field.name] = field.value;
+    }
+  }
+
+  return { fields, customFields };
 }
 
 export function buildItemCopyText(category: VaultCategory, content: VaultItemContent): string {

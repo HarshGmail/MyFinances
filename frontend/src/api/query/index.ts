@@ -15,3 +15,4 @@ export * from './userGoals';
 export * from './capitalGains';
 export * from './emailIntegration';
 export * from './vault';
+export * from './wallets';
