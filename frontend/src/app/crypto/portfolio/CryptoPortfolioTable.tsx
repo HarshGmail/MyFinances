@@ -16,6 +16,7 @@ import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { formatCurrency, formatToPercentage } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
 import { PortfolioItem } from './useCryptoPortfolioData';
+import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 
 export default function CryptoPortfolioTable({
   portfolioData,
@@ -35,6 +36,28 @@ export default function CryptoPortfolioTable({
   onScrollToChart: () => void;
 }) {
   const { theme } = useAppStore();
+
+  const xirrByCoin = useMemo(() => {
+    const result: Record<string, number | null> = {};
+    portfolioData.forEach((item) => {
+      const coinTxs = getCoinTransactions(item.currency.toUpperCase());
+      if (!coinTxs.length) {
+        result[item.currency] = null;
+        return;
+      }
+      const flows: XirrCashFlow[] = coinTxs.map((tx) => ({
+        amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+        when: new Date(tx.date),
+      }));
+      flows.push({ amount: item.currentValue, when: new Date() });
+      try {
+        result[item.currency] = xirr(flows) * 100;
+      } catch {
+        result[item.currency] = null;
+      }
+    });
+    return result;
+  }, [portfolioData, getCoinTransactions]);
 
   const pieData = useMemo(
     () =>
@@ -106,9 +129,63 @@ export default function CryptoPortfolioTable({
   );
 
   return (
-    <div className="max-w-full mx-auto flex flex-row gap-4">
-      <div className="w-3/4 overflow-x-auto">
-        <Table>
+    <div className="max-w-full mx-auto flex flex-col md:flex-row gap-4">
+      <div className="w-full md:w-3/4 md:overflow-x-auto">
+        <div className="md:hidden space-y-3">
+          {portfolioData.map((item, idx) => (
+            <div
+              key={item.currency || idx}
+              onClick={() => {
+                setSelectedCoin(item.currency || 'All');
+                onScrollToChart();
+              }}
+            >
+              <MobileDataCard
+                title={item.coinName}
+                headline={formatCurrency(item.currentValue)}
+                subline={
+                  <span className={getProfitLossColor(item.profitLoss)}>
+                    {formatToPercentage(item.profitLossPercentage)}
+                  </span>
+                }
+              >
+                <MobileDataMetric label="Balance">{item.balance.toFixed(6)}</MobileDataMetric>
+                <MobileDataMetric label="Avg Price">
+                  {item.balance > 0
+                    ? formatCurrency(Number((item.investedAmount / item.balance).toFixed(2)))
+                    : 'N/A'}
+                </MobileDataMetric>
+                <MobileDataMetric label="Price">
+                  {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
+                </MobileDataMetric>
+                <MobileDataMetric label="Invested">
+                  {formatCurrency(item.investedAmount)}
+                </MobileDataMetric>
+                <MobileDataMetric label="P&L">
+                  <span className={getProfitLossColor(item.profitLoss)}>
+                    {formatCurrency(item.profitLoss)}
+                  </span>
+                </MobileDataMetric>
+                <MobileDataMetric label="XIRR">
+                  {xirrByCoin[item.currency] !== null && xirrByCoin[item.currency] !== undefined
+                    ? `${xirrByCoin[item.currency]!.toFixed(2)}%`
+                    : 'N/A'}
+                </MobileDataMetric>
+                <MobileDataMetric label="Unrealized">
+                  {cryptoUnrealizedByCoin[item.coinName] !== undefined ? (
+                    <span className={getProfitLossColor(cryptoUnrealizedByCoin[item.coinName])}>
+                      {formatCurrency(cryptoUnrealizedByCoin[item.coinName])}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </MobileDataMetric>
+              </MobileDataCard>
+            </div>
+          ))}
+        </div>
+
+        <Table className="hidden md:table">
           <TableHeader>
             <TableRow>
               <TableHead>S.No</TableHead>
@@ -126,20 +203,7 @@ export default function CryptoPortfolioTable({
           </TableHeader>
           <TableBody>
             {portfolioData.map((item, idx) => {
-              const coinTxs = getCoinTransactions(item.currency.toUpperCase());
-              let coinXirr: number | null = null;
-              if (coinTxs.length > 0) {
-                const flows: XirrCashFlow[] = coinTxs.map((tx) => ({
-                  amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-                  when: new Date(tx.date),
-                }));
-                flows.push({ amount: item.currentValue, when: new Date() });
-                try {
-                  coinXirr = xirr(flows) * 100;
-                } catch {
-                  coinXirr = null;
-                }
-              }
+              const coinXirr = xirrByCoin[item.currency];
               return (
                 <TableRow
                   key={item.currency || idx}
@@ -171,7 +235,7 @@ export default function CryptoPortfolioTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {coinXirr !== null ? (
+                    {coinXirr !== null && coinXirr !== undefined ? (
                       <Badge variant={coinXirr >= 0 ? 'default' : 'destructive'}>
                         {coinXirr.toFixed(2)}%
                       </Badge>
@@ -194,7 +258,7 @@ export default function CryptoPortfolioTable({
           </TableBody>
         </Table>
       </div>
-      <div className="w-1/4">
+      <div className="w-full md:w-1/4">
         <div className="w-full min-w-[180px] flex flex-col items-center justify-center min-h-[180px]">
           <div
             className="w-full flex flex-col items-center"

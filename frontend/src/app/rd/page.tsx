@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { differenceInDays, differenceInMonths } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
+import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Drawer,
@@ -786,7 +787,37 @@ export default function RecurringDepositPage() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="md:hidden space-y-3">
+                {processedRDData.map((rd) => (
+                  <MobileDataCard
+                    key={rd._id}
+                    title={rd.recurringDepositName}
+                    headline={`₹${Math.round(rd.currentValue).toLocaleString('en-IN')}`}
+                    subline={
+                      <span className={rd.isMatured ? 'text-green-600' : 'text-muted-foreground'}>
+                        {rd.isMatured ? 'Matured' : `${Math.round(rd.progressPercentage)}% done`}
+                      </span>
+                    }
+                  >
+                    <MobileDataMetric label="Platform">{rd.platform || '-'}</MobileDataMetric>
+                    <MobileDataMetric label="Invested">
+                      ₹{rd.amountInvested.toLocaleString('en-IN')}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="Rate">{rd.rateOfInterest}%</MobileDataMetric>
+                    <MobileDataMetric label="Maturity">
+                      ₹{Math.round(rd.maturityAmount).toLocaleString('en-IN')}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="Interest">
+                      ₹{Math.round(rd.currentInterest).toLocaleString('en-IN')}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="Status">
+                      {rd.isMatured ? 'Matured' : 'Active'}
+                    </MobileDataMetric>
+                  </MobileDataCard>
+                ))}
+              </div>
+
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

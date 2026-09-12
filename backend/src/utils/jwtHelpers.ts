@@ -8,6 +8,9 @@ interface UserData {
   id: string;
 }
 
+const SESSION_DURATION_SECONDS = 30 * 24 * 60 * 60;
+const SESSION_DURATION_MS = SESSION_DURATION_SECONDS * 1000;
+
 export function generateToken(userData: UserData): string {
   return jwt.sign(
     {
@@ -16,7 +19,7 @@ export function generateToken(userData: UserData): string {
       userId: userData.id,
     },
     config.JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: SESSION_DURATION_SECONDS }
   );
 }
 
@@ -25,7 +28,7 @@ export function setAuthCookie(res: Response, token: string): void {
   res.cookie('token', token, {
     httpOnly: true,
     secure: isProd,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: SESSION_DURATION_MS,
     sameSite: 'lax',
     domain: isProd ? '.my-finances.site' : undefined,
   });
@@ -39,6 +42,19 @@ export function clearAuthCookie(res: Response): void {
     sameSite: 'lax',
     domain: isProd ? '.my-finances.site' : undefined,
   });
+}
+
+export function refreshAuthCookieIfStale(
+  res: Response,
+  payload: { name?: string; email?: string; userId: string; exp?: number }
+): void {
+  if (!payload.exp || !payload.name || !payload.email) return;
+  const secondsUntilExpiry = payload.exp - Math.floor(Date.now() / 1000);
+  if (secondsUntilExpiry > SESSION_DURATION_SECONDS / 2) return;
+  setAuthCookie(
+    res,
+    generateToken({ name: payload.name, email: payload.email, id: payload.userId })
+  );
 }
 
 export function authenticateUser(res: Response, userData: UserData): string {

@@ -15,6 +15,12 @@ import { useUrlFilters } from '@/utils/useUrlState';
 
 const DEFAULT_DATE_SORT = 'latest';
 
+function formatTotal(total: number, units?: string): string {
+  if (units === 'rupee') return `₹${total.toFixed(2)}`;
+  if (units && units !== 'none') return `${total.toFixed(2)} ${units}`;
+  return total.toFixed(2);
+}
+
 export interface Column {
   id: string;
   label: string;
@@ -187,9 +193,9 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   return (
     <div className="max-w-7xl mx-auto">
       {(title || actions) && (
-        <div className="flex items-center w-full mb-4">
+        <div className="flex items-center gap-2 w-full mb-4">
           {title && (
-            <h2 className="text-xl font-bold flex-grow text-center">
+            <h2 className="text-base sm:text-xl font-bold flex-grow min-w-0 text-center">
               <span className="inline-flex items-center gap-2">
                 {titleIcon}
                 {title}
@@ -215,7 +221,57 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         </div>
       )}
 
-      <Table>
+      <div className="md:hidden space-y-3">
+        {filteredRows.map((row, idx) => {
+          const [headingColumn, ...detailColumns] = columns;
+          return (
+            <div key={row._id || idx} className="rounded-lg border p-3">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="font-semibold text-sm">
+                  {headingColumn ? renderCell(row, headingColumn) : `#${idx + 1}`}
+                </div>
+                {actionsRenderer && <div className="shrink-0">{actionsRenderer(row, idx)}</div>}
+              </div>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {detailColumns.map((column) => (
+                  <div key={column.id} className="min-w-0">
+                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {column.label}
+                    </dt>
+                    <dd className={`text-sm truncate ${column.className ?? ''}`}>
+                      {renderCell(row, column)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        })}
+
+        {Object.keys(columnTotals).length > 0 && (
+          <div className="rounded-lg border p-3 bg-muted/40">
+            <div className="font-semibold text-sm mb-2">Total</div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {columns
+                .filter((column) => column.showTotal)
+                .map((column) => (
+                  <div key={column.id} className="min-w-0">
+                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {column.label}
+                    </dt>
+                    <dd className={`text-sm truncate ${column.className ?? ''}`}>
+                      {column.customTotal
+                        ? column.customTotal(filteredRows, columns)
+                        : formatTotal(columnTotals[column.id], column.units)}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+        )}
+      </div>
+
+      <Table className="hidden md:table">
         <TableHeader>
           <TableRow>
             <TableHead>S.No</TableHead>
@@ -254,11 +310,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   <TableCell key={column.id} className={column.className}>
                     {column.customTotal
                       ? column.customTotal(filteredRows, columns)
-                      : column.units === 'rupee'
-                        ? `₹${columnTotals[column.id].toFixed(2)}`
-                        : column.units && column.units !== 'none'
-                          ? `${columnTotals[column.id].toFixed(2)} ${column.units}`
-                          : columnTotals[column.id].toFixed(2)}
+                      : formatTotal(columnTotals[column.id], column.units)}
                   </TableCell>
                 ) : (
                   <TableCell key={column.id} className={column.className} />

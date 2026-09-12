@@ -4,10 +4,18 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 const LAST_ROUTE_KEY = 'lastRoute';
-const PUBLIC_ROUTES = ['/', '/login', '/signup', '/privacy', '/forgot-password', '/reset-password'];
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/signup',
+  '/privacy',
+  '/forgot-password',
+  '/reset-password',
+  '/offline',
+];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isSessionResolved } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -20,6 +28,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    if (!isSessionResolved) return;
     // If not logged in, redirect to /
     if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname)) {
       router.replace('/');
@@ -40,7 +49,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.replace('/home');
       }
     }
-  }, [isLoggedIn, pathname, router]);
+  }, [isLoggedIn, isSessionResolved, pathname, router]);
 
   return <>{children}</>;
 }
