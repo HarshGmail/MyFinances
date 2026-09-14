@@ -23,6 +23,7 @@ import {
   sanitizeCustomPdfPasswords,
 } from '../utils/customPasswords';
 import config from '../config';
+import { sendPush } from '../services/pushService';
 import logger from '../utils/logger';
 
 interface RustMfTx {
@@ -766,6 +767,16 @@ async function runSyncInBackground(
         },
       }
     );
+
+    const importedCount = newMF.length + newGold.length + newStocks.length + newCrypto.length;
+    await sendPush(userId.toString(), {
+      title: 'Email import finished',
+      body: importedCount
+        ? `${importedCount} new ${importedCount === 1 ? 'transaction' : 'transactions'} imported`
+        : 'No new transactions found',
+      url: '/integrations',
+      tag: 'email-sync',
+    });
   } catch (err) {
     logger.error({ err }, `[syncJob:${jobId}] Unhandled error`);
     await db.collection('syncJobs').updateOne(
@@ -778,6 +789,13 @@ async function runSyncInBackground(
         },
       }
     );
+
+    await sendPush(userId.toString(), {
+      title: 'Email import failed',
+      body: 'The sync could not finish. Open the app to retry.',
+      url: '/integrations',
+      tag: 'email-sync',
+    });
   }
 }
 

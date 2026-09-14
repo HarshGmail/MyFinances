@@ -47,6 +47,11 @@ interface Config {
 
   // Frontend URL for password reset links (defaults to prod)
   FRONTEND_URL?: string;
+
+  // VAPID keys for Web Push — generate with: npx web-push generate-vapid-keys
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 // Validate required environment variables
@@ -79,6 +84,9 @@ const config: Config = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://www.my-finances.site',
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT || 'mailto:support@my-finances.site',
 };
 
 export default config;

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, Clock, TriangleAlert, Wallet } from 'lucide-react';
+import { Check, Clock, Smartphone, TriangleAlert, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useJoinWalletMutation } from '@/api/mutations';
 import { useWalletInviteInfoQuery } from '@/api/query';
@@ -15,6 +15,7 @@ import {
   isVaultCryptoAvailable,
   wrapKeyForPublicKey,
 } from '@/utils/vaultCrypto';
+import { isStandaloneDisplayMode } from '@/lib/pwa';
 import { useVaultSession } from '../../useVaultSession';
 import { VaultLocked } from '../../VaultLocked';
 import { VaultUnsupported } from '../../VaultUnsupported';
@@ -37,10 +38,15 @@ export default function JoinWalletPage({ params }: JoinWalletPageProps) {
   const [linkKey, setLinkKey] = useState<string | null>(null);
   const [hasReadHash, setHasReadHash] = useState(false);
   const [joinStatus, setJoinStatus] = useState<'idle' | 'pending' | 'active'>('idle');
+  const [isBrowserTab, setIsBrowserTab] = useState(false);
 
   useEffect(() => {
     setLinkKey(readWalletKeyFromHash());
     setHasReadHash(true);
+  }, []);
+
+  useEffect(() => {
+    setIsBrowserTab(!isStandaloneDisplayMode());
   }, []);
 
   const session = useVaultSession();
@@ -137,6 +143,8 @@ export default function JoinWalletPage({ params }: JoinWalletPageProps) {
         </p>
         <VaultLocked
           onUnlock={session.unlock}
+          onBiometricUnlock={session.unlockWithBiometrics}
+          isBiometricEnrolled={session.isBiometricEnrolled}
           isBusy={session.isBusy}
           lockedUntil={session.lockedUntil}
           attemptsRemaining={session.attemptsRemaining}
@@ -220,6 +228,18 @@ export default function JoinWalletPage({ params }: JoinWalletPageProps) {
                 Requesting access sends your name to the owner. You will be able to read the
                 contents once they approve.
               </p>
+              {isBrowserTab && (
+                <div className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+                  <Smartphone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">Using the installed app?</p>
+                    <p className="text-muted-foreground">
+                      This is the browser, which keeps a separate vault session. If you have
+                      MyFinance on your Home Screen, copy this link and open it there instead.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Button
                 className="w-full"
                 disabled={isPending || !session.hasSharingKeys}

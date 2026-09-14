@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './baseUrl';
 import { toast } from 'sonner';
 import { clearQueryCache } from '@/lib/queryPersister';
+import { getAuthToken } from './authToken';
 
 interface ApiFetchOptions extends RequestInit {
   endpoint: string;
@@ -17,10 +18,12 @@ export async function apiRequest<T = any>({
   ...rest
 }: ApiFetchOptions): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const authToken = getAuthToken();
   const response = await fetch(url, {
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...headers,
     },
     credentials: 'include',

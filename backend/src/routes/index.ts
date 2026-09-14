@@ -20,3 +20,4 @@ export { default as emailIntegrationsRouter } from './emailIntegrations';
 export { default as webhooksRouter } from './webhooks';
 export { default as vaultRouter } from './vault';
 export { default as walletsRouter } from './wallets';
+export { default as pushRouter } from './push';

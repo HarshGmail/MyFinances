@@ -30,6 +30,7 @@ import {
   webhooksRouter,
   vaultRouter,
   walletsRouter,
+  pushRouter,
 } from './routes';
 import { requestLogger, blockDemoMutations, errorHandler } from './middleware';
 import logger from './utils/logger';
@@ -89,6 +90,7 @@ app.use('/api/capital-gains', capitalGainsRouter);
 app.use('/api/email-integration', emailIntegrationsRouter);
 app.use('/api/vault', vaultRouter);
 app.use('/api/wallets', walletsRouter);
+app.use('/api/push', pushRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/api/health', (req, res) => {

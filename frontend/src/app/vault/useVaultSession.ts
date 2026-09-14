@@ -28,6 +28,14 @@ import {
   unwrapKeyWithPrivateKey,
   verifyPin,
 } from '@/utils/vaultCrypto';
+import {
+  clearBiometricUnlock,
+  enrollBiometricUnlock,
+  hasBiometricUnlock,
+  isBiometricSupported,
+  unlockPinWithBiometrics,
+} from '@/utils/vaultBiometrics';
+import { useAppStore } from '@/store/useAppStore';
 import { VaultDecryptedItem } from './vaultTypes';
 
 export type VaultStatus = 'loading' | 'unsupported' | 'setup' | 'locked' | 'unlocked';
@@ -52,12 +60,25 @@ export function useVaultSession() {
   const [isBusy, setIsBusy] = useState(false);
   const [privateKeyJwk, setPrivateKeyJwk] = useState<JsonWebKey | null>(null);
   const [publicKeyJwk, setPublicKeyJwk] = useState<JsonWebKey | null>(null);
+  const userEmail = useAppStore((state) => state.user?.email);
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
+  const [isBiometricEnrolled, setIsBiometricEnrolled] = useState(false);
   const lastActivityRef = useRef(Date.now());
   const walletKeysRef = useRef(new Map<string, CryptoKey>());
 
   useEffect(() => {
     setCryptoAvailable(isVaultCryptoAvailable());
   }, []);
+
+  const refreshBiometricState = useCallback(async () => {
+    const [supported, enrolled] = await Promise.all([isBiometricSupported(), hasBiometricUnlock()]);
+    setIsBiometricAvailable(supported);
+    setIsBiometricEnrolled(supported && enrolled);
+  }, []);
+
+  useEffect(() => {
+    refreshBiometricState();
+  }, [refreshBiometricState]);
 
   const lock = useCallback(() => {
     setKey(null);
@@ -173,6 +194,36 @@ export function useVaultSession() {
     [loadItems, refetchMeta, ensureSharingKeys]
   );
 
+  const unlockWithBiometrics = useCallback(async () => {
+    const pin = await unlockPinWithBiometrics();
+    await unlock(pin);
+  }, [unlock]);
+
+  const enableBiometricUnlock = useCallback(
+    async (pin: string) => {
+      setIsBusy(true);
+      try {
+        const session = await requestVaultUnlock();
+        const derivedKey = await deriveKey(pin, session.salt, session.kdf.iterations);
+        if (!(await verifyPin(derivedKey, session.verifier))) {
+          await refetchMeta();
+          throw new VaultWrongPinError();
+        }
+        await confirmVaultUnlock();
+        await enrollBiometricUnlock(pin, userEmail ?? '');
+        await refreshBiometricState();
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [refetchMeta, refreshBiometricState, userEmail]
+  );
+
+  const disableBiometricUnlock = useCallback(async () => {
+    await clearBiometricUnlock();
+    await refreshBiometricState();
+  }, [refreshBiometricState]);
+
   const saveItem = useCallback(
     async (category: VaultCategory, content: VaultItemContent, itemId?: string) => {
       if (!key) throw new Error('The vault is locked');
@@ -230,11 +281,13 @@ export function useVaultSession() {
         });
         setKey(nextKey);
         setDamagedIds([]);
+        await clearBiometricUnlock();
+        await refreshBiometricState();
       } finally {
         setIsBusy(false);
       }
     },
-    [key, items, rekeyVault, privateKeyJwk]
+    [key, items, rekeyVault, privateKeyJwk, refreshBiometricState]
   );
 
   const resolveWalletKey = useCallback(
@@ -258,11 +311,13 @@ export function useVaultSession() {
     setIsBusy(true);
     try {
       await destroyVault();
+      await clearBiometricUnlock();
+      await refreshBiometricState();
       lock();
     } finally {
       setIsBusy(false);
     }
-  }, [destroyVault, lock]);
+  }, [destroyVault, lock, refreshBiometricState]);
 
   useEffect(() => {
     if (!key) return;
@@ -297,8 +352,13 @@ export function useVaultSession() {
     privateKeyJwk,
     hasSharingKeys: Boolean(publicKeyJwk && privateKeyJwk),
     resolveWalletKey,
+    isBiometricAvailable,
+    isBiometricEnrolled,
     createVault,
     unlock,
+    unlockWithBiometrics,
+    enableBiometricUnlock,
+    disableBiometricUnlock,
     lock,
     saveItem,
     removeItem,
