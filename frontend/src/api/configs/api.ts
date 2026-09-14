@@ -31,17 +31,17 @@ export async function apiRequest<T = any>({
     ...rest,
   });
   if (!response.ok) {
-    let errorObj: any = { message: 'Unknown error', status: response.status };
+    let errorObj: any = { message: 'Unknown error' };
     try {
       errorObj = await response.json();
     } catch {
       try {
-        const text = await response.text();
-        errorObj = { message: text, status: response.status };
+        errorObj = { message: await response.text() };
       } catch {
         // Ignore text parsing errors
       }
     }
+    errorObj.status = response.status;
     // Handle 403 Forbidden: demo mode read-only
     if (response.status === 403 && errorObj?.message === 'Demo data is read-only') {
       toast.error('Demo data is read-only');

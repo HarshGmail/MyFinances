@@ -4,9 +4,7 @@ import { decryptItem, deriveKeyFromPrfOutput, encryptItem } from './vaultCrypto'
 const STORAGE_KEY = 'myfinances-vault-biometric-v1';
 const RP_NAME = 'MyFinance Vault';
 const CREDENTIAL_USER_NAME = 'Vault';
-const PRF_SALT: Uint8Array<ArrayBuffer> = new TextEncoder().encode(
-  'myfinances-vault-pin-unlock-v1'
-);
+const PRF_SALT: Uint8Array = new TextEncoder().encode('myfinances-vault-pin-unlock-v1');
 const CHALLENGE_BYTES = 32;
 const USER_HANDLE_BYTES = 16;
 const CREDENTIAL_TIMEOUT_MS = 60_000;
@@ -40,14 +38,14 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
+function base64ToBytes(value: string): Uint8Array {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
 
-function randomBytes(length: number): Uint8Array<ArrayBuffer> {
+function randomBytes(length: number): Uint8Array {
   return window.crypto.getRandomValues(new Uint8Array(length));
 }
 

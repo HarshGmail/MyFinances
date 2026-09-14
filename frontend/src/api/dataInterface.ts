@@ -683,11 +683,6 @@ export interface VaultInitPayload {
   wrappedPrivateKey?: string;
 }
 
-export interface VaultKeyPairPayload {
-  publicKey: JsonWebKey;
-  wrappedPrivateKey: string;
-}
-
 export interface VaultItemContent {
   fields: Record<string, string>;
   customFields: VaultCustomField[];
@@ -710,6 +705,11 @@ export interface VaultItemRecord {
 export interface VaultKdf {
   algo: string;
   iterations: number;
+}
+
+export interface VaultKeyPairPayload {
+  publicKey: JsonWebKey;
+  wrappedPrivateKey: string;
 }
 
 export interface VaultMeta {
@@ -834,11 +834,6 @@ export interface WalletSummary {
 
 export type WorldBankApiResponse = [WorldBankMeta, WorldBankDataPoint[]];
 
-export interface WrappedWalletKey {
-  epk: JsonWebKey;
-  wrapped: string;
-}
-
 export interface WorldBankCountryRef {
   id: string; // e.g., "IN"
   value: string; // e.g., "India"
@@ -867,4 +862,9 @@ export interface WorldBankMeta {
   total: number;
   sourceid: string;
   lastupdated: string; // ISO date
+}
+
+export interface WrappedWalletKey {
+  epk: JsonWebKey;
+  wrapped: string;
 }

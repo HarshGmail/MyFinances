@@ -112,7 +112,12 @@ interface Props {
 }
 
 type SortKey =
-  'investedAmount' | 'trailingPE' | 'returnOnEquity' | 'profitMargins' | 'revenueGrowth' | 'beta';
+  | 'investedAmount'
+  | 'trailingPE'
+  | 'returnOnEquity'
+  | 'profitMargins'
+  | 'revenueGrowth'
+  | 'beta';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'investedAmount', label: 'Investment Amount' },
