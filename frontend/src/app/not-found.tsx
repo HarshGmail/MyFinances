@@ -17,7 +17,7 @@ export default function NotFound() {
   }, []);
 
   return (
-    <div className="p-4 max-w-2xl mx-auto min-h-screen flex items-center justify-center">
+    <div className="p-4 max-w-2xl mx-auto min-h-dvh flex items-center justify-center">
       <Card className="w-full border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-900/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-amber-700 dark:text-amber-400">

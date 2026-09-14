@@ -42,7 +42,12 @@ export const PreviewPiPButton: React.FC<Props> = ({
   className,
 }) => {
   const [pipWin, setPipWin] = useState<Window | null>(null);
+  const [isPipSupported, setIsPipSupported] = useState(false);
   const mountRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsPipSupported(typeof window.documentPictureInPicture?.requestWindow === 'function');
+  }, []);
 
   const open = useCallback(async () => {
     try {
@@ -87,6 +92,8 @@ export const PreviewPiPButton: React.FC<Props> = ({
   }, [pipWin]);
 
   const portal = pipWin && mountRef.current ? createPortal(children, mountRef.current) : null;
+
+  if (!isPipSupported) return null;
 
   return (
     <>

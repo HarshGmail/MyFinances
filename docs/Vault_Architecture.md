@@ -265,6 +265,35 @@ This is why items are decrypted eagerly into state on unlock and `buildItemCopyT
 
 ---
 
+### Face ID unlock (WebAuthn PRF)
+
+Optional, device-local, and deliberately **not** a change to the server-side threat model. The PIN
+remains the only root secret; Face ID is a second way to retrieve it on one device.
+
+```
+passkey (iCloud Keychain) ──prf.eval(salt)──▶ 32 bytes ──HKDF-SHA256──▶ AES-256-GCM wrapping key
+                                                                              │
+PIN ──encryptItem(wrappingKey, pin)──▶ envelope ──▶ IndexedDB on this device only
+```
+
+`frontend/src/utils/vaultBiometrics.ts` owns it. On unlock, `prf.eval` reproduces the wrapping key,
+the PIN is decrypted, and it feeds the existing `deriveKey()` path unchanged — the verifier, items,
+wallet keys and `ensureSharingKeys` are all untouched.
+
+What this does and does not change:
+
+- **The blob never leaves the device.** No new backend field, no new endpoint, nothing for the
+  server to read. A Mongo dump is exactly as (un)useful as before.
+- **The device's biometric set becomes an unlock path.** Anyone enrolled in Face ID/Touch ID on that
+  device can open the vault. That is the trade the user opts into, and the setup dialog says so.
+- **PRF support is uneven** — Safari has it from iOS 18 via iCloud Keychain, but not with external
+  security keys. It is feature-detected and the toggle is hidden when unavailable. **The PIN must
+  always remain a working unlock path; never make biometrics the sole factor.**
+
+**Changing the PIN or destroying the vault must clear the stored blob** — `changePin` and `destroy`
+both call `clearBiometricUnlock()`. Forgetting that leaves Face ID unlocking with a stale PIN, which
+then fails the verifier with no obvious cause.
+
 ## 6. Operational notes
 
 - `ENCRYPTION_KEY` must be 64 hex characters (32 bytes). `startServer()` logs a fatal error at boot if

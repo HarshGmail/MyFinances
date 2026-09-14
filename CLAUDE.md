@@ -104,7 +104,7 @@ frontend/src/
 │   ├── rd/                   Recurring deposits
 │   ├── goals/                Investment goals
 │   ├── profile/              User profile + salary history (Phone + PAN Number fields; PAN has show/hide toggle)
-│   ├── integrations/         3 tabs: UPI Auto-Track, Claude MCP, Email Import
+│   ├── integrations/         4 tabs: UPI Auto-Track, Claude MCP, Email Import, Notifications
 │   ├── vault/                PIN-locked, end-to-end encrypted secrets store
 │   │   ├── page.tsx                Orchestrator — Unsupported / Setup / Locked / Unlocked
 │   │   ├── useVaultSession.ts      Owns the CryptoKey, decrypted items, idle auto-lock
@@ -510,3 +510,13 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 35. **Wallet keys are cached by `walletId:keyEpoch`, not `walletId`** — the epoch is part of the cache key so a rotation elsewhere cannot serve a stale key from cache. The cache lives in `useVaultSession` and is cleared by the same `lock()` that clears the vault key, so wallet keys inherit the identical never-persisted, idle-locked lifetime.
 
 36. **Shared entries are per-field projections and are copies, not live links** — only ticked fields are encrypted into the wallet entry; the rest never leave the owner's vault. `VaultFieldDef.shareByDefault` ticks identifying fields by default and leaves `cardNumber`/`cvv`/`atmPin`/passwords unticked. Editing the vault entry does **not** update the shared copy (`sourceItemId` records the link); automatic propagation was rejected because it would silently re-share fields. Server-side, members may only edit entries where `addedBy` matches — enforced in the `arrayFilters`, not just hidden in the UI.
+
+37. **The app is an installable PWA, and that only works because frontend and API are same-site** — `www.my-finances.site` and `api.my-finances.site` share the registrable domain, so the `SameSite=Lax` cookie is first-party and installing to the Home Screen changes nothing about auth. Do **not** move the API to a different domain, and do not assume a Capacitor/WebView shell would work as-is: `capacitor://localhost` is cross-site against the API and would break the cookie, CORS and Gmail OAuth at once. `apiRequest()` already has the bearer-token seam (`api/configs/authToken.ts`) if that is ever needed; the backend has read `Authorization: Bearer` all along.
+
+38. **The service worker must never cache API responses** — `public/sw.js` returns early for any non-same-origin request, which excludes `api.my-finances.site` by construction. TanStack Query + `queryPersister.ts` already own data freshness and persistence; caching authenticated financial responses in the Cache API would duplicate that state with a second, separate eviction story. The service worker's job is the app shell only, which is what makes the already-persisted query cache reachable offline.
+
+39. **Session is 30 days with a sliding refresh, and boot state is server-verified** — `SESSION_DURATION_SECONDS` in `jwtHelpers.ts` is the single source for both the JWT `expiresIn` and the cookie `maxAge`; keep them from drifting apart. `authenticateToken` re-issues the cookie past the halfway mark, but only when the token came from a cookie — never for a bearer token, which has no cookie to refresh. Note the separate `'24h'` in `ingestTokenExchange` is the MCP bearer and is deliberately left short. `AuthProvider` probes `/api/verify` on mount and `RouteGuard` waits for `isSessionResolved`; only a real 401 clears local state, so an offline launch is not treated as a logout.
+
+40. **Face ID unlock stores the PIN wrapped under a WebAuthn PRF key, on the device only** — see `utils/vaultBiometrics.ts` and the Face ID section of `docs/Vault_Architecture.md`. Nothing new reaches the server. Two rules: PRF support is uneven (Safari has it from iOS 18 via iCloud Keychain, not with security keys), so it is feature-detected and the PIN always stays a working unlock path; and `changePin`/`destroy` must both call `clearBiometricUnlock()`, or Face ID unlocks with a stale PIN and fails the verifier for no visible reason.
+
+41. **Wide tables render as stacked cards below `md:`** — `components/custom/MobileDataCard.tsx` is the shared primitive; `TransactionsTable` and the stocks/crypto/FD/RD/MF/scorecard tables each render cards on mobile and keep `<Table className="hidden md:table">` for desktop. When adding a column to one of those tables, add it to the card too, or it silently disappears on the phone.

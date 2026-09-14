@@ -12,7 +12,7 @@ export default function StockSearchLandingPage() {
   const portfolioStocks = portfolioData?.portfolio ?? [];
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-8 min-h-screen flex flex-col items-center justify-center">
+    <div className="p-4 max-w-2xl mx-auto space-y-8 min-h-dvh flex flex-col items-center justify-center">
       <div className="text-center space-y-2 mb-8">
         <div className="flex justify-center mb-4">
           <div className="p-3 rounded-full bg-muted">

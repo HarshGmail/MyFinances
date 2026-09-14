@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { KeyRound, Lock, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Lock, Plus, ScanFace, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { VaultCategory, VaultItemContent, WalletSummary } from '@/api/dataInterface';
 import { useWalletsQuery } from '@/api/query';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { useUrlState } from '@/utils/useUrlState';
 import { CategoryRail } from './CategoryRail';
+import { BiometricSetupDialog } from './BiometricSetupDialog';
 import { ChangePinDialog } from './ChangePinDialog';
 import { DestroyVaultDialog } from './DestroyVaultDialog';
 import { VaultItemCard } from './VaultItemCard';
@@ -52,6 +53,10 @@ interface VaultShellProps {
   onRemove: (itemId: string) => Promise<void>;
   onChangePin: (newPin: string) => Promise<void>;
   onDestroy: () => Promise<void>;
+  isBiometricAvailable: boolean;
+  isBiometricEnrolled: boolean;
+  onEnableBiometrics: (pin: string) => Promise<void>;
+  onDisableBiometrics: () => Promise<void>;
 }
 
 function toFormValues(category: VaultCategory, item?: VaultDecryptedItem): VaultItemFormValues {
@@ -90,6 +95,10 @@ export function VaultShell({
   onRemove,
   onChangePin,
   onDestroy,
+  isBiometricAvailable,
+  isBiometricEnrolled,
+  onEnableBiometrics,
+  onDisableBiometrics,
 }: VaultShellProps) {
   const [activeTab, setActiveTab] = useUrlState<VaultTabId>(
     'tab',
@@ -102,6 +111,7 @@ export function VaultShell({
   const [editingItem, setEditingItem] = useState<VaultDecryptedItem | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<VaultDecryptedItem | null>(null);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
+  const [isBiometricSetupOpen, setIsBiometricSetupOpen] = useState(false);
   const [isDestroyOpen, setIsDestroyOpen] = useState(false);
   const [sharingItem, setSharingItem] = useState<VaultDecryptedItem | null>(null);
 
@@ -203,6 +213,19 @@ export function VaultShell({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isBiometricAvailable && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() =>
+                isBiometricEnrolled ? onDisableBiometrics() : setIsBiometricSetupOpen(true)
+              }
+            >
+              <ScanFace className="h-4 w-4" />
+              {isBiometricEnrolled ? 'Disable Face ID' : 'Enable Face ID'}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -328,6 +351,13 @@ export function VaultShell({
         onChangePin={onChangePin}
         isPending={isBusy}
         damagedCount={damagedIds.length}
+      />
+
+      <BiometricSetupDialog
+        open={isBiometricSetupOpen}
+        onOpenChange={setIsBiometricSetupOpen}
+        onEnable={onEnableBiometrics}
+        isPending={isBusy}
       />
 
       <DestroyVaultDialog

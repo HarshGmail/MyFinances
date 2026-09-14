@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Lock, TriangleAlert } from 'lucide-react';
+import { Lock, ScanFace, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { VaultWrongPinError } from '@/utils/vaultCrypto';
@@ -9,6 +9,8 @@ import { PinInput, VAULT_PIN_LENGTH } from './PinInput';
 
 interface VaultLockedProps {
   onUnlock: (pin: string) => Promise<void>;
+  onBiometricUnlock: () => Promise<void>;
+  isBiometricEnrolled: boolean;
   isBusy: boolean;
   lockedUntil: string | null;
   attemptsRemaining?: number;
@@ -26,6 +28,8 @@ function formatCountdown(milliseconds: number): string {
 
 export function VaultLocked({
   onUnlock,
+  onBiometricUnlock,
+  isBiometricEnrolled,
   isBusy,
   lockedUntil,
   attemptsRemaining,
@@ -56,6 +60,17 @@ export function VaultLocked({
         return;
       }
       setErrorMessage((error as Error)?.message || 'Could not unlock the vault');
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    if (isBusy || isLockedOut) return;
+    setErrorMessage('');
+    try {
+      await onBiometricUnlock();
+    } catch (error) {
+      if ((error as Error)?.name === 'NotAllowedError') return;
+      setErrorMessage((error as Error)?.message || 'Face ID unlock failed — use your PIN');
     }
   };
 
@@ -111,6 +126,18 @@ export function VaultLocked({
         >
           {isBusy ? 'Unlocking…' : 'Unlock'}
         </Button>
+
+        {isBiometricEnrolled && (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={isBusy || isLockedOut}
+            onClick={handleBiometricUnlock}
+          >
+            <ScanFace className="h-4 w-4 mr-2" />
+            Unlock with Face ID
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

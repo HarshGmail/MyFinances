@@ -2,11 +2,12 @@
 
 import { useUserProfileQuery } from '@/api/query';
 import { Badge } from '@/components/ui/badge';
-import { Smartphone, Bot, Mail, ChevronRight } from 'lucide-react';
+import { Smartphone, Bot, Mail, Bell, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import UpiIntegration from './UpiIntegration';
 import McpIntegration from './McpIntegration';
 import EmailIntegration from './EmailIntegration';
+import NotificationsIntegration from './NotificationsIntegration';
 import { useUrlState } from '@/utils/useUrlState';
 
 const INTEGRATIONS = [
@@ -31,11 +32,18 @@ const INTEGRATIONS = [
     description: 'Auto-import from CDSL eCAS, SafeGold & CoinDCX',
     badge: 'New',
   },
+  {
+    id: 'notifications',
+    name: 'Notifications',
+    icon: Bell,
+    description: 'Push alerts when a sync finishes',
+    badge: 'App',
+  },
 ] as const;
 
 type TabId = (typeof INTEGRATIONS)[number]['id'];
 
-const TAB_IDS = ['upi', 'mcp', 'email'] as const satisfies readonly TabId[];
+const TAB_IDS = ['upi', 'mcp', 'email', 'notifications'] as const satisfies readonly TabId[];
 
 export default function IntegrationsPage() {
   const [selected, setSelected] = useUrlState<TabId>('tab', 'upi', TAB_IDS);
@@ -104,6 +112,7 @@ export default function IntegrationsPage() {
               }}
             />
           )}
+          {selected === 'notifications' && <NotificationsIntegration />}
         </div>
       </div>
     </div>

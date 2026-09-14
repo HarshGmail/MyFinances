@@ -87,7 +87,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-background shadow-xl transform transition-transform duration-300 ease-in-out">
+      <div className="fixed right-0 top-0 h-full w-full max-w-full sm:w-96 bg-background shadow-xl transform transition-transform duration-300 ease-in-out safe-area-top safe-area-bottom">
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">

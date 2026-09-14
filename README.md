@@ -107,6 +107,49 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 
 ---
 
+## Install as an iPhone app
+
+The frontend is an installable PWA. On the iPhone, open `https://www.my-finances.site` in Safari →
+Share → **Add to Home Screen**. It then runs fullscreen with its own icon, keeps working offline for
+pages you have already opened, and can send push notifications.
+
+Two things only work from the **installed** app, not a Safari tab: push notifications (an iOS rule)
+and Face ID unlock for the vault.
+
+**Push notifications** need VAPID keys in the backend `.env`:
+
+```
+VAPID_PUBLIC_KEY=       # generate both with: npx web-push generate-vapid-keys
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+Then enable them in the installed app under Integrations → Notifications. Without these keys the
+tab explains that push is not configured and everything else keeps working.
+
+**Local testing** must use HTTPS — the vault needs a secure context and `http://192.168.x.x:3000`
+does not qualify. Run `npx next dev --experimental-https` and open that from the phone.
+
+Regenerate the app icons after changing `frontend/public/logo.png`:
+
+```bash
+cd frontend && node scripts/generate-pwa-icons.js
+```
+
+### Why a PWA and not a native wrapper
+
+The frontend and API share the registrable domain `my-finances.site`, so the auth cookie
+(`SameSite=Lax`, `Domain=.my-finances.site`) is first-party and a Home Screen PWA keeps working
+unchanged. A Capacitor shell runs on `capacitor://localhost`, which is cross-site — it would need
+the origin added to `corsOptions.origin`, a token-in-body login instead of the cookie, and a
+reworked Gmail OAuth flow, since Google blocks OAuth in embedded webviews. `apiRequest()` already
+attaches an optional bearer token via `api/configs/authToken.ts` if that day comes; the backend has
+read bearer tokens all along.
+
+Live Activities / Dynamic Island are ActivityKit and remain native-only — no PWA can reach them.
+
+---
+
 ## API Routes
 
 | Prefix | Domain |

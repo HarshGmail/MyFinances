@@ -132,7 +132,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-66px)]">
+    <div className="min-h-[calc(100dvh-66px)]">
       <BackendWarmup />
 
       {/* ── Hero ─────────────────────────────────────────── */}

@@ -88,7 +88,7 @@ function ConnectMcpContent() {
   }, [profile, isLoading, isError, requestId]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-zinc-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Connection diagram */}
         <div className="flex items-center justify-center gap-4 mb-8">
@@ -208,7 +208,7 @@ export default function ConnectMcpPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="min-h-dvh bg-zinc-950 flex items-center justify-center">
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
         </div>
       }

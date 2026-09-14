@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProfitLossColor } from '@/utils/text';
 import Link from 'next/link';
 import { StockTransaction } from '@/api/dataInterface';
+import { StockPortfolioCard } from './StockPortfolioCard';
 
 export default function StocksPortfolioPage() {
   const { theme } = useAppStore();
@@ -62,6 +63,30 @@ export default function StocksPortfolioPage() {
     () => portfolioData?.transactions ?? [],
     [portfolioData?.transactions]
   );
+
+  const xirrByStockName = useMemo(() => {
+    const result: Record<string, number | null> = {};
+    processedPortfolioData.forEach((row) => {
+      const stockTxs = stockTransactions.filter((tx) => tx.stockName === row.stockName);
+      if (!stockTxs.length || row.currentValuation <= 0) {
+        result[row.stockName] = null;
+        return;
+      }
+      const cashFlows: XirrCashFlow[] = [
+        ...stockTxs.map((tx) => ({
+          amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+          when: new Date(tx.date),
+        })),
+        { amount: row.currentValuation, when: new Date() },
+      ];
+      try {
+        result[row.stockName] = xirr(cashFlows) * 100;
+      } catch {
+        result[row.stockName] = null;
+      }
+    });
+    return result;
+  }, [processedPortfolioData, stockTransactions]);
 
   // Single combined series: sum all stocks' holding value at each timestamp
   const chartData = useMemo(() => {
@@ -346,8 +371,19 @@ export default function StocksPortfolioPage() {
       )}
 
       {processedPortfolioData.length > 0 && (
-        <div className="w-full mx-auto rounded-lg border p-1">
-          <Table>
+        <div className="w-full mx-auto md:rounded-lg md:border md:p-1">
+          <div className="md:hidden space-y-3">
+            {processedPortfolioData.map((row) => (
+              <StockPortfolioCard
+                key={row.stockName}
+                row={row}
+                stockXirr={xirrByStockName[row.stockName]}
+                unrealized={stockUnrealizedByName[row.stockName]}
+              />
+            ))}
+          </div>
+
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>S.No</TableHead>
@@ -368,22 +404,7 @@ export default function StocksPortfolioPage() {
             </TableHeader>
             <TableBody>
               {processedPortfolioData.map((row, idx) => {
-                const stockTxs = stockTransactions.filter((tx) => tx.stockName === row.stockName);
-                let stockXirr: number | null = null;
-                if (stockTxs.length > 0 && row.currentValuation > 0) {
-                  const cashFlows: XirrCashFlow[] = [
-                    ...stockTxs.map((tx) => ({
-                      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-                      when: new Date(tx.date),
-                    })),
-                    { amount: row.currentValuation, when: new Date() },
-                  ];
-                  try {
-                    stockXirr = xirr(cashFlows) * 100;
-                  } catch {
-                    stockXirr = null;
-                  }
-                }
+                const stockXirr = xirrByStockName[row.stockName];
                 return (
                   <TableRow key={row.stockName} className="hover:bg-muted transition">
                     <TableCell>{idx + 1}</TableCell>

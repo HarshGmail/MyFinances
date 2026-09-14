@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Copy, Link2, TriangleAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Copy, Link2, Share2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,11 @@ export function ShareWalletDialog({
   isPending,
 }: ShareWalletDialogProps) {
   const [link, setLink] = useState('');
+  const [canShareLink, setCanShareLink] = useState(false);
+
+  useEffect(() => {
+    setCanShareLink(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  }, []);
 
   const handleGenerate = async () => {
     try {
@@ -84,6 +89,19 @@ export function ShareWalletDialog({
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
+                {canShareLink && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    title="Share invite link"
+                    onClick={() => {
+                      navigator.share({ url: link, title: 'Shared wallet invite' }).catch(() => {});
+                    }}
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Expires in {EXPIRY_DAYS} days · usable {MAX_USES} times

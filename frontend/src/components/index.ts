@@ -4,6 +4,7 @@ export { Navbar } from './Navbar';
 export { RouteGuard } from './RouteGuard';
 export { ThemeSyncer } from './ThemeSyncer';
 export { DemoBanner } from './DemoBanner';
+export { ServiceWorkerRegistrar } from './ServiceWorkerRegistrar';
 
 export * from './ui/button';
 export * from './ui/form';

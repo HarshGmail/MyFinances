@@ -126,7 +126,27 @@
   }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
   }
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+}
+
+@utility safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility safe-area-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 body::-webkit-scrollbar,

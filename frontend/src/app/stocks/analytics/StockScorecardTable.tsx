@@ -22,6 +22,7 @@ import { StockFinancials, StocksPortfolioItem } from '@/api/dataInterface';
 import { getVerdict } from '@/app/stocks/detail/[symbol]/verdicts';
 import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
 import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';
+import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 
 const COL_METRIC_MAP: Record<string, string> = {
   'P/E': 'Trailing P/E',
@@ -33,6 +34,77 @@ const COL_METRIC_MAP: Record<string, string> = {
   Beta: 'Beta (5Y)',
   'D/E': 'Debt / Equity',
 };
+
+interface ScorecardRow {
+  sym: string;
+  invested: number;
+  pe: number | null | undefined;
+  pb: number | null | undefined;
+  roe: number | null | undefined;
+  netMargin: number | null | undefined;
+  revGrowth: number | null | undefined;
+  epsGrowth: number | null | undefined;
+  beta: number | null | undefined;
+  de: number | null | undefined;
+}
+
+interface ScorecardMetric {
+  column: string;
+  verdictKey: string;
+  read: (row: ScorecardRow) => number | null | undefined;
+  format: (row: ScorecardRow) => string;
+}
+
+const SCORECARD_METRICS: ScorecardMetric[] = [
+  {
+    column: 'P/E',
+    verdictKey: 'trailingPE',
+    read: (r) => r.pe,
+    format: (r) => (r.pe != null ? r.pe.toFixed(1) : '—'),
+  },
+  {
+    column: 'P/B',
+    verdictKey: 'priceToBook',
+    read: (r) => r.pb,
+    format: (r) => (r.pb != null ? r.pb.toFixed(1) : '—'),
+  },
+  {
+    column: 'ROE',
+    verdictKey: 'returnOnEquity',
+    read: (r) => r.roe,
+    format: (r) => fmt(r.roe, true),
+  },
+  {
+    column: 'Net Margin',
+    verdictKey: 'profitMargins',
+    read: (r) => r.netMargin,
+    format: (r) => fmt(r.netMargin, true),
+  },
+  {
+    column: 'Rev Growth',
+    verdictKey: 'revenueGrowth',
+    read: (r) => r.revGrowth,
+    format: (r) => fmt(r.revGrowth, true),
+  },
+  {
+    column: 'EPS Growth',
+    verdictKey: 'earningsGrowth',
+    read: (r) => r.epsGrowth,
+    format: (r) => fmt(r.epsGrowth, true),
+  },
+  {
+    column: 'Beta',
+    verdictKey: 'beta',
+    read: (r) => r.beta,
+    format: (r) => (r.beta != null ? r.beta.toFixed(2) : '—'),
+  },
+  {
+    column: 'D/E',
+    verdictKey: 'debtToEquity',
+    read: (r) => r.de,
+    format: (r) => (r.de != null ? (r.de / 100).toFixed(2) : '—'),
+  },
+];
 
 interface Props {
   analyticsData: Record<string, StockFinancials>;
@@ -146,18 +218,38 @@ export function StockScorecardTable({ analyticsData, portfolio }: Props) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
+        <CardContent className="md:overflow-x-auto">
+          <div className="md:hidden space-y-3">
+            {sorted.map((r) => (
+              <MobileDataCard
+                key={r.sym}
+                title={r.sym}
+                headline={`₹${r.invested.toLocaleString('en-IN')}`}
+                columns={2}
+              >
+                {SCORECARD_METRICS.map((metric) => (
+                  <MobileDataMetric key={metric.column} label={metric.column}>
+                    <span className="flex items-center gap-1.5">
+                      {metric.format(r)}
+                      {verdictDot(getVerdict(metric.verdictKey, metric.read(r))?.color)}
+                    </span>
+                  </MobileDataMetric>
+                ))}
+              </MobileDataCard>
+            ))}
+          </div>
+
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>Stock</TableHead>
                 <TableHead className="text-right">Invested</TableHead>
-                {Object.keys(COL_METRIC_MAP).map((col) => (
-                  <TableHead key={col} className="text-right">
+                {SCORECARD_METRICS.map(({ column }) => (
+                  <TableHead key={column} className="text-right">
                     <span className="inline-flex items-center justify-end gap-1">
-                      {col}
+                      {column}
                       <button
-                        onClick={() => setSelectedMetric(COL_METRIC_MAP[col])}
+                        onClick={() => setSelectedMetric(COL_METRIC_MAP[column])}
                         className="text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <Info className="h-3 w-3" />
@@ -174,54 +266,14 @@ export function StockScorecardTable({ analyticsData, portfolio }: Props) {
                   <TableCell className="text-right text-muted-foreground">
                     ₹{r.invested.toLocaleString('en-IN')}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {r.pe != null ? r.pe.toFixed(1) : '—'}
-                      {verdictDot(getVerdict('trailingPE', r.pe)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {r.pb != null ? r.pb.toFixed(1) : '—'}
-                      {verdictDot(getVerdict('priceToBook', r.pb)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {fmt(r.roe, true)}
-                      {verdictDot(getVerdict('returnOnEquity', r.roe)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {fmt(r.netMargin, true)}
-                      {verdictDot(getVerdict('profitMargins', r.netMargin)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {fmt(r.revGrowth, true)}
-                      {verdictDot(getVerdict('revenueGrowth', r.revGrowth)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {fmt(r.epsGrowth, true)}
-                      {verdictDot(getVerdict('earningsGrowth', r.epsGrowth)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {r.beta != null ? r.beta.toFixed(2) : '—'}
-                      {verdictDot(getVerdict('beta', r.beta)?.color)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="flex items-center justify-end gap-1.5">
-                      {r.de != null ? (r.de / 100).toFixed(2) : '—'}
-                      {verdictDot(getVerdict('debtToEquity', r.de)?.color)}
-                    </span>
-                  </TableCell>
+                  {SCORECARD_METRICS.map((metric) => (
+                    <TableCell key={metric.column} className="text-right">
+                      <span className="flex items-center justify-end gap-1.5">
+                        {metric.format(r)}
+                        {verdictDot(getVerdict(metric.verdictKey, metric.read(r))?.color)}
+                      </span>
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
             </TableBody>

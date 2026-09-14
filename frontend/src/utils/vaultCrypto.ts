@@ -9,6 +9,7 @@ const ECDH_ALGORITHM = 'ECDH';
 const ECDH_CURVE = 'P-256';
 const HKDF_ALGORITHM = 'HKDF';
 const WRAP_INFO = 'myfinances-wallet-key-wrap-v1';
+const BIOMETRIC_WRAP_INFO = 'myfinances-vault-biometric-wrap-v1';
 
 export const VAULT_KDF_ITERATIONS = 310_000;
 export const VAULT_SALT_BYTES = 16;
@@ -296,6 +297,25 @@ export async function unwrapKeyWithPrivateKey(
     rawWalletKey,
     { name: AES_ALGORITHM, length: AES_KEY_LENGTH },
     true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function deriveKeyFromPrfOutput(prfOutput: ArrayBuffer): Promise<CryptoKey> {
+  const subtle = requireSubtleCrypto();
+  const hkdfBaseKey = await subtle.importKey('raw', prfOutput, HKDF_ALGORITHM, false, [
+    'deriveKey',
+  ]);
+  return subtle.deriveKey(
+    {
+      name: HKDF_ALGORITHM,
+      hash: KDF_HASH,
+      salt: new Uint8Array(0),
+      info: new TextEncoder().encode(BIOMETRIC_WRAP_INFO),
+    },
+    hkdfBaseKey,
+    { name: AES_ALGORITHM, length: AES_KEY_LENGTH },
+    false,
     ['encrypt', 'decrypt']
   );
 }

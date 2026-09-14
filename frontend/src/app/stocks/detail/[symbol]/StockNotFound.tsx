@@ -11,7 +11,7 @@ export default function StockNotFound({ symbol }: Props) {
   const router = useRouter();
 
   return (
-    <div className="p-4 max-w-2xl mx-auto min-h-screen flex items-center justify-center">
+    <div className="p-4 max-w-2xl mx-auto min-h-dvh flex items-center justify-center">
       <Card className="w-full border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-900/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-red-700 dark:text-red-400">

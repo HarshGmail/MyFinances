@@ -44,7 +44,10 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[280px] sm:w-[350px] flex flex-col h-full">
+      <SheetContent
+        side="right"
+        className="w-[280px] sm:w-[350px] flex flex-col h-full safe-area-top safe-area-bottom"
+      >
         <SheetHeader>
           <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>

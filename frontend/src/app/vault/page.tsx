@@ -29,6 +29,8 @@ export default function VaultPage() {
       {session.status === 'locked' && (
         <VaultLocked
           onUnlock={session.unlock}
+          onBiometricUnlock={session.unlockWithBiometrics}
+          isBiometricEnrolled={session.isBiometricEnrolled}
           isBusy={session.isBusy}
           lockedUntil={session.lockedUntil}
           attemptsRemaining={session.attemptsRemaining}
@@ -48,6 +50,10 @@ export default function VaultPage() {
           onRemove={session.removeItem}
           onChangePin={session.changePin}
           onDestroy={session.destroy}
+          isBiometricAvailable={session.isBiometricAvailable}
+          isBiometricEnrolled={session.isBiometricEnrolled}
+          onEnableBiometrics={session.enableBiometricUnlock}
+          onDisableBiometrics={session.disableBiometricUnlock}
         />
       )}
     </div>

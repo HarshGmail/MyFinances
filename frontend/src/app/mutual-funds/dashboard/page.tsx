@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
+import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { useAppStore } from '@/store/useAppStore';
@@ -622,7 +623,82 @@ export default function MutualFundsDashboardPage() {
       )}
       {tableData.length > 0 ? (
         <div className="max-w mx-auto">
-          <Table>
+          <div className="md:hidden space-y-3">
+            {tableData
+              .filter((row) => row.totalUnits > 0)
+              .map((row) => (
+                <div
+                  key={row.fundName}
+                  onClick={() =>
+                    setSelectedFund(selectedFund === row.fundName ? 'All' : row.fundName)
+                  }
+                >
+                  <MobileDataCard
+                    title={
+                      <span className={selectedFund === row.fundName ? 'text-primary' : ''}>
+                        {row.fundName}
+                      </span>
+                    }
+                    headline={
+                      row.currentValue !== null
+                        ? formatCurrency(Number(row.currentValue.toFixed(2)))
+                        : 'N/A'
+                    }
+                    subline={
+                      row.profitLossPercentage !== null ? (
+                        <span className={getProfitLossColor(row.profitLoss)}>
+                          {row.profitLossPercentage.toFixed(2)}%
+                        </span>
+                      ) : (
+                        'N/A'
+                      )
+                    }
+                  >
+                    <MobileDataMetric label="Units">{row.totalUnits.toFixed(2)}</MobileDataMetric>
+                    <MobileDataMetric label="Invested">
+                      ₹{row.totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="NAV">
+                      {row.currentNav !== null
+                        ? `₹${row.currentNav.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        : 'N/A'}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="P&L">
+                      {row.profitLoss !== null ? (
+                        <span className={getProfitLossColor(row.profitLoss)}>
+                          {formatCurrency(Number(row.profitLoss.toFixed(2)))}
+                        </span>
+                      ) : (
+                        'N/A'
+                      )}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="XIRR">
+                      {row.fundXirr !== null ? `${row.fundXirr.toFixed(2)}%` : 'N/A'}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="STCG">
+                      {mfUnrealizedByFund[row.fundName] ? (
+                        <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].stcg)}>
+                          {formatCurrency(mfUnrealizedByFund[row.fundName].stcg)}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </MobileDataMetric>
+                    <MobileDataMetric label="LTCG">
+                      {mfUnrealizedByFund[row.fundName] ? (
+                        <span className={getProfitLossColor(mfUnrealizedByFund[row.fundName].ltcg)}>
+                          {formatCurrency(mfUnrealizedByFund[row.fundName].ltcg)}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </MobileDataMetric>
+                  </MobileDataCard>
+                </div>
+              ))}
+          </div>
+
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>S.No</TableHead>

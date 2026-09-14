@@ -28,6 +28,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "scripts/sort-ts-interfaces.js",
+    "scripts/generate-pwa-icons.js",
+    "public/sw.js",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]

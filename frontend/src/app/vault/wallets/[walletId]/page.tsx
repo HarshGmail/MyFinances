@@ -143,6 +143,8 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
       <div className="p-4 sm:p-6 max-w-5xl mx-auto">
         <VaultLocked
           onUnlock={session.unlock}
+          onBiometricUnlock={session.unlockWithBiometrics}
+          isBiometricEnrolled={session.isBiometricEnrolled}
           isBusy={session.isBusy}
           lockedUntil={session.lockedUntil}
           attemptsRemaining={session.attemptsRemaining}

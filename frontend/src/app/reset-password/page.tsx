@@ -69,7 +69,7 @@ function ResetPasswordContent() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="min-h-dvh flex items-center justify-center p-4 bg-background">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Invalid Reset Link</CardTitle>
@@ -89,7 +89,7 @@ function ResetPasswordContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+    <div className="min-h-dvh flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -147,7 +147,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <div className="min-h-dvh flex items-center justify-center p-4 bg-background">
           <Card className="w-full max-w-md">
             <CardHeader>
               <Skeleton className="h-8 w-32" />

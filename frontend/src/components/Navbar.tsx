@@ -8,8 +8,8 @@ export function Navbar() {
   const { user, theme, toggleTheme, handleLogout, getNavbarStyle } = useNavbarLogic();
 
   return (
-    <nav style={getNavbarStyle()} className="w-full sticky top-0 z-50">
-      <div className="w-full flex items-center justify-between px-4 md:px-6 py-2">
+    <nav style={getNavbarStyle()} className="w-full sticky top-0 z-50 safe-area-top">
+      <div className="w-full flex items-center justify-between px-4 md:px-6 py-2 safe-area-x">
         <NavbarLogo />
         <DesktopNav user={user} />
         <NavbarRightActions
