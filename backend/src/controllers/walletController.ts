@@ -379,7 +379,7 @@ export async function addWalletItem(req: Request, res: Response) {
     const wrapped = encrypt(parsed.ciphertext);
 
     const updated = await walletsCollection().updateOne(
-      { _id: walletObjectId },
+      { _id: walletObjectId, items: { $elemMatch: { id: itemId, addedBy: userId } } },
       {
         $set: {
           'items.$[entry].ciphertext': wrapped,
@@ -392,11 +392,6 @@ export async function addWalletItem(req: Request, res: Response) {
     );
 
     if (updated.matchedCount === 0) {
-      res.status(404).json({ success: false, message: 'Wallet not found' });
-      return;
-    }
-
-    if (updated.modifiedCount === 0) {
       const alreadyExists = await walletsCollection().findOne(
         { _id: walletObjectId, 'items.id': itemId },
         { projection: { _id: 1 } }

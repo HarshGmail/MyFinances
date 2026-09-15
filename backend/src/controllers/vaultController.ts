@@ -262,7 +262,7 @@ export async function upsertVaultItem(req: Request, res: Response) {
     const wrapped = encrypt(parsed.ciphertext);
 
     const updated = await collection.updateOne(
-      { userId },
+      { userId, 'items.id': itemId },
       {
         $set: {
           'items.$[entry].ciphertext': wrapped,
@@ -275,11 +275,12 @@ export async function upsertVaultItem(req: Request, res: Response) {
     );
 
     if (updated.matchedCount === 0) {
-      res.status(404).json({ success: false, message: 'Vault not found' });
-      return;
-    }
+      const vaultExists = await collection.findOne({ userId }, { projection: { _id: 1 } });
+      if (!vaultExists) {
+        res.status(404).json({ success: false, message: 'Vault not found' });
+        return;
+      }
 
-    if (updated.modifiedCount === 0) {
       const inserted = await collection.updateOne(
         { userId, [`items.${VAULT_MAX_ITEMS}`]: { $exists: false } },
         {
