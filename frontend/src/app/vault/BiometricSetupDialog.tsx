@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { ScanFace } from 'lucide-react';
+import { ScanFace, Fingerprint } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { VaultWrongPinError } from '@/utils/vaultCrypto';
 import { PinInput, VAULT_PIN_LENGTH } from './PinInput';
+import { isIosDevice } from '@/lib/pwa';
 
 interface BiometricSetupDialogProps {
   open: boolean;
@@ -29,6 +30,13 @@ export function BiometricSetupDialog({
 }: BiometricSetupDialogProps) {
   const [pin, setPin] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isIos, setIsIos] = useState(false);
+  const biometricLabel = isIos ? 'Face ID' : 'biometric unlock';
+  const BiometricIcon = isIos ? ScanFace : Fingerprint;
+
+  useEffect(() => {
+    setIsIos(isIosDevice());
+  }, []);
 
   const reset = () => {
     setPin('');
@@ -40,7 +48,7 @@ export function BiometricSetupDialog({
     setErrorMessage('');
     try {
       await onEnable(pin);
-      toast.success('Face ID unlock enabled');
+      toast.success(`${biometricLabel} enabled`);
       reset();
       onOpenChange(false);
     } catch (error) {
@@ -50,7 +58,7 @@ export function BiometricSetupDialog({
         return;
       }
       if ((error as Error)?.name === 'NotAllowedError') return;
-      setErrorMessage((error as Error)?.message || 'Could not enable Face ID unlock');
+      setErrorMessage((error as Error)?.message || `Could not enable ${biometricLabel}`);
     }
   };
 
@@ -65,12 +73,12 @@ export function BiometricSetupDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ScanFace className="h-5 w-5" />
-            Enable Face ID unlock
+            <BiometricIcon className="h-5 w-5" />
+            Enable {biometricLabel}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Confirm your PIN once. It is then encrypted with a key only this device&apos;s Face ID
-            can reproduce, and stored here — never on the server.
+            Confirm your PIN once. It is then encrypted with a key only this device can reproduce,
+            and stored here — never on the server.
           </p>
         </DialogHeader>
 
@@ -102,7 +110,7 @@ export function BiometricSetupDialog({
             Cancel
           </Button>
           <Button disabled={pin.length !== VAULT_PIN_LENGTH || isPending} onClick={handleSubmit}>
-            {isPending ? 'Enabling…' : 'Enable Face ID'}
+            {isPending ? 'Enabling…' : `Enable ${biometricLabel}`}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { VaultWrongPinError } from '@/utils/vaultCrypto';
 import { PinInput, VAULT_PIN_LENGTH } from './PinInput';
+import { isIosDevice } from '@/lib/pwa';
 
 interface VaultLockedProps {
   onUnlock: (pin: string) => Promise<void>;
@@ -37,6 +38,12 @@ export function VaultLocked({
   const [pin, setPin] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const [isIos, setIsIos] = useState(false);
+  const biometricLabel = isIos ? 'Face ID' : 'biometric unlock';
+
+  useEffect(() => {
+    setIsIos(isIosDevice());
+  }, []);
 
   const lockoutEndsAt = lockedUntil ? new Date(lockedUntil).getTime() : 0;
   const remainingLockoutMs = lockoutEndsAt - now;
@@ -70,7 +77,7 @@ export function VaultLocked({
       await onBiometricUnlock();
     } catch (error) {
       if ((error as Error)?.name === 'NotAllowedError') return;
-      setErrorMessage((error as Error)?.message || 'Face ID unlock failed — use your PIN');
+      setErrorMessage((error as Error)?.message || `${biometricLabel} failed — use your PIN`);
     }
   };
 
@@ -135,7 +142,7 @@ export function VaultLocked({
             onClick={handleBiometricUnlock}
           >
             <ScanFace className="h-4 w-4 mr-2" />
-            Unlock with Face ID
+            Unlock with {biometricLabel}
           </Button>
         )}
       </CardContent>

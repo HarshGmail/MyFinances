@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { KeyRound, Lock, Plus, ScanFace, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { isIosDevice } from '@/lib/pwa';
 import { useUrlState } from '@/utils/useUrlState';
 import { CategoryRail } from './CategoryRail';
 import { BiometricSetupDialog } from './BiometricSetupDialog';
@@ -114,6 +115,12 @@ export function VaultShell({
   const [isBiometricSetupOpen, setIsBiometricSetupOpen] = useState(false);
   const [isDestroyOpen, setIsDestroyOpen] = useState(false);
   const [sharingItem, setSharingItem] = useState<VaultDecryptedItem | null>(null);
+  const [isIos, setIsIos] = useState(false);
+  const biometricLabel = isIos ? 'Face ID' : 'biometric unlock';
+
+  useEffect(() => {
+    setIsIos(isIosDevice());
+  }, []);
 
   const {
     data: wallets,
@@ -223,7 +230,7 @@ export function VaultShell({
               }
             >
               <ScanFace className="h-4 w-4" />
-              {isBiometricEnrolled ? 'Disable Face ID' : 'Enable Face ID'}
+              {isBiometricEnrolled ? `Disable ${biometricLabel}` : `Enable ${biometricLabel}`}
             </Button>
           )}
           <Button

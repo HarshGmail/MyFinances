@@ -19,7 +19,7 @@ interface PrfExtensionResults {
 }
 
 export class BiometricUnavailableError extends Error {
-  constructor(message = 'Face ID unlock is not available on this device') {
+  constructor(message = 'Biometric unlock is not available on this device') {
     super(message);
     this.name = 'BiometricUnavailableError';
   }
@@ -155,7 +155,7 @@ export async function unlockPinWithBiometrics(): Promise<string> {
   if (!isBiometricApiAvailable()) throw new BiometricUnavailableError();
 
   const stored = await readStoredUnlock();
-  if (!stored) throw new BiometricUnavailableError('Face ID unlock has not been set up');
+  if (!stored) throw new BiometricUnavailableError('Biometric unlock has not been set up');
 
   const wrappingKey = await deriveKeyFromPrfOutput(await evaluatePrf(stored.credentialId));
   return decryptItem<string>(wrappingKey, stored.wrappedPin);

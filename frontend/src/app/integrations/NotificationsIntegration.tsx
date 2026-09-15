@@ -6,7 +6,8 @@ import { Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePushConfigQuery } from '@/api/query';
-import { isStandaloneDisplayMode } from '@/lib/pwa';
+import { isStandaloneDisplayMode, isIosDevice } from '@/lib/pwa';
+import { InstallAppButton } from '@/components/custom/InstallAppButton';
 import {
   getExistingPushSubscription,
   isPushSupported,
@@ -20,6 +21,8 @@ export default function NotificationsIntegration() {
   const [isBusy, setIsBusy] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [isInstalledApp, setIsInstalledApp] = useState(true);
+  const [isIos, setIsIos] = useState(false);
+  const requiresInstallForPush = isIos;
 
   const refreshSubscription = useCallback(async () => {
     setIsSubscribed(Boolean(await getExistingPushSubscription()));
@@ -28,6 +31,7 @@ export default function NotificationsIntegration() {
   useEffect(() => {
     setIsSupported(isPushSupported());
     setIsInstalledApp(isStandaloneDisplayMode());
+    setIsIos(isIosDevice());
     refreshSubscription();
   }, [refreshSubscription]);
 
@@ -74,13 +78,15 @@ export default function NotificationsIntegration() {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        <InstallAppButton />
+
         {!isSupported && (
           <p className="text-sm text-muted-foreground">
             This browser does not support push notifications.
           </p>
         )}
 
-        {isSupported && !isInstalledApp && (
+        {isSupported && !isInstalledApp && requiresInstallForPush && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
             <p className="font-medium">Add the app to your Home Screen first</p>
             <p className="text-muted-foreground mt-1">

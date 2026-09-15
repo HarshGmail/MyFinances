@@ -6,7 +6,7 @@ const fs = require('fs');
 const SOURCE_LOGO = path.resolve('./public/logo.png');
 const OUTPUT_DIR = path.resolve('./public/icons');
 
-const ICON_BACKGROUND = { r: 255, g: 255, b: 255, alpha: 1 };
+const ICON_BACKGROUND = { r: 10, g: 10, b: 10, alpha: 1 };
 const MASKABLE_CONTENT_RATIO = 0.6;
 const APPLE_CONTENT_RATIO = 0.82;
 

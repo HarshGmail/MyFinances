@@ -2,12 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, Mail, MessageSquare, Clock, Loader2, ShieldCheck } from 'lucide-react';
+import { Copy, Mail, MessageSquare, Clock, Loader2, ShieldCheck, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useUpdateIngestSenderEmailMutation } from '@/api/mutations';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useUpdateIngestSenderEmailMutation, useRegenerateIngestTokenMutation } from '@/api/mutations';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface UpiIntegrationProps {
@@ -23,8 +31,10 @@ export default function UpiIntegration({
 }: UpiIntegrationProps) {
   const emailAddress = 'transactions-ingest@my-finances.site';
   const [senderEmailInput, setSenderEmailInput] = useState('');
+  const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { mutate: saveSenderEmail, isPending: isSaving } = useUpdateIngestSenderEmailMutation();
+  const { mutate: regenerateToken, isPending: isRegenerating } = useRegenerateIngestTokenMutation();
 
   useEffect(() => {
     setSenderEmailInput(ingestSenderEmail ?? '');
@@ -38,6 +48,16 @@ export default function UpiIntegration({
         toast.success(trimmed ? 'Sender email saved' : 'Sender email cleared');
       },
       onError: () => toast.error('Failed to save sender email'),
+    });
+  }
+
+  function handleRegenerateToken() {
+    regenerateToken(undefined, {
+      onSuccess: () => {
+        setIsRegenerateDialogOpen(false);
+        toast.success('Token regenerated');
+      },
+      onError: () => toast.error('Failed to regenerate token'),
     });
   }
 
@@ -107,6 +127,15 @@ export default function UpiIntegration({
                 >
                   <Copy className="h-4 w-4" />
                 </button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsRegenerateDialogOpen(true)}
+                  disabled={isRegenerating}
+                  title="Regenerate token"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </Button>
               </div>
             </>
           ) : (
@@ -299,6 +328,37 @@ UPI/P2M/123456/Amazon - Rs.500 debit from HDFC Bank`}
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isRegenerateDialogOpen} onOpenChange={setIsRegenerateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Regenerate ingest token?</DialogTitle>
+            <DialogDescription>
+              This will invalidate your current token. Your iPhone Shortcut and Claude MCP connection
+              will stop working until you update them with the new token.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRegenerateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRegenerateToken}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating…
+                </>
+              ) : (
+                'Regenerate'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
