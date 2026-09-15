@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Lock } from 'lucide-react';
+import { Vault } from 'lucide-react';
 
 export function NavbarLogo() {
   const router = useRouter();
@@ -19,11 +19,11 @@ export function NavbarLogo() {
       </div>
       <button
         onClick={() => router.push('/vault')}
-        className="p-2 hover:bg-muted rounded-lg transition-colors"
+        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         title="Vault"
         aria-label="Open vault"
       >
-        <Lock className="h-5 w-5" />
+        <Vault className="h-4 w-4" />
       </button>
     </div>
   );
