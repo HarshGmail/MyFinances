@@ -15,7 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useUpdateIngestSenderEmailMutation, useRegenerateIngestTokenMutation } from '@/api/mutations';
+import {
+  useUpdateIngestSenderEmailMutation,
+  useRegenerateIngestTokenMutation,
+} from '@/api/mutations';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface UpiIntegrationProps {
@@ -334,19 +337,15 @@ UPI/P2M/123456/Amazon - Rs.500 debit from HDFC Bank`}
           <DialogHeader>
             <DialogTitle>Regenerate ingest token?</DialogTitle>
             <DialogDescription>
-              This will invalidate your current token. Your iPhone Shortcut and Claude MCP connection
-              will stop working until you update them with the new token.
+              This will invalidate your current token. Your iPhone Shortcut and Claude MCP
+              connection will stop working until you update them with the new token.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRegenerateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRegenerateToken}
-              disabled={isRegenerating}
-            >
+            <Button variant="destructive" onClick={handleRegenerateToken} disabled={isRegenerating}>
               {isRegenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
