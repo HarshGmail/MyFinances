@@ -264,7 +264,7 @@ export default function Auth() {
             <div className="flex flex-wrap gap-2 mb-6">
               {[
                 { icon: Landmark, label: 'Bank Details' },
-                { icon: CreditCard, label: 'Credit Cards' },
+                { icon: CreditCard, label: 'Cards' },
                 { icon: ShieldCheck, label: 'Insurance' },
                 { icon: KeyRound, label: 'Logins' },
               ].map(({ icon: Icon, label }) => (

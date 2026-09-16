@@ -9,6 +9,8 @@ export interface VaultDecryptedItem {
   updatedAt: string;
 }
 
+export type VaultFieldFormat = 'cardNumber' | 'expiry';
+
 export interface VaultFieldDef {
   name: string;
   label: string;
@@ -16,6 +18,9 @@ export interface VaultFieldDef {
   multiline?: boolean;
   placeholder?: string;
   shareByDefault?: boolean;
+  derived?: boolean;
+  format?: VaultFieldFormat;
+  suggestions?: string[];
 }
 
 export interface VaultCategoryDef {
@@ -46,19 +51,42 @@ const BANK_FIELDS: VaultFieldDef[] = [
   { name: 'remarks', label: 'Remarks', multiline: true, shareByDefault: true },
 ];
 
+export const CARD_TYPES = ['Credit', 'Debit', 'Prepaid', 'Forex'];
+export const CARD_NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Diners Club'];
+
 const CARD_FIELDS: VaultFieldDef[] = [
   { name: 'issuer', label: 'Issuer', placeholder: 'HDFC Bank', shareByDefault: true },
+  {
+    name: 'cardType',
+    label: 'Card Type',
+    placeholder: 'Credit / Debit',
+    shareByDefault: true,
+    suggestions: CARD_TYPES,
+  },
   {
     name: 'network',
     label: 'Network',
     placeholder: 'Visa / Mastercard / RuPay',
     shareByDefault: true,
+    suggestions: CARD_NETWORKS,
   },
   { name: 'cardLabel', label: 'Card Name', placeholder: 'Millennia', shareByDefault: true },
   { name: 'nameOnCard', label: 'Name on Card', shareByDefault: true },
-  { name: 'cardNumber', label: 'Card Number', secret: true },
-  { name: 'lastFour', label: 'Last 4 Digits', placeholder: '4821', shareByDefault: true },
-  { name: 'expiry', label: 'Expiry', placeholder: 'MM/YY', shareByDefault: true },
+  {
+    name: 'cardNumber',
+    label: 'Card Number',
+    secret: true,
+    format: 'cardNumber',
+    placeholder: '1234 5678 9012 3456',
+  },
+  {
+    name: 'lastFour',
+    label: 'Last 4 Digits',
+    placeholder: '4821',
+    shareByDefault: true,
+    derived: true,
+  },
+  { name: 'expiry', label: 'Expiry', placeholder: 'MM/YY', shareByDefault: true, format: 'expiry' },
   { name: 'cvv', label: 'CVV', secret: true },
   { name: 'atmPin', label: 'ATM PIN', secret: true },
   { name: 'creditLimit', label: 'Credit Limit' },
@@ -120,10 +148,10 @@ export const VAULT_CATEGORIES: VaultCategoryDef[] = [
   },
   {
     id: 'card',
-    label: 'Credit Cards',
+    label: 'Cards',
     singular: 'Card',
     icon: CreditCard,
-    description: 'Card numbers, CVV, PIN and the offers each one carries',
+    description: 'Credit and debit cards, their PINs and the offers each one carries',
     titleField: 'issuer',
     subtitleField: 'cardLabel',
     fields: CARD_FIELDS,
@@ -200,10 +228,72 @@ export function maskValue(value: string): string {
   return `${MASK_CHARACTER.repeat(hiddenLength)} ${trimmed.slice(-REVEALED_TAIL_LENGTH)}`;
 }
 
+const CARD_NUMBER_GROUP_SIZE = 4;
+const CARD_NUMBER_MAX_DIGITS = 19;
+const EXPIRY_DIGITS = 4;
+const LAST_FOUR_LENGTH = 4;
+
+export function formatCardNumberInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, CARD_NUMBER_MAX_DIGITS);
+  return digits.replace(new RegExp(`(.{${CARD_NUMBER_GROUP_SIZE}})`, 'g'), '$1 ').trim();
+}
+
+export function formatExpiryInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, EXPIRY_DIGITS);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+export function formatVaultFieldInput(format: VaultFieldFormat, value: string): string {
+  return format === 'cardNumber' ? formatCardNumberInput(value) : formatExpiryInput(value);
+}
+
+export function deriveLastFour(cardNumber: string): string {
+  return cardNumber.replace(/\D/g, '').slice(-LAST_FOUR_LENGTH);
+}
+
+export function applyDerivedFields(
+  category: VaultCategory,
+  content: VaultItemContent
+): VaultItemContent {
+  if (category !== 'card') return content;
+  const lastFour = deriveLastFour(content.fields.cardNumber ?? '');
+  if (!lastFour) return content;
+  return { ...content, fields: { ...content.fields, lastFour } };
+}
+
+export interface VaultCardFace {
+  issuer: string;
+  cardLabel: string;
+  network: string;
+  cardType: string;
+  nameOnCard: string;
+  expiry: string;
+  maskedNumber: string;
+  fullNumber: string;
+}
+
+export function getCardFace(content: VaultItemContent): VaultCardFace {
+  const fields = content.fields;
+  const fullNumber = (fields.cardNumber ?? '').trim();
+  const lastFour = deriveLastFour(fullNumber) || (fields.lastFour ?? '').trim();
+  return {
+    issuer: (fields.issuer ?? '').trim(),
+    cardLabel: (fields.cardLabel ?? '').trim(),
+    network: (fields.network ?? '').trim(),
+    cardType: (fields.cardType ?? '').trim(),
+    nameOnCard: (fields.nameOnCard ?? '').trim(),
+    expiry: (fields.expiry ?? '').trim(),
+    maskedNumber: lastFour ? `•••• •••• •••• ${lastFour}` : '•••• •••• •••• ••••',
+    fullNumber: fullNumber ? formatCardNumberInput(fullNumber) : '',
+  };
+}
+
 export interface VaultDisplayField {
   name: string;
   label: string;
   value: string;
+  displayValue: string;
   secret: boolean;
   multiline: boolean;
 }
@@ -214,14 +304,18 @@ export function getPopulatedFields(
 ): VaultDisplayField[] {
   const definition = getCategoryDef(category);
   const standard = definition.fields
-    .filter((field) => (content.fields[field.name] ?? '').trim().length > 0)
-    .map((field) => ({
-      name: field.name,
-      label: field.label,
-      value: content.fields[field.name].trim(),
-      secret: Boolean(field.secret),
-      multiline: Boolean(field.multiline),
-    }));
+    .filter((field) => !field.derived && (content.fields[field.name] ?? '').trim().length > 0)
+    .map((field) => {
+      const value = content.fields[field.name].trim();
+      return {
+        name: field.name,
+        label: field.label,
+        value,
+        displayValue: field.format ? formatVaultFieldInput(field.format, value) : value,
+        secret: Boolean(field.secret),
+        multiline: Boolean(field.multiline),
+      };
+    });
 
   const custom = content.customFields
     .filter((field) => field.label.trim().length > 0 && field.value.trim().length > 0)
@@ -229,6 +323,7 @@ export function getPopulatedFields(
       name: `custom:${field.label}`,
       label: field.label.trim(),
       value: field.value.trim(),
+      displayValue: field.value.trim(),
       secret: field.secret,
       multiline: false,
     }));
@@ -301,7 +396,7 @@ export function buildItemCopyText(category: VaultCategory, content: VaultItemCon
     .filter(Boolean)
     .join(' — ');
   const lines = getPopulatedFields(category, content).map(
-    (field) => `${field.label}: ${field.value}`
+    (field) => `${field.label}: ${field.displayValue}`
   );
   return [heading, ...lines].join('\n');
 }

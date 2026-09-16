@@ -28,6 +28,7 @@ import {
   VaultDecryptedItem,
   VaultTabId,
   WALLETS_TAB_ID,
+  applyDerivedFields,
   buildSharedProjection,
   emptyContentFor,
   getCategoryDef,
@@ -182,15 +183,18 @@ export function VaultShell({
   };
 
   const handleSubmit = async (values: VaultItemFormValues) => {
-    const content = trimContent(values);
-    if (!content.fields[definition.titleField]) {
-      toast.error(
-        `${definition.fields.find((f) => f.name === definition.titleField)?.label} is required`
-      );
+    const targetCategory = editingItem?.category ?? category;
+    const targetDefinition = getCategoryDef(targetCategory);
+    const content = applyDerivedFields(targetCategory, trimContent(values));
+    if (!content.fields[targetDefinition.titleField]) {
+      const titleLabel = targetDefinition.fields.find(
+        (field) => field.name === targetDefinition.titleField
+      )?.label;
+      toast.error(`${titleLabel} is required`);
       return;
     }
     try {
-      await onSave(editingItem?.category ?? category, content, editingItem?.id);
+      await onSave(targetCategory, content, editingItem?.id);
       setIsItemDialogOpen(false);
       setEditingItem(null);
       toast.success(editingItem ? 'Entry updated' : 'Entry saved');

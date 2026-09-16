@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getCategoryDef } from './vaultTypes';
+import { formatVaultFieldInput, getCategoryDef } from './vaultTypes';
 
 export interface VaultItemFormValues {
   fields: Record<string, string>;
@@ -61,30 +61,57 @@ export function VaultItemDialog({
 
         <form className="space-y-4 py-2" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {definition.fields.map((field) => (
-              <div
-                key={field.name}
-                className={`space-y-1.5 ${field.multiline ? 'sm:col-span-2' : ''}`}
-              >
-                <Label htmlFor={`vault-${field.name}`}>{field.label}</Label>
-                {field.multiline ? (
-                  <Textarea
-                    id={`vault-${field.name}`}
-                    rows={2}
-                    placeholder={field.placeholder}
-                    autoComplete="off"
-                    {...form.register(`fields.${field.name}` as const)}
-                  />
-                ) : (
-                  <Input
-                    id={`vault-${field.name}`}
-                    placeholder={field.placeholder}
-                    autoComplete="off"
-                    {...form.register(`fields.${field.name}` as const)}
-                  />
-                )}
-              </div>
-            ))}
+            {definition.fields
+              .filter((field) => !field.derived)
+              .map((field) => {
+                const registration = form.register(`fields.${field.name}` as const);
+                const suggestionsId = field.suggestions ? `vault-${field.name}-options` : undefined;
+                return (
+                  <div
+                    key={field.name}
+                    className={`space-y-1.5 ${field.multiline ? 'sm:col-span-2' : ''}`}
+                  >
+                    <Label htmlFor={`vault-${field.name}`}>{field.label}</Label>
+                    {field.multiline ? (
+                      <Textarea
+                        id={`vault-${field.name}`}
+                        rows={2}
+                        placeholder={field.placeholder}
+                        autoComplete="off"
+                        {...registration}
+                      />
+                    ) : (
+                      <>
+                        <Input
+                          id={`vault-${field.name}`}
+                          placeholder={field.placeholder}
+                          autoComplete="off"
+                          list={suggestionsId}
+                          inputMode={field.format ? 'numeric' : undefined}
+                          className={field.format ? 'font-mono tracking-wider' : undefined}
+                          {...registration}
+                          onChange={(event) => {
+                            if (field.format) {
+                              event.target.value = formatVaultFieldInput(
+                                field.format,
+                                event.target.value
+                              );
+                            }
+                            registration.onChange(event);
+                          }}
+                        />
+                        {field.suggestions && (
+                          <datalist id={suggestionsId}>
+                            {field.suggestions.map((suggestion) => (
+                              <option key={suggestion} value={suggestion} />
+                            ))}
+                          </datalist>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
           </div>
 
           <div className="space-y-3 rounded-lg border p-3">

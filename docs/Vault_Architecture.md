@@ -415,7 +415,8 @@ projection under WK as a new wallet entry. Fields left unticked are never encryp
 therefore never leave the owner's vault in any form.
 
 `VaultFieldDef.shareByDefault` drives the initial ticks: identifying and useful fields (issuer,
-network, name on card, expiry, last four, offer notes) start ticked; `cardNumber`, `cvv`, `atmPin`,
+network, card type, name on card, expiry, last four, offer notes) start ticked; `cardNumber`,
+`cvv`, `atmPin`,
 account numbers and passwords start unticked and carry a warning marker. Custom fields default to
 ticked unless the user marked them secret.
 
