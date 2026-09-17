@@ -11,18 +11,22 @@ import {
   useDeleteWalletItemMutation,
   useDeleteWalletMutation,
   useRemoveWalletMemberMutation,
+  useJoinWalletMutation,
   useRotateWalletKeyMutation,
   useSaveWalletItemMutation,
 } from '@/api/mutations';
 import {
+  decodeWalletKeyFromLink,
   decryptItem,
   encryptItem,
   exportWalletKeyRaw,
   encodeWalletKeyForLink,
   generateWalletKey,
+  importWalletKeyRaw,
   newItemId,
   wrapKeyForPublicKey,
 } from '@/utils/vaultCrypto';
+import { buildInviteCode, buildInviteLink } from './inviteCode';
 
 type WalletKeyResolver = (
   walletId: string,
@@ -49,6 +53,7 @@ export function useWalletActions({
   const { mutateAsync: approveMemberRequest } = useApproveWalletMemberMutation();
   const { mutateAsync: removeMemberRequest } = useRemoveWalletMemberMutation();
   const { mutateAsync: rotateKeyRequest } = useRotateWalletKeyMutation();
+  const { mutateAsync: joinWalletRequest } = useJoinWalletMutation();
 
   const [isWalletBusy, setIsWalletBusy] = useState(false);
 
@@ -146,12 +151,33 @@ export function useWalletActions({
           maxUses,
         });
         const rawKey = encodeWalletKeyForLink(await exportWalletKeyRaw(walletKey));
-        return `${window.location.origin}/vault/join/${invite.token}#k=${rawKey}`;
+        const parts = { token: invite.token, key: rawKey };
+        return {
+          link: buildInviteLink(window.location.origin, parts),
+          code: buildInviteCode(parts),
+        };
       } finally {
         setIsWalletBusy(false);
       }
     },
     [createInviteRequest, resolveWalletKey]
+  );
+
+  const joinByInvite = useCallback(
+    async (token: string, key: string) => {
+      setIsWalletBusy(true);
+      try {
+        const ownPublicKey = requireSharingKey();
+        const walletKey = await importWalletKeyRaw(decodeWalletKeyFromLink(key));
+        const wrappedWalletKey = await wrapKeyForPublicKey(walletKey, ownPublicKey);
+        const result = await joinWalletRequest({ token, wrappedWalletKey });
+        await refetchWallets();
+        return result;
+      } finally {
+        setIsWalletBusy(false);
+      }
+    },
+    [joinWalletRequest, refetchWallets, requireSharingKey]
   );
 
   const approveMember = useCallback(
@@ -244,6 +270,7 @@ export function useWalletActions({
     shareItemToWallet,
     removeWalletItem,
     createInviteLink,
+    joinByInvite,
     approveMember,
     rejectMember,
     removeMemberAndRotate,

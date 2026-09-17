@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LogIn, Plus, Wallet } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { WalletSummary } from '@/api/dataInterface';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateWalletDialog } from './CreateWalletDialog';
+import { JoinWalletDialog } from './JoinWalletDialog';
 import { WalletRow } from './WalletRow';
 
 interface WalletsSectionProps {
@@ -16,6 +18,7 @@ interface WalletsSectionProps {
   hasSharingKeys: boolean;
   isPending: boolean;
   onCreate: (name: string) => Promise<void>;
+  onJoin: (token: string, key: string) => Promise<void>;
 }
 
 export function WalletsSection({
@@ -25,8 +28,16 @@ export function WalletsSection({
   hasSharingKeys,
   isPending,
   onCreate,
+  onJoin,
 }: WalletsSectionProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const shouldOpenJoin = searchParams.get('join') === '1';
+
+  useEffect(() => {
+    if (shouldOpenJoin && hasSharingKeys) setIsJoinOpen(true);
+  }, [shouldOpenJoin, hasSharingKeys]);
 
   return (
     <div className="space-y-4">
@@ -37,15 +48,27 @@ export function WalletsSection({
             Pool entries with friends — everyone adds their own and everyone can copy
           </p>
         </div>
-        <Button
-          size="sm"
-          className="gap-1.5 shrink-0"
-          disabled={!hasSharingKeys}
-          onClick={() => setIsCreateOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-          New
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={!hasSharingKeys}
+            onClick={() => setIsJoinOpen(true)}
+          >
+            <LogIn className="h-4 w-4" />
+            Join
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={!hasSharingKeys}
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            New
+          </Button>
+        </div>
       </div>
 
       {!hasSharingKeys && (
@@ -68,18 +91,30 @@ export function WalletsSection({
             <Wallet className="h-10 w-10 mx-auto text-muted-foreground/50" />
             <p className="mt-3 font-medium">No wallets yet</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-              Create one to share selected card or account details with friends. Wallets others
-              share with you appear here once they approve your request.
+              Create one to share selected card or account details with friends, or join one with an
+              invite code someone sent you.
             </p>
-            <Button
-              size="sm"
-              className="mt-4 gap-1.5"
-              disabled={!hasSharingKeys}
-              onClick={() => setIsCreateOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Create a wallet
-            </Button>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={!hasSharingKeys}
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Create a wallet
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={!hasSharingKeys}
+                onClick={() => setIsJoinOpen(true)}
+              >
+                <LogIn className="h-4 w-4" />
+                Join with a code
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -94,6 +129,13 @@ export function WalletsSection({
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onCreate={onCreate}
+        isPending={isPending}
+      />
+
+      <JoinWalletDialog
+        open={isJoinOpen}
+        onOpenChange={setIsJoinOpen}
+        onJoin={onJoin}
         isPending={isPending}
       />
     </div>

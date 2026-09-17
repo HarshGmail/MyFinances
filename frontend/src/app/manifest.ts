@@ -13,6 +13,10 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: PWA_THEME_COLOR_DARK,
     theme_color: PWA_THEME_COLOR_DARK,
     categories: ['finance', 'productivity'],
+    shortcuts: [
+      { name: 'Vault', short_name: 'Vault', url: '/vault' },
+      { name: 'Join a wallet', short_name: 'Join wallet', url: '/vault?tab=wallets&join=1' },
+    ],
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

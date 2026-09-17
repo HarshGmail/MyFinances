@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, Clock, Smartphone, TriangleAlert, Wallet } from 'lucide-react';
+import { Check, Clock, Copy, Smartphone, TriangleAlert, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useJoinWalletMutation } from '@/api/mutations';
 import { useWalletInviteInfoQuery } from '@/api/query';
@@ -16,6 +16,7 @@ import {
   wrapKeyForPublicKey,
 } from '@/utils/vaultCrypto';
 import { isStandaloneDisplayMode } from '@/lib/pwa';
+import { buildInviteCode } from '../../wallets/inviteCode';
 import { useVaultSession } from '../../useVaultSession';
 import { VaultLocked } from '../../VaultLocked';
 import { VaultUnsupported } from '../../VaultUnsupported';
@@ -229,15 +230,32 @@ export default function JoinWalletPage({ params }: JoinWalletPageProps) {
                 contents once they approve.
               </p>
               {isBrowserTab && (
-                <div className="flex items-start gap-2 rounded-lg border p-3 text-sm">
-                  <Smartphone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-medium">Using the installed app?</p>
-                    <p className="text-muted-foreground">
-                      This is the browser, which keeps a separate vault session. If you have
-                      MyFinance on your Home Screen, copy this link and open it there instead.
-                    </p>
+                <div className="space-y-2 rounded-lg border p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Smartphone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium">Have MyFinance on your Home Screen?</p>
+                      <p className="text-muted-foreground">
+                        The installed app keeps its own sign-in and vault session, so joining here
+                        in the browser means signing in and unlocking twice. Copy the invite code
+                        instead, then paste it in the app under Vault → Wallets → Join.
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(buildInviteCode({ token, key: linkKey }))
+                        .then(() => toast.success('Invite code copied — paste it in the app'))
+                        .catch(() => toast.error('Could not copy the invite code'));
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy invite code for the app
+                  </Button>
                 </div>
               )}
               <Button

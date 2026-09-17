@@ -380,11 +380,31 @@ wallet. As with the vault, the server adds its own `encrypt()` layer over `encry
 
 ## 10. The share flow
 
-Link shape:
+Two carriers, same payload — an **invite code** and a **link**:
 
 ```
-https://…/vault/join/<inviteToken>#k=<base64url(WK)>
+MFW1.<inviteToken>.<base64url(WK)>                     invite code (preferred)
+https://…/vault/join/<inviteToken>#k=<base64url(WK)>   link
 ```
+
+**The code is the default offer**, because the link has two failure modes on phones:
+
+- **Chat apps eat the fragment.** WhatsApp builds a preview from the URL and has been observed
+  dropping everything after `#`, leaving a link that cannot decrypt anything. The code has no `#`
+  and no URL shape, so there is nothing for a previewer to rewrite.
+- **A tapped link opens the browser, not the installed app.** On iOS a Home Screen web app has its
+  own storage container — separate cookies and a separate vault session — and iOS does not let a PWA
+  capture links at all. So the recipient signs in again and re-enters their PIN in Safari. This is an
+  Apple platform limit with no workaround. Android installed via WebAPK does capture in-scope links.
+
+`parseWalletInvite` in `frontend/src/app/vault/wallets/inviteCode.ts` accepts either carrier, and
+extracts one from surrounding chat text. A link whose `#k=` was stripped raises
+`InviteKeyMissingError` so the UI can say what actually went wrong rather than "invalid invite".
+
+Joining by code happens inside the already-open app (Vault → Wallets → Join), so the session and the
+unlocked vault are reused — no second sign-in, no second PIN. `/vault/join/[token]` still works for a
+tapped link, and when it detects a browser tab it offers a "Copy invite code for the app" button so
+the recipient can finish in the installed app instead.
 
 **The fragment is never sent in an HTTP request.** It stays out of server logs, `Referer` headers and
 proxies, so the wallet key reaches the recipient's browser without ever touching our infrastructure.

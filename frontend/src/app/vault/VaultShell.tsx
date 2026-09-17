@@ -170,6 +170,13 @@ export function VaultShell({
     await walletActions.shareItemToWallet(target, sharingItem.category, projection, sharingItem.id);
   };
 
+  const handleJoinWallet = async (token: string, key: string) => {
+    const result = await walletActions.joinByInvite(token, key);
+    toast.success(
+      result.status === 'active' ? 'You already have access' : 'Request sent to the owner'
+    );
+  };
+
   const openAddDialog = () => {
     setEditingItem(null);
     form.reset(toFormValues(category));
@@ -289,6 +296,7 @@ export function VaultShell({
               hasSharingKeys={hasSharingKeys}
               isPending={walletActions.isWalletBusy}
               onCreate={walletActions.createWallet}
+              onJoin={handleJoinWallet}
             />
           ) : (
             <>
