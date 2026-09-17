@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { ReactNode } from 'react';
 import { VaultCategory, VaultItemContent, WrappedWalletKey } from '@/api/dataInterface';
 import { useVaultMetaQuery } from '@/api/query';
 import {
@@ -44,7 +53,7 @@ export const VAULT_IDLE_LOCK_MS = 5 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 15 * 1000;
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'focus'];
 
-export function useVaultSession() {
+function useVaultSessionState() {
   const { data: meta, isLoading: isMetaLoading, refetch: refetchMeta } = useVaultMetaQuery();
   const { mutateAsync: initVault } = useInitVaultMutation();
   const { mutateAsync: saveVaultItem } = useSaveVaultItemMutation();
@@ -341,28 +350,73 @@ export function useVaultSession() {
     else status = meta?.exists ? 'locked' : 'setup';
   }
 
-  return {
-    status,
-    items,
-    damagedIds,
-    isBusy,
-    lockedUntil: meta?.lockedUntil ?? null,
-    attemptsRemaining: meta?.attemptsRemaining,
-    publicKeyJwk,
-    privateKeyJwk,
-    hasSharingKeys: Boolean(publicKeyJwk && privateKeyJwk),
-    resolveWalletKey,
-    isBiometricAvailable,
-    isBiometricEnrolled,
-    createVault,
-    unlock,
-    unlockWithBiometrics,
-    enableBiometricUnlock,
-    disableBiometricUnlock,
-    lock,
-    saveItem,
-    removeItem,
-    changePin,
-    destroy,
-  };
+  const lockedUntil = meta?.lockedUntil ?? null;
+  const attemptsRemaining = meta?.attemptsRemaining;
+
+  return useMemo(
+    () => ({
+      status,
+      items,
+      damagedIds,
+      isBusy,
+      lockedUntil,
+      attemptsRemaining,
+      publicKeyJwk,
+      privateKeyJwk,
+      hasSharingKeys: Boolean(publicKeyJwk && privateKeyJwk),
+      resolveWalletKey,
+      isBiometricAvailable,
+      isBiometricEnrolled,
+      createVault,
+      unlock,
+      unlockWithBiometrics,
+      enableBiometricUnlock,
+      disableBiometricUnlock,
+      lock,
+      saveItem,
+      removeItem,
+      changePin,
+      destroy,
+    }),
+    [
+      status,
+      items,
+      damagedIds,
+      isBusy,
+      lockedUntil,
+      attemptsRemaining,
+      publicKeyJwk,
+      privateKeyJwk,
+      resolveWalletKey,
+      isBiometricAvailable,
+      isBiometricEnrolled,
+      createVault,
+      unlock,
+      unlockWithBiometrics,
+      enableBiometricUnlock,
+      disableBiometricUnlock,
+      lock,
+      saveItem,
+      removeItem,
+      changePin,
+      destroy,
+    ]
+  );
+}
+
+export type VaultSession = ReturnType<typeof useVaultSessionState>;
+
+const VaultSessionContext = createContext<VaultSession | null>(null);
+
+export function VaultSessionProvider({ children }: { children: ReactNode }) {
+  const session = useVaultSessionState();
+  return <VaultSessionContext.Provider value={session}>{children}</VaultSessionContext.Provider>;
+}
+
+export function useVaultSession(): VaultSession {
+  const session = useContext(VaultSessionContext);
+  if (!session) {
+    throw new Error('useVaultSession must be used inside a VaultSessionProvider');
+  }
+  return session;
 }

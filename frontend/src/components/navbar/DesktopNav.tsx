@@ -21,6 +21,7 @@ import {
   Plug,
   BarChart3,
   ChevronRight,
+  Lock,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -332,6 +333,7 @@ const MORE_ITEMS: NavItem[] = [
   { title: 'Recurring Deposits', icon: <PiggyBank className="w-4 h-4" />, path: '/rd' },
   { title: 'Fixed Deposits', icon: <Wallet className="w-4 h-4" />, path: '/fd' },
   { title: 'Goals', icon: <Goal className="w-4 h-4" />, path: '/goals' },
+  { title: 'Vault', icon: <Lock className="w-4 h-4" />, path: '/vault' },
   { title: 'Popup Settings', icon: <PictureInPicture2 className="w-4 h-4" />, path: '/popup' },
   { title: 'Integrations', icon: <Plug className="w-4 h-4" />, path: '/integrations' },
 ];

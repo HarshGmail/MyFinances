@@ -63,11 +63,13 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
     refetchWallets,
   });
 
+  const { resolveWalletKey } = session;
+
   const loadItems = useCallback(
     async (target: WalletSummary) => {
       setIsLoadingItems(true);
       try {
-        const key = await session.resolveWalletKey(
+        const key = await resolveWalletKey(
           target.id,
           target.wrappedWalletKey,
           target.memberKeyEpoch
@@ -101,7 +103,7 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
         setIsLoadingItems(false);
       }
     },
-    [session]
+    [resolveWalletKey]
   );
 
   useEffect(() => {

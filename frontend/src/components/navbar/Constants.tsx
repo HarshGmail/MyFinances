@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Receipt,
   Search,
+  Lock,
 } from 'lucide-react';
 
 export const MOBILE_MENU_ITEMS = [
@@ -117,6 +118,11 @@ export const MOBILE_MENU_ITEMS = [
     title: 'Goals',
     icon: <Goal className="w-4 h-4" />,
     path: '/goals',
+  },
+  {
+    title: 'Vault',
+    icon: <Lock className="w-4 h-4" />,
+    path: '/vault',
   },
   {
     title: 'Integrations',
