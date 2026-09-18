@@ -7,7 +7,7 @@ import {
   useMutualFundInfoFetchQuery,
   useCryptoTransactionsQuery,
   useMutualFundTransactionsQuery,
-  useMfapiNavHistoryBatchQuery,
+  useMfapiLatestNavQuery,
   useNseQuoteQuery,
   useGoldTransactionsQuery,
   useCryptoCoinPricesQuery,
@@ -185,7 +185,7 @@ export default function Goals() {
     if (!mfInfoData) return [];
     return Array.from(new Set(mfInfoData.map((info) => info.schemeNumber)));
   }, [mfInfoData]);
-  const { data: navHistoryBatch } = useMfapiNavHistoryBatchQuery(schemeNumbers);
+  const { data: navHistoryBatch } = useMfapiLatestNavQuery(schemeNumbers);
 
   // Build NAV data map for mutual funds
   const navDataMap = useMemo(() => {

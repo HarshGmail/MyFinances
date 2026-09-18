@@ -9,6 +9,7 @@ import {
   ThemeSyncer,
   DemoBanner,
   ServiceWorkerRegistrar,
+  BackendWarmup,
 } from '@/components';
 import Providers from './providers';
 import { AuthProvider } from '@/context/AuthContext';
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <RouteGuard>
               <ThemeSyncer />
               <ServiceWorkerRegistrar />
+              <BackendWarmup />
               <div className="flex flex-col min-h-dvh">
                 <Navbar />
                 <DemoBanner />

@@ -7,7 +7,7 @@ import {
   useMutualFundInfoFetchQuery,
   useCryptoTransactionsQuery,
   useMutualFundTransactionsQuery,
-  useMfapiNavHistoryBatchQuery,
+  useMfapiLatestNavQuery,
   useNseQuoteQuery,
   useSafeGoldRatesQuery,
   useGoldTransactionsQuery,
@@ -68,7 +68,7 @@ export default function GoalsTable() {
     if (!mfInfoData) return [];
     return Array.from(new Set(mfInfoData.map((info) => info.schemeNumber)));
   }, [mfInfoData]);
-  const { data: navHistoryBatch } = useMfapiNavHistoryBatchQuery(schemeNumbers);
+  const { data: navHistoryBatch } = useMfapiLatestNavQuery(schemeNumbers);
 
   // Get gold rates
   const endDate = new Date().toISOString().slice(0, 10);

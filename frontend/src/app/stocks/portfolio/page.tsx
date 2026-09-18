@@ -38,7 +38,7 @@ export default function StocksPortfolioPage() {
 
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const { data: portfolioData, isLoading, error } = useStocksPortfolioQuery();
+  const { data: portfolioData, isLoading, error } = useStocksPortfolioQuery(true);
   const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
   // All data comes from the single portfolio query — no dependent waterfall

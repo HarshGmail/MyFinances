@@ -14,6 +14,7 @@ import DepositCard from './DepositCard';
 import CapitalGainsCard from './CapitalGainsCard';
 import DashboardSkeleton from './DashboardSkeleton';
 import HomeInfoSheet from './HomeInfoSheet';
+import RefreshIndicator from './RefreshIndicator';
 
 const Chart = dynamic(() => import('./Chart'), { ssr: false });
 
@@ -45,7 +46,9 @@ export default function Home() {
     polarCategories,
     investedData,
     currentValueData,
-    isLoading,
+    isInitialLoad,
+    isRefreshing,
+    lastUpdatedAt,
     aiPrompt,
   } = useHomePortfolioData();
 
@@ -64,13 +67,14 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   }, [aiPrompt]);
 
-  if (isLoading) return <DashboardSkeleton />;
+  if (isInitialLoad) return <DashboardSkeleton />;
 
   return (
     <div className="p-4">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-6 text-center">Portfolio Dashboard</h2>
         <div className="flex items-center gap-1">
+          <RefreshIndicator isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
           <Button
             variant="ghost"
             size="icon"

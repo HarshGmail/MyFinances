@@ -51,11 +51,14 @@ export function useSearchStockByNameQuery(symbol: string) {
   });
 }
 
-export function useStocksPortfolioQuery() {
+export function useStocksPortfolioQuery(withPriceData = false) {
   return useQuery<StocksPortfolioResponse>({
-    queryKey: ['stocks-portfolio'],
+    queryKey: ['stocks-portfolio', withPriceData],
     queryFn: async () => {
-      const response = await apiRequest({ endpoint: '/stocks/portfolio', method: 'GET' });
+      const response = await apiRequest({
+        endpoint: withPriceData ? '/stocks/portfolio?priceData=1' : '/stocks/portfolio',
+        method: 'GET',
+      });
       return response.data;
     },
     staleTime: 5 * 60 * 1000,

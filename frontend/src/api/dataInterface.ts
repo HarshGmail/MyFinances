@@ -568,7 +568,7 @@ export interface StocksPortfolioItem {
 
 export interface StocksPortfolioResponse {
   portfolio: StocksPortfolioItem[];
-  priceData: Record<string, StockData>;
+  priceData?: Record<string, StockData>;
   summary: StocksPortfolioSummary;
   transactions: StockTransaction[];
 }

@@ -1,5 +1,6 @@
 import config from './config';
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import { CorsOptions } from 'cors';
 import cookieParser from 'cookie-parser';
@@ -57,6 +58,7 @@ const corsOptions: CorsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(compression());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -103,6 +105,21 @@ app.get('/api/health', (req, res) => {
 // Global error handler — must be the last middleware so it catches errors from all routes above
 app.use(errorHandler);
 
+const USER_SCOPED_COLLECTIONS = [
+  'stocks',
+  'digitalGold',
+  'crypto',
+  'mutualFunds',
+  'mutualFundsInfo',
+  'epfAccounts',
+  'fixedDeposits',
+  'recurringDeposits',
+  'expenses',
+  'expenseTransactions',
+  'assetTargets',
+  'userGoals',
+];
+
 const ENCRYPTION_KEY_PATTERN = /^[0-9a-f]{64}$/i;
 
 function warnIfEncryptionKeyUnusable() {
@@ -139,6 +156,16 @@ async function startServer() {
     await database.getDb().collection('walletMembers').createIndex({ userId: 1, status: 1 });
 
     await database.getDb().collection('walletInvites').createIndex({ token: 1 }, { unique: true });
+
+    await Promise.all(
+      USER_SCOPED_COLLECTIONS.map((name) =>
+        database.getDb().collection(name).createIndex({ userId: 1 })
+      )
+    );
+
+    await database.getDb().collection('priceCache').createIndex({ key: 1 });
+
+    await database.getDb().collection('goldRatesCache').createIndex({ date: 1 });
 
     // Start the server
     app.listen(port, '0.0.0.0', () => {

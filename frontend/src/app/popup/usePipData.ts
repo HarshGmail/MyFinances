@@ -7,7 +7,7 @@ import {
   useSafeGoldRatesQuery,
   useMutualFundTransactionsQuery,
   useMutualFundInfoFetchQuery,
-  useMfapiNavHistoryBatchQuery,
+  useMfapiLatestNavQuery,
   useStockTransactionsQuery,
   useNseQuoteQuery,
 } from '@/api/query';
@@ -116,7 +116,7 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
 
   const { data: navHistoryBatch, isLoading: navHistoryLoading, refetch: refetchNavHistory } =
     // @ts-expect-error to be fixed
-    useMfapiNavHistoryBatchQuery(schemeNumbers);
+    useMfapiLatestNavQuery(schemeNumbers);
 
   // Calculate mutual fund portfolio data
   const mfPortfolioData: MutualFundPortfolioData[] = useMemo(() => {

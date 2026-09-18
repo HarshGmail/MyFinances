@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { SignupForm, LoginForm, SectionTabs, BackendWarmup } from '@/components';
+import { SignupForm, LoginForm, SectionTabs } from '@/components';
 import { Button } from '@/components/ui/button';
 import { useDemoLoginMutation } from '@/api/mutations';
 import { useAppStore } from '@/store/useAppStore';
@@ -133,8 +133,6 @@ export default function Auth() {
 
   return (
     <div className="min-h-[calc(100dvh-66px)]">
-      <BackendWarmup />
-
       {/* ── Hero ─────────────────────────────────────────── */}
       <section className="relative flex flex-col items-center justify-center text-center px-6 pt-20 pb-16 overflow-hidden">
         {/* background glow */}

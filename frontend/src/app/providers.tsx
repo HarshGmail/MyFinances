@@ -23,6 +23,11 @@ const PERSISTENT_QUERY_KEYS = new Set([
   'asset-targets',
   'user-profile',
   'expenseTransactionNames',
+  'stocks-portfolio',
+  'capital-gains',
+  'safe-gold-rates',
+  'crypto-prices',
+  'mfapi-nav-latest',
 ]);
 
 export default function Providers({ children }: { children: ReactNode }) {

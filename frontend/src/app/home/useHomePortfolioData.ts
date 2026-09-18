@@ -9,7 +9,7 @@ import {
   useCryptoTransactionsQuery,
   useCryptoCoinPricesQuery,
   useMutualFundInfoFetchQuery,
-  useMfapiNavHistoryBatchQuery,
+  useMfapiLatestNavQuery,
   useEpfQuery,
   useEpfTimelineQuery,
   useFixedDepositsQuery,
@@ -33,6 +33,9 @@ interface CryptoPortfolioItem {
   profitLossPercentage: number;
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const LATEST_GOLD_RATE_LOOKBACK_DAYS = 7;
+
 const calculateCompoundInterest = (principal: number, rate: number, timeInMonths: number) => {
   const quarterlyRate = rate / 400;
   const quarters = Math.floor(timeInMonths / 3);
@@ -47,19 +50,27 @@ const calculateCompoundInterest = (principal: number, rate: number, timeInMonths
 export function useHomePortfolioData() {
   const user = useAppStore((state) => state.user);
 
-  const { data: cgData } = useCapitalGainsQuery();
-  const { data: stocksPortfolioData, isLoading: stocksPortfolioLoading } =
-    useStocksPortfolioQuery();
-  const { data: mutualFundsTransactionsData, isLoading: mfTransactionsLoading } =
-    useMutualFundTransactionsQuery();
-  const { data: mfInfoData, isLoading: mfInfoLoading } = useMutualFundInfoFetchQuery();
-  const { data: goldTransactions, isLoading: goldTransactionsLoading } = useGoldTransactionsQuery();
-  const { data: cryptoTransactions, isLoading: cryptoTransactionsLoading } =
-    useCryptoTransactionsQuery();
-  const { data: epfData, isLoading: epfLoading } = useEpfQuery();
-  const { data: epfTimelineData, isLoading: epfTimelineLoading } = useEpfTimelineQuery();
-  const { data: fdData, isLoading: fdLoading } = useFixedDepositsQuery();
-  const { data: rdData, isLoading: rdLoading } = useRecurringDepositsQuery();
+  const capitalGainsQuery = useCapitalGainsQuery();
+  const stocksPortfolioQuery = useStocksPortfolioQuery();
+  const mfTransactionsQuery = useMutualFundTransactionsQuery();
+  const mfInfoQuery = useMutualFundInfoFetchQuery();
+  const goldTransactionsQuery = useGoldTransactionsQuery();
+  const cryptoTransactionsQuery = useCryptoTransactionsQuery();
+  const epfQuery = useEpfQuery();
+  const epfTimelineQuery = useEpfTimelineQuery();
+  const fdQuery = useFixedDepositsQuery();
+  const rdQuery = useRecurringDepositsQuery();
+
+  const { data: cgData } = capitalGainsQuery;
+  const { data: stocksPortfolioData } = stocksPortfolioQuery;
+  const { data: mutualFundsTransactionsData } = mfTransactionsQuery;
+  const { data: mfInfoData } = mfInfoQuery;
+  const { data: goldTransactions } = goldTransactionsQuery;
+  const { data: cryptoTransactions } = cryptoTransactionsQuery;
+  const { data: epfData } = epfQuery;
+  const { data: epfTimelineData } = epfTimelineQuery;
+  const { data: fdData } = fdQuery;
+  const { data: rdData } = rdQuery;
 
   const stockPortfolioData = useMemo(
     () => stocksPortfolioData?.portfolio ?? [],
@@ -76,8 +87,8 @@ export function useHomePortfolioData() {
     return Array.from(new Set(mfInfoData.map((info) => info.schemeNumber)));
   }, [mfInfoData]);
 
-  const { data: navHistoryBatch, isLoading: navHistoryLoading } =
-    useMfapiNavHistoryBatchQuery(schemeNumbers);
+  const navHistoryQuery = useMfapiLatestNavQuery(schemeNumbers);
+  const { data: navHistoryBatch } = navHistoryQuery;
 
   const navDataMap = useMemo(() => {
     const map: Record<string, { nav: number; navDate: string } | null> = {};
@@ -97,13 +108,11 @@ export function useHomePortfolioData() {
 
   // ===== GOLD =====
   const endDate = new Date().toISOString().slice(0, 10);
-  const fiveYearsAgo = new Date();
-  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-  const startDate = fiveYearsAgo.toISOString().slice(0, 10);
-  const { data: goldRatesData, isLoading: goldRatesLoading } = useSafeGoldRatesQuery({
-    startDate,
-    endDate,
-  });
+  const startDate = new Date(Date.now() - LATEST_GOLD_RATE_LOOKBACK_DAYS * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10);
+  const goldRatesQuery = useSafeGoldRatesQuery({ startDate, endDate });
+  const { data: goldRatesData } = goldRatesQuery;
 
   const goldPortfolioData = useMemo(() => {
     if (!goldTransactions) return [];
@@ -166,7 +175,8 @@ export function useHomePortfolioData() {
       .map(([symbol]) => symbol);
   }, [cryptoInvestedMap]);
 
-  const { data: coinPrices, isLoading: cryptoPricesLoading } = useCryptoCoinPricesQuery(validCoins);
+  const coinPricesQuery = useCryptoCoinPricesQuery(validCoins);
+  const { data: coinPrices } = coinPricesQuery;
 
   const cryptoPortfolioData = useMemo<CryptoPortfolioItem[]>(() => {
     if (!coinPrices?.data) return [];
@@ -654,19 +664,46 @@ export function useHomePortfolioData() {
     portfolioSummary.rd.currentValue,
   ];
 
-  const isLoading =
-    stocksPortfolioLoading ||
-    mfInfoLoading ||
-    mfTransactionsLoading ||
-    navHistoryLoading ||
-    goldTransactionsLoading ||
-    goldRatesLoading ||
-    cryptoTransactionsLoading ||
-    cryptoPricesLoading ||
-    epfLoading ||
-    epfTimelineLoading ||
-    fdLoading ||
-    rdLoading;
+  const dashboardQueries = [
+    capitalGainsQuery,
+    stocksPortfolioQuery,
+    mfTransactionsQuery,
+    mfInfoQuery,
+    navHistoryQuery,
+    goldTransactionsQuery,
+    goldRatesQuery,
+    cryptoTransactionsQuery,
+    coinPricesQuery,
+    epfQuery,
+    epfTimelineQuery,
+    fdQuery,
+    rdQuery,
+  ];
+
+  const coreDataArrived = [
+    stocksPortfolioQuery,
+    mfTransactionsQuery,
+    mfInfoQuery,
+    goldTransactionsQuery,
+    cryptoTransactionsQuery,
+    epfQuery,
+    epfTimelineQuery,
+    fdQuery,
+    rdQuery,
+  ].every((query) => query.data !== undefined);
+
+  const navPricesReady = schemeNumbers.length === 0 || navHistoryBatch !== undefined;
+  const goldRatesReady = !goldTransactions?.length || goldRatesData !== undefined;
+  const coinPricesReady = validCoins.length === 0 || coinPrices !== undefined;
+
+  const isInitialLoad = !coreDataArrived || !navPricesReady || !goldRatesReady || !coinPricesReady;
+
+  const isRefreshing = dashboardQueries.some((query) => query.isFetching);
+
+  const updateTimestamps = dashboardQueries
+    .map((query) => query.dataUpdatedAt)
+    .filter((timestamp) => timestamp > 0);
+  const lastUpdatedAt = updateTimestamps.length ? Math.min(...updateTimestamps) : null;
 
   return {
     userName: user?.name,
@@ -694,7 +731,9 @@ export function useHomePortfolioData() {
     polarCategories,
     investedData,
     currentValueData,
-    isLoading,
+    isInitialLoad,
+    isRefreshing,
+    lastUpdatedAt,
     aiPrompt,
   };
 }

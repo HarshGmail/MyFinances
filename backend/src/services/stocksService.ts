@@ -9,12 +9,15 @@ import logger from '../utils/logger';
 
 const yahooFinance = new YahooFinance();
 
+const QUOTE_FETCH_CONCURRENCY = 5;
+const QUOTE_BATCH_DELAY_MS = 300;
+
 export class StocksService {
   static async fetchNSEQuotes(symbols: string[]): Promise<Record<string, StockData | null>> {
     const results: [string, StockData | null][] = [];
     const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-    for (const symbol of symbols) {
+    const fetchOne = async (symbol: string): Promise<[string, StockData | null]> => {
       try {
         const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
 
@@ -25,23 +28,30 @@ export class StocksService {
           return: 'object',
         });
 
-        const transformed: StockData = {
-          chart: {
-            result: [chartData as unknown as ChartResult],
-            error: null,
+        return [
+          symbol,
+          {
+            chart: {
+              result: [chartData as unknown as ChartResult],
+              error: null,
+            },
           },
-        };
-
-        results.push([symbol, transformed]);
+        ];
       } catch (err: unknown) {
         const error = err as Error;
-        logger.error({ err: error }, 'Yahoo API error');
-        results.push([symbol, null]);
+        logger.error({ err: error, symbol }, 'Yahoo API error');
+        return [symbol, null];
       }
+    };
 
-      // Small delay between requests to be polite to Yahoo's servers
-      if (symbol !== symbols[symbols.length - 1]) {
-        await new Promise((res) => setTimeout(res, 300));
+    // Batched rather than fully parallel to stay polite to Yahoo's servers
+    for (let i = 0; i < symbols.length; i += QUOTE_FETCH_CONCURRENCY) {
+      const batch = symbols.slice(i, i + QUOTE_FETCH_CONCURRENCY);
+      results.push(...(await Promise.all(batch.map(fetchOne))));
+
+      const hasMore = i + QUOTE_FETCH_CONCURRENCY < symbols.length;
+      if (hasMore) {
+        await new Promise((res) => setTimeout(res, QUOTE_BATCH_DELAY_MS));
       }
     }
 

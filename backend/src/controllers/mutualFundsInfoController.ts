@@ -70,7 +70,7 @@ export async function getMutualFundInfo(req: Request, res: Response) {
 
 export async function getMfapiNavHistory(req: Request, res: Response) {
   try {
-    const { schemeNumbers } = req.body;
+    const { schemeNumbers, latestOnly } = req.body;
 
     if (!schemeNumbers || !Array.isArray(schemeNumbers) || schemeNumbers.length === 0) {
       res.status(400).json({
@@ -126,7 +126,10 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
     // Create a map with scheme numbers as keys
     const navHistoryMap: Record<string, MutualFundNavHistoryItem> = {};
     results.forEach((result) => {
-      navHistoryMap[result.schemeNumber] = result.data;
+      navHistoryMap[result.schemeNumber] =
+        latestOnly && result.data?.data
+          ? { ...result.data, data: result.data.data.slice(0, 1) }
+          : result.data;
     });
 
     res.status(200).json({

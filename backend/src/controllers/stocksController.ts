@@ -13,6 +13,8 @@ import {
 } from '../utils/priceCache';
 import logger from '../utils/logger';
 
+const PORTFOLIO_PRICE_CACHE_MS = 60 * 1000;
+
 // Strip exchange suffixes (.NS, .BO, etc.) that should not be stored — stocksService
 // appends .NS itself when calling Yahoo Finance.
 function normalizeSymbol(raw: string): string {
@@ -311,16 +313,32 @@ export async function getStocksPortfolio(req: Request, res: Response) {
     }
 
     const stockNames = Object.keys(grouped);
-    const rawPriceData = await StocksService.fetchNSEQuotes(stockNames);
     const priceData: Record<string, StockData | null> = {};
-    for (const symbol of stockNames) {
-      const cacheKey = `stock:chart:${symbol}`;
-      const liveResult = rawPriceData[symbol];
-      if (liveResult !== null) {
-        priceData[symbol] = liveResult;
-        await setCache(cacheKey, liveResult);
-      } else {
-        priceData[symbol] = (await getCached<StockData>(cacheKey)) ?? null;
+
+    const cacheKeyFor = (symbol: string) => `stock:chart:${symbol}`;
+    const freshlyCached = await Promise.all(
+      stockNames.map((symbol) =>
+        getCachedWithMaxAgeMs<StockData>(cacheKeyFor(symbol), PORTFOLIO_PRICE_CACHE_MS)
+      )
+    );
+
+    const symbolsToFetch: string[] = [];
+    stockNames.forEach((symbol, index) => {
+      const cached = freshlyCached[index];
+      if (cached) priceData[symbol] = cached;
+      else symbolsToFetch.push(symbol);
+    });
+
+    if (symbolsToFetch.length) {
+      const rawPriceData = await StocksService.fetchNSEQuotes(symbolsToFetch);
+      for (const symbol of symbolsToFetch) {
+        const liveResult = rawPriceData[symbol];
+        if (liveResult !== null) {
+          priceData[symbol] = liveResult;
+          await setCache(cacheKeyFor(symbol), liveResult);
+        } else {
+          priceData[symbol] = (await getCached<StockData>(cacheKeyFor(symbol))) ?? null;
+        }
       }
     }
 
@@ -396,11 +414,13 @@ export async function getStocksPortfolio(req: Request, res: Response) {
         ? parseFloat(((totalOneDayChange / totalPreviousValue) * 100).toFixed(2))
         : 0;
 
+    const includePriceData = req.query.priceData === '1';
+
     res.status(200).json({
       success: true,
       data: {
         portfolio,
-        priceData,
+        priceData: includePriceData ? priceData : {},
         summary: {
           totalInvested,
           totalCurrentValue,
