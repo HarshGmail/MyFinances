@@ -180,6 +180,15 @@ export const VAULT_CATEGORIES: VaultCategoryDef[] = [
 
 export const VAULT_CATEGORY_IDS = VAULT_CATEGORIES.map((category) => category.id);
 
+const FACE_CATEGORIES: VaultCategory[] = ['card', 'bank'];
+
+export function hasCardFace(category: VaultCategory): boolean {
+  return FACE_CATEGORIES.includes(category);
+}
+
+export const VAULT_FACE_GRID_CLASS =
+  'grid items-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(19rem,1fr))]';
+
 export const WALLETS_TAB_ID = 'wallets';
 
 export type VaultTabId = VaultCategory | typeof WALLETS_TAB_ID;

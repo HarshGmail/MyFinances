@@ -22,9 +22,10 @@ interface CardFaceProps {
   content: VaultItemContent;
   isNumberRevealed?: boolean;
   actions?: ReactNode;
+  marker?: ReactNode;
 }
 
-export function CardFace({ content, isNumberRevealed, actions }: CardFaceProps) {
+export function CardFace({ content, isNumberRevealed, actions, marker }: CardFaceProps) {
   const face = getCardFace(content);
   const displayNumber = isNumberRevealed && face.fullNumber ? face.fullNumber : face.maskedNumber;
 
@@ -52,11 +53,14 @@ export function CardFace({ content, isNumberRevealed, actions }: CardFaceProps) 
             <div className="text-[11px] text-white/70 truncate">{face.cardLabel}</div>
           )}
         </div>
-        {face.cardType && (
-          <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider backdrop-blur-sm">
-            {face.cardType}
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {face.cardType && (
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider backdrop-blur-sm">
+              {face.cardType}
+            </span>
+          )}
+          {marker}
+        </div>
       </div>
 
       {actions && <div className="relative flex items-center gap-0.5 -ml-1.5">{actions}</div>}

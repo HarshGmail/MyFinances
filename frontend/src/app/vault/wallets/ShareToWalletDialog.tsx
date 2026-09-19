@@ -12,81 +12,120 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { VaultDecryptedItem, getItemTitle, getShareableFields, maskValue } from '../vaultTypes';
 
 interface ShareToWalletDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  item: VaultDecryptedItem | null;
+  items: VaultDecryptedItem[];
   wallets: { summary: WalletSummary; name: string }[];
-  onShare: (walletId: string, selectedFieldNames: string[]) => Promise<void>;
+  onShare: (
+    walletIds: string[],
+    selectedFieldNamesByItemId: Record<string, string[]>
+  ) => Promise<void>;
   isPending: boolean;
+}
+
+function defaultFieldNames(item: VaultDecryptedItem): string[] {
+  return getShareableFields(item.category, item.content)
+    .filter((field) => field.shareByDefault)
+    .map((field) => field.name);
+}
+
+function toggleIn(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
 }
 
 export function ShareToWalletDialog({
   open,
   onOpenChange,
-  item,
+  items,
   wallets,
   onShare,
   isPending,
 }: ShareToWalletDialogProps) {
-  const [walletId, setWalletId] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
+  const [walletIds, setWalletIds] = useState<string[]>([]);
+  const [selectedByItem, setSelectedByItem] = useState<Record<string, string[]>>({});
 
-  const fields = useMemo(
-    () => (item ? getShareableFields(item.category, item.content) : []),
-    [item]
+  const isSingleItem = items.length === 1;
+  const singleItem = isSingleItem ? items[0] : null;
+  const onlyWalletId = wallets.length === 1 ? wallets[0].summary.id : null;
+
+  const singleItemFields = useMemo(
+    () => (singleItem ? getShareableFields(singleItem.category, singleItem.content) : []),
+    [singleItem]
   );
 
+  const itemsSignature = items.map((item) => item.id).join(',');
+
   useEffect(() => {
-    if (!open || !item) return;
-    setSelected(fields.filter((field) => field.shareByDefault).map((field) => field.name));
-    setWalletId((current) => current || wallets[0]?.summary.id || '');
-  }, [open, item, fields, wallets]);
+    if (!open || items.length === 0) return;
+    const defaults: Record<string, string[]> = {};
+    for (const item of items) defaults[item.id] = defaultFieldNames(item);
+    setSelectedByItem(defaults);
+    setWalletIds(onlyWalletId ? [onlyWalletId] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, itemsSignature, onlyWalletId]);
 
-  const toggle = (name: string) => {
-    setSelected((current) =>
-      current.includes(name) ? current.filter((entry) => entry !== name) : [...current, name]
+  const selectedFieldCount = Object.values(selectedByItem).reduce(
+    (total, names) => total + names.length,
+    0
+  );
+
+  const secretsSelected = items.reduce((total, item) => {
+    const selected = new Set(selectedByItem[item.id] ?? []);
+    return (
+      total +
+      getShareableFields(item.category, item.content).filter(
+        (field) => field.secret && selected.has(field.name)
+      ).length
     );
-  };
+  }, 0);
 
-  const secretsSelected = fields.filter(
-    (field) => field.secret && selected.includes(field.name)
+  const itemsWithNothingSelected = items.filter(
+    (item) => (selectedByItem[item.id] ?? []).length === 0
   ).length;
 
+  const canShare =
+    walletIds.length > 0 && selectedFieldCount > 0 && itemsWithNothingSelected === 0 && !isPending;
+
   const handleShare = async () => {
-    if (!walletId || selected.length === 0 || isPending) return;
+    if (!canShare) return;
     try {
-      await onShare(walletId, selected);
+      await onShare(walletIds, selectedByItem);
       onOpenChange(false);
-      toast.success('Shared to wallet');
+      const entryLabel = items.length === 1 ? 'Entry' : `${items.length} entries`;
+      const walletLabel = walletIds.length === 1 ? 'wallet' : `${walletIds.length} wallets`;
+      toast.success(`${entryLabel} shared to ${walletLabel}`);
     } catch (error) {
       toast.error('Could not share to the wallet', { description: (error as Error)?.message });
     }
   };
 
+  const shareButtonLabel = isPending
+    ? 'Sharing…'
+    : `Share ${selectedFieldCount} ${selectedFieldCount === 1 ? 'field' : 'fields'}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Share to a wallet</DialogTitle>
-          {item && (
-            <p className="text-sm text-muted-foreground">
-              Choose exactly what the other members of the wallet can see of{' '}
-              <span className="font-medium text-foreground">
-                {getItemTitle(item.category, item.content)}
-              </span>
-              .
-            </p>
-          )}
+          <DialogTitle>
+            {isSingleItem ? 'Share to a wallet' : `Share ${items.length} entries`}
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {singleItem ? (
+              <>
+                Choose exactly what the other members of the wallet can see of{' '}
+                <span className="font-medium text-foreground">
+                  {getItemTitle(singleItem.category, singleItem.content)}
+                </span>
+                .
+              </>
+            ) : (
+              'Each entry shares only the fields ticked below. Sensitive fields start unticked.'
+            )}
+          </p>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -96,36 +135,49 @@ export function ShareToWalletDialog({
             </p>
           ) : (
             <>
-              <div className="space-y-1.5">
-                <span className="text-sm font-medium">Wallet</span>
-                <Select value={walletId} onValueChange={setWalletId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a wallet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {wallets.map(({ summary, name }) => (
-                      <SelectItem key={summary.id} value={summary.id}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <span className="text-sm font-medium">
+                  {wallets.length === 1 ? 'Wallet' : 'Wallets'}
+                </span>
+                <div className="rounded-lg border divide-y">
+                  {wallets.map(({ summary, name }) => (
+                    <label
+                      key={summary.id}
+                      className="flex items-center gap-3 p-2.5 cursor-pointer hover:bg-accent/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={walletIds.includes(summary.id)}
+                        onChange={() => setWalletIds((current) => toggleIn(current, summary.id))}
+                        className="h-4 w-4 rounded border-input accent-primary shrink-0"
+                      />
+                      <span className="flex-1 min-w-0 text-sm truncate">{name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {summary.memberCount} {summary.memberCount === 1 ? 'member' : 'members'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Fields to share</span>
-                <div className="rounded-lg border divide-y">
-                  {fields.map((field) => {
-                    const isChecked = selected.includes(field.name);
-                    return (
+              {singleItem ? (
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Fields to share</span>
+                  <div className="rounded-lg border divide-y">
+                    {singleItemFields.map((field) => (
                       <label
                         key={field.name}
                         className="flex items-center gap-3 p-2.5 cursor-pointer hover:bg-accent/40"
                       >
                         <input
                           type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggle(field.name)}
+                          checked={(selectedByItem[singleItem.id] ?? []).includes(field.name)}
+                          onChange={() =>
+                            setSelectedByItem((current) => ({
+                              ...current,
+                              [singleItem.id]: toggleIn(current[singleItem.id] ?? [], field.name),
+                            }))
+                          }
                           className="h-4 w-4 rounded border-input accent-primary shrink-0"
                         />
                         <span className="flex-1 min-w-0">
@@ -141,10 +193,80 @@ export function ShareToWalletDialog({
                           />
                         )}
                       </label>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Entries and their fields</span>
+                  <div className="space-y-2">
+                    {items.map((item) => {
+                      const fields = getShareableFields(item.category, item.content);
+                      const selected = selectedByItem[item.id] ?? [];
+                      return (
+                        <details
+                          key={item.id}
+                          className="rounded-lg border [&_summary::-webkit-details-marker]:hidden"
+                        >
+                          <summary className="flex cursor-pointer items-center justify-between gap-3 p-2.5 text-sm hover:bg-accent/40">
+                            <span className="min-w-0 truncate font-medium">
+                              {getItemTitle(item.category, item.content)}
+                            </span>
+                            <span
+                              className={`shrink-0 text-xs ${
+                                selected.length === 0 ? 'text-destructive' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {selected.length} of {fields.length}
+                            </span>
+                          </summary>
+                          <div className="divide-y border-t">
+                            {fields.map((field) => (
+                              <label
+                                key={field.name}
+                                className="flex items-center gap-3 p-2.5 cursor-pointer hover:bg-accent/40"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected.includes(field.name)}
+                                  onChange={() =>
+                                    setSelectedByItem((current) => ({
+                                      ...current,
+                                      [item.id]: toggleIn(current[item.id] ?? [], field.name),
+                                    }))
+                                  }
+                                  className="h-4 w-4 rounded border-input accent-primary shrink-0"
+                                />
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-sm">{field.label}</span>
+                                  <span className="block text-xs text-muted-foreground truncate font-mono">
+                                    {field.secret ? maskValue(field.value) : field.value}
+                                  </span>
+                                </span>
+                                {field.secret && (
+                                  <TriangleAlert
+                                    className="h-4 w-4 text-amber-500 shrink-0"
+                                    aria-label="Sensitive field"
+                                  />
+                                )}
+                              </label>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {itemsWithNothingSelected > 0 && (
+                <p className="text-sm text-destructive">
+                  {itemsWithNothingSelected}{' '}
+                  {itemsWithNothingSelected === 1 ? 'entry has' : 'entries have'} no fields ticked.
+                  Tick at least one field, or deselect{' '}
+                  {itemsWithNothingSelected === 1 ? 'it' : 'them'}.
+                </p>
+              )}
 
               {secretsSelected > 0 && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -175,8 +297,8 @@ export function ShareToWalletDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={!walletId || selected.length === 0 || isPending} onClick={handleShare}>
-            {isPending ? 'Sharing…' : `Share ${selected.length} fields`}
+          <Button disabled={!canShare} onClick={handleShare}>
+            {shareButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

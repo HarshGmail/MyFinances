@@ -9,6 +9,7 @@ interface PassbookFaceProps {
   content: VaultItemContent;
   isNumberRevealed?: boolean;
   actions?: ReactNode;
+  marker?: ReactNode;
 }
 
 function passbookRow(label: string, value: string) {
@@ -21,7 +22,7 @@ function passbookRow(label: string, value: string) {
   );
 }
 
-export function PassbookFace({ content, isNumberRevealed, actions }: PassbookFaceProps) {
+export function PassbookFace({ content, isNumberRevealed, actions, marker }: PassbookFaceProps) {
   const fields = content.fields;
   const bankName = (fields.bankName ?? '').trim() || 'Bank Account';
   const accountHolder = (fields.accountHolder ?? '').trim();
@@ -55,11 +56,14 @@ export function PassbookFace({ content, isNumberRevealed, actions }: PassbookFac
             </div>
           </div>
         </div>
-        {ifsc && (
-          <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 font-mono text-[9px] tracking-wider backdrop-blur-sm">
-            {ifsc}
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {ifsc && (
+            <span className="rounded-full bg-white/15 px-2 py-0.5 font-mono text-[9px] tracking-wider backdrop-blur-sm">
+              {ifsc}
+            </span>
+          )}
+          {marker}
+        </div>
       </div>
 
       {actions && <div className="relative ml-2.5 flex items-center gap-0.5">{actions}</div>}

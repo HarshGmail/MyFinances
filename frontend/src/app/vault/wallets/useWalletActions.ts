@@ -34,6 +34,12 @@ type WalletKeyResolver = (
   keyEpoch: number
 ) => Promise<CryptoKey | null>;
 
+export interface WalletShareProjection {
+  category: VaultCategory;
+  content: VaultItemContent;
+  sourceItemId: string;
+}
+
 interface UseWalletActionsOptions {
   publicKeyJwk: JsonWebKey | null;
   resolveWalletKey: WalletKeyResolver;
@@ -92,30 +98,37 @@ export function useWalletActions({
     [deleteWalletRequest, refetchWallets]
   );
 
-  const shareItemToWallet = useCallback(
-    async (
-      wallet: WalletSummary,
-      category: VaultCategory,
-      projection: VaultItemContent,
-      sourceItemId: string
-    ) => {
+  const shareItemsToWallets = useCallback(
+    async (targets: WalletSummary[], projections: WalletShareProjection[]) => {
       setIsWalletBusy(true);
       try {
-        const walletKey = await resolveWalletKey(
-          wallet.id,
-          wallet.wrappedWalletKey,
-          wallet.memberKeyEpoch
-        );
-        if (!walletKey) throw new Error('This wallet could not be unlocked');
-        const ciphertext = await encryptItem(walletKey, projection);
-        await saveWalletItemRequest({
-          walletId: wallet.id,
-          itemId: newItemId(),
-          category,
-          ciphertext,
-          sourceItemId,
-        });
+        const failures: string[] = [];
+        for (const wallet of targets) {
+          try {
+            const walletKey = await resolveWalletKey(
+              wallet.id,
+              wallet.wrappedWalletKey,
+              wallet.memberKeyEpoch
+            );
+            if (!walletKey) throw new Error('could not be unlocked');
+            for (const projection of projections) {
+              await saveWalletItemRequest({
+                walletId: wallet.id,
+                itemId: newItemId(),
+                category: projection.category,
+                ciphertext: await encryptItem(walletKey, projection.content),
+                sourceItemId: projection.sourceItemId,
+              });
+            }
+          } catch (error) {
+            failures.push((error as Error)?.message ?? 'failed');
+          }
+        }
         await refetchWallets();
+        if (failures.length === targets.length) throw new Error(failures[0]);
+        if (failures.length > 0) {
+          throw new Error(`${failures.length} of ${targets.length} wallets could not be updated`);
+        }
       } finally {
         setIsWalletBusy(false);
       }
@@ -267,7 +280,7 @@ export function useWalletActions({
     isWalletBusy,
     createWallet,
     deleteWallet,
-    shareItemToWallet,
+    shareItemsToWallets,
     removeWalletItem,
     createInviteLink,
     joinByInvite,

@@ -2,7 +2,7 @@ import axios from 'axios';
 import config from '../config';
 import logger from '../utils/logger';
 
-type ParserType = 'cdsl_cas' | 'safe_gold' | 'safe_gold_invoice' | 'epf_passbook';
+export type ParserType = 'cdsl_cas' | 'safe_gold' | 'safe_gold_invoice' | 'epf_passbook';
 
 interface PdfInput {
   data: string; // base64
@@ -57,7 +57,9 @@ export async function uploadPdf(buffer: Buffer, passwords: string[]): Promise<st
     );
     form.append('passwords', JSON.stringify(passwords));
 
-    const res = await axios.post<{ file_id: string }>(`${base}/files`, form);
+    const res = await withRetryOnThrottle(() =>
+      axios.post<{ file_id: string }>(`${base}/files`, form)
+    );
     logger.info({ fileId: res.data.file_id, sizeKb }, '[PdfClient] PDF uploaded');
     return res.data.file_id;
   } catch (err) {
@@ -65,6 +67,17 @@ export async function uploadPdf(buffer: Buffer, passwords: string[]): Promise<st
     logger.error({ err, sizeKb, status }, '[PdfClient] PDF upload failed');
     throw err;
   }
+}
+
+export async function uploadPdfsSequentially(
+  buffers: Buffer[],
+  passwords: string[]
+): Promise<string[]> {
+  const fileIds: string[] = [];
+  for (const buffer of buffers) {
+    fileIds.push(await uploadPdf(buffer, passwords));
+  }
+  return fileIds;
 }
 
 /**
@@ -80,10 +93,12 @@ export async function submitPdfJobByIds(
   logger.info({ parserType, fileCount: fileIds.length }, '[PdfClient] Submitting job by file IDs');
 
   try {
-    const res = await axios.post<{ job_id: string }>(`${base}/jobs`, {
-      parser_type: parserType,
-      file_ids: fileIds,
-    });
+    const res = await withRetryOnThrottle(() =>
+      axios.post<{ job_id: string }>(`${base}/jobs`, {
+        parser_type: parserType,
+        file_ids: fileIds,
+      })
+    );
     logger.info({ parserType, jobId: res.data.job_id }, '[PdfClient] Job submitted by IDs');
     return res.data.job_id;
   } catch (err) {
@@ -115,10 +130,12 @@ export async function submitPdfJob(
   );
 
   try {
-    const res = await axios.post<{ job_id: string }>(`${base}/jobs`, {
-      parser_type: parserType,
-      pdfs,
-    } satisfies JobPayload);
+    const res = await withRetryOnThrottle(() =>
+      axios.post<{ job_id: string }>(`${base}/jobs`, {
+        parser_type: parserType,
+        pdfs,
+      } satisfies JobPayload)
+    );
     logger.info({ parserType, jobId: res.data.job_id }, '[PdfClient] Job submitted successfully');
     return res.data.job_id;
   } catch (err) {
@@ -146,7 +163,9 @@ export async function waitForPdfJob(
 
   while (Date.now() < deadline) {
     try {
-      const res = await axios.get<RustJobStatus>(`${base}/jobs/${jobId}`);
+      const res = await withRetryOnThrottle(() =>
+        axios.get<RustJobStatus>(`${base}/jobs/${jobId}`)
+      );
       const { status, result, error } = res.data;
 
       if (status === 'done') {
@@ -173,6 +192,41 @@ export async function waitForPdfJob(
 
   logger.error({ jobId, timeoutMs }, '[PdfClient] Job timed out');
   throw new Error(`PDF parsing job timed out after ${timeoutMs / 1000}s`);
+}
+
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+const MAX_RETRIES = 5;
+const BASE_BACKOFF_MS = 2000;
+const MAX_BACKOFF_MS = 30000;
+
+function getResponseStatus(err: unknown): number | undefined {
+  return (err as { response?: { status?: number } })?.response?.status;
+}
+
+function getRetryAfterMs(err: unknown): number | undefined {
+  const header = (err as { response?: { headers?: Record<string, string> } })?.response?.headers?.[
+    'retry-after'
+  ];
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}
+
+async function withRetryOnThrottle<T>(request: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request();
+    } catch (err) {
+      const status = getResponseStatus(err);
+      if (!status || !RETRYABLE_STATUSES.has(status) || attempt >= MAX_RETRIES) throw err;
+
+      const backoffMs = Math.min(
+        getRetryAfterMs(err) ?? BASE_BACKOFF_MS * 2 ** attempt,
+        MAX_BACKOFF_MS
+      );
+      logger.warn({ status, attempt: attempt + 1, backoffMs }, '[PdfClient] Throttled, retrying');
+      await sleep(backoffMs);
+    }
+  }
 }
 
 function sleep(ms: number): Promise<void> {

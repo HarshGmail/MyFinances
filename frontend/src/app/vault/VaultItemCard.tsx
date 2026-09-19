@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Copy, Eye, EyeOff, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, Eye, EyeOff, Pencil, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import {
   getItemSubtitle,
   getItemTitle,
   getPopulatedFields,
+  hasCardFace,
   maskValue,
 } from './vaultTypes';
 
@@ -22,9 +23,12 @@ interface VaultItemCardProps {
   onEdit: (item: VaultDecryptedItem) => void;
   onDelete: (item: VaultDecryptedItem) => void;
   onShare?: (item: VaultDecryptedItem) => void;
+  isSelectable?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (item: VaultDecryptedItem) => void;
+  ownershipMark?: { isMine: boolean; label: string };
 }
 
-const FACE_CATEGORIES = ['card', 'bank'];
 const FACE_SECRET_FIELD: Record<string, string> = {
   card: 'cardNumber',
   bank: 'accountNumber',
@@ -37,7 +41,16 @@ function copyToClipboard(value: string, label: string) {
     .catch(() => toast.error(`Could not copy ${label.toLowerCase()}`));
 }
 
-export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCardProps) {
+export function VaultItemCard({
+  item,
+  onEdit,
+  onDelete,
+  onShare,
+  isSelectable,
+  isSelected,
+  onToggleSelect,
+  ownershipMark,
+}: VaultItemCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [revealedFields, setRevealedFields] = useState<string[]>([]);
   const definition = getCategoryDef(item.category);
@@ -45,7 +58,7 @@ export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCard
   const title = getItemTitle(item.category, item.content);
   const subtitle = getItemSubtitle(item.category, item.content);
   const fields = getPopulatedFields(item.category, item.content);
-  const hasFace = FACE_CATEGORIES.includes(item.category);
+  const hasFace = hasCardFace(item.category);
 
   const toggleReveal = (name: string) => {
     setRevealedFields((current) =>
@@ -178,37 +191,79 @@ export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCard
       </>
     );
 
+    const activate = () =>
+      isSelectable && onToggleSelect ? onToggleSelect(item) : setIsExpanded((current) => !current);
+
     return (
       <div className="space-y-2">
         <div
           role="button"
           tabIndex={0}
-          aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((current) => !current)}
+          aria-expanded={isSelectable ? undefined : isExpanded}
+          aria-pressed={isSelectable ? isSelected : undefined}
+          onClick={activate}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              setIsExpanded((current) => !current);
+              activate();
             }
           }}
-          className="w-full max-w-[21rem] cursor-pointer rounded-xl transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-[0.99] sm:hover:-translate-y-0.5"
+          className={`relative w-full max-w-[21rem] cursor-pointer rounded-xl transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-[0.99] sm:hover:-translate-y-0.5 ${
+            isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+          }`}
         >
-          <Face content={item.content} isNumberRevealed={isNumberRevealed} actions={faceActions} />
+          <Face
+            content={item.content}
+            isNumberRevealed={isNumberRevealed}
+            actions={isSelectable ? undefined : faceActions}
+            marker={
+              ownershipMark && (
+                <span
+                  title={ownershipMark.label}
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    ownershipMark.isMine ? 'bg-emerald-400' : 'bg-sky-400'
+                  }`}
+                >
+                  <span className="sr-only">{ownershipMark.label}</span>
+                </span>
+              )
+            }
+          />
+          {isSelectable && (
+            <span
+              aria-hidden
+              className={`absolute inset-0 flex items-start justify-start rounded-xl p-2.5 transition-colors ${
+                isSelected ? 'bg-primary/10' : 'bg-black/25'
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-md border-2 ${
+                  isSelected
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-white/80 bg-black/30'
+                }`}
+              >
+                {isSelected && <Check className="h-4 w-4" />}
+              </span>
+            </span>
+          )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsExpanded((current) => !current)}
-          className="flex items-center gap-1 rounded px-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          />
-          {isExpanded ? 'Hide details' : 'Show all details'}
-        </button>
+        {!isSelectable && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="flex items-center gap-1 rounded px-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            />
+            {isExpanded ? 'Hide details' : 'Show all details'}
+          </button>
+        )}
 
-        {isExpanded && (
-          <Card className="max-w-[42rem]">
+        {isExpanded && !isSelectable && (
+          <Card>
             <CardContent className="py-2">{detailRows}</CardContent>
           </Card>
         )}
@@ -217,31 +272,61 @@ export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCard
   }
 
   return (
-    <Card>
+    <Card className={isSelected ? 'ring-2 ring-primary' : undefined}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
-            aria-expanded={isExpanded}
-            onClick={() => setIsExpanded((current) => !current)}
+            aria-expanded={isSelectable ? undefined : isExpanded}
+            aria-pressed={isSelectable ? isSelected : undefined}
+            onClick={() =>
+              isSelectable && onToggleSelect
+                ? onToggleSelect(item)
+                : setIsExpanded((current) => !current)
+            }
             className="flex items-start gap-3 min-w-0 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
-              <CategoryIcon className="h-4 w-4" />
-            </div>
+            {isSelectable ? (
+              <div
+                aria-hidden
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 ${
+                  isSelected
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-transparent'
+                }`}
+              >
+                {isSelected && <Check className="h-4 w-4" />}
+              </div>
+            ) : (
+              <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+                <CategoryIcon className="h-4 w-4" />
+              </div>
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
+                {ownershipMark && (
+                  <span
+                    title={ownershipMark.label}
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                      ownershipMark.isMine ? 'bg-emerald-500' : 'bg-sky-500'
+                    }`}
+                  >
+                    <span className="sr-only">{ownershipMark.label}</span>
+                  </span>
+                )}
                 <span className="font-semibold truncate">{title}</span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                />
+                {!isSelectable && (
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
+                )}
               </div>
               {subtitle && <div className="text-sm text-muted-foreground truncate">{subtitle}</div>}
             </div>
           </button>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className={`flex items-center gap-1 shrink-0 ${isSelectable ? 'hidden' : ''}`}>
             <Button
               size="sm"
               variant="ghost"
@@ -275,7 +360,7 @@ export function VaultItemCard({ item, onEdit, onDelete, onShare }: VaultItemCard
           </div>
         </div>
       </CardHeader>
-      {isExpanded && (
+      {isExpanded && !isSelectable && (
         <CardContent className="pt-0">
           {fields.length === 0 ? (
             <p className="text-sm text-muted-foreground">No details saved yet.</p>

@@ -16,7 +16,7 @@ export default function RefreshIndicator({
         title="Fetching the latest prices"
       >
         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        <span className="hidden sm:inline">Refreshing…</span>
+        <span>Refreshing…</span>
       </span>
     );
   }

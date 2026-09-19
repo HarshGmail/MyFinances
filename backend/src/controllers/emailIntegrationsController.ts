@@ -5,17 +5,14 @@ import database from '../database';
 import { fundNameSimilarity, lookupMFAPIScheme } from '../utils/fundNameMatch';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { GmailClient } from '../services/gmailService';
-import { parseCdslMFTransactions } from '../services/cdslParser';
+import { parseCdslMFTransactions, ParsedMFTransaction } from '../services/cdslParser';
 import { ParsedStockHolding } from '../services/cdslStocksParser';
-import { parseSafeGoldTransactions } from '../services/safegoldParser';
+import { parseSafeGoldTransactions, ParsedGoldTransaction } from '../services/safegoldParser';
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
-import {
-  isPdfServiceAvailable,
-  uploadPdf,
-  submitPdfJobByIds,
-  waitForPdfJob,
-} from '../services/pdfParsingClient';
+import { isPdfServiceAvailable } from '../services/pdfParsingClient';
+import { parsePdfBatch, PdfBatchResult } from '../services/emailPdfParsing';
+import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { decrypt } from '../utils/encryption';
 import {
   loadCustomPdfPasswords,
@@ -42,6 +39,29 @@ interface RustGoldTx {
   amount: number;
   gold_price: number;
   tax: number;
+}
+
+function mfTransactionFromRust(tx: RustMfTx): ParsedMFTransaction {
+  return {
+    date: new Date(tx.date),
+    fundName: tx.fund_name,
+    type: tx.transaction_type as ParsedMFTransaction['type'],
+    numOfUnits: tx.units,
+    fundPrice: tx.nav,
+    amount: tx.amount,
+  };
+}
+
+function goldTransactionFromRust(tx: RustGoldTx): ParsedGoldTransaction {
+  return {
+    date: new Date(tx.date),
+    type: tx.transaction_type as ParsedGoldTransaction['type'],
+    quantity: tx.grams,
+    amount: tx.amount,
+    goldPrice: tx.gold_price,
+    tax: tx.tax,
+    platform: 'SafeGold',
+  };
 }
 
 // ─── Wake PDF Parser ──────────────────────────────────────────────────────────
@@ -412,7 +432,6 @@ async function runSyncInBackground(
   integrations: Record<string, unknown>[],
   db: ReturnType<typeof database.getDb>
 ) {
-  const useRustService = isPdfServiceAvailable();
   const cdslPassword = derivesCdslPassword(userDoc.panNumber as string | undefined);
   const safegoldPassword = derivesSafeGoldPassword(
     userDoc.name as string,
@@ -472,54 +491,29 @@ async function runSyncInBackground(
         logger.info({ account: accountTag, count: cdslPdfs.length }, '[Sync] CDSL PDFs fetched');
 
         if (cdslPdfs.length > 0) {
-          if (useRustService) {
-            try {
-              const fileIds = await Promise.all(
-                cdslPdfs.map((pdf) => uploadPdf(pdf, cdslPasswords))
-              );
-              const rustJobId = await submitPdfJobByIds('cdsl_cas', fileIds);
-              const rustResult = await waitForPdfJob(rustJobId);
-              const mfCount = rustResult?.transactions?.length ?? 0;
-              if (rustResult?.transactions) {
-                const mfTxs = (rustResult.transactions as RustMfTx[]).map((tx) => ({
-                  date: new Date(tx.date),
-                  fundName: tx.fund_name,
-                  type: tx.transaction_type as 'credit' | 'debit',
-                  numOfUnits: tx.units,
-                  fundPrice: tx.nav,
-                  amount: tx.amount,
-                }));
-                allMFTransactions.push(...(mfTxs as typeof allMFTransactions));
-                logger.info(
-                  { account: accountTag, count: mfTxs.length },
-                  '[Sync] CDSL parsed via Rust service'
-                );
-              }
-              if (mfCount === 0) {
-                // 0 transactions from N PDFs usually means the password was wrong.
-                errors.push(
-                  `[${accountTag}] CDSL: parsed ${cdslPdfs.length} PDF(s) but found 0 transactions. ` +
-                    `If these are password-protected, the password may be incorrect. ` +
-                    describeAttemptedPasswords(cdslPasswords, {
-                      pan: cdslPassword,
-                      custom: customPasswords,
-                    })
-                );
-              }
-            } catch (rustErr) {
-              const msg =
-                `[${accountTag}] CDSL Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}. ` +
-                describeAttemptedPasswords(cdslPasswords, {
-                  pan: cdslPassword,
-                  custom: customPasswords,
-                });
-              errors.push(msg);
-              logger.error(
-                { err: rustErr, account: accountTag },
-                '[Sync] Rust service failed for CDSL'
-              );
-            }
-          }
+          const outcome = await parsePdfBatch({
+            parserType: 'cdsl_cas',
+            buffers: cdslPdfs,
+            passwords: cdslPasswords,
+            fromRust: mfTransactionFromRust,
+            parseText: parseCdslMFTransactions,
+          });
+          allMFTransactions.push(...outcome.transactions);
+          logger.info(
+            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+            '[Sync] CDSL parsed'
+          );
+          errors.push(
+            ...describePdfBatchProblems(
+              `[${accountTag}] CDSL`,
+              cdslPdfs.length,
+              outcome,
+              describeAttemptedPasswords(cdslPasswords, {
+                pan: cdslPassword,
+                custom: customPasswords,
+              })
+            )
+          );
         }
       } catch (e) {
         const msg = `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`;
@@ -550,54 +544,30 @@ async function runSyncInBackground(
         );
 
         if (sgPdfs.length > 0) {
-          if (useRustService) {
-            try {
-              const fileIds = await Promise.all(sgPdfs.map((pdf) => uploadPdf(pdf, sgPasswords)));
-              const rustJobId = await submitPdfJobByIds('safe_gold', fileIds);
-              const rustResult = await waitForPdfJob(rustJobId);
-              const sgCount = rustResult?.transactions?.length ?? 0;
-              if (rustResult?.transactions) {
-                const goldTxs = (rustResult.transactions as RustGoldTx[]).map((tx) => ({
-                  date: new Date(tx.date),
-                  type: tx.transaction_type as 'credit' | 'debit',
-                  quantity: tx.grams,
-                  amount: tx.amount,
-                  goldPrice: tx.gold_price,
-                  tax: tx.tax,
-                  platform: 'SafeGold' as const,
-                }));
-                allGoldTransactions.push(...(goldTxs as typeof allGoldTransactions));
-                logger.info(
-                  { account: accountTag, count: goldTxs.length },
-                  '[Sync] SafeGold parsed via Rust service'
-                );
-              }
-              if (sgCount === 0) {
-                errors.push(
-                  `[${accountTag}] SafeGold: parsed ${sgPdfs.length} PDF(s) but found 0 transactions. ` +
-                    `If these are password-protected, the password may be incorrect. ` +
-                    describeAttemptedPasswords(sgPasswords, {
-                      derived: safegoldPassword,
-                      derivedLabel: 'first 4 of name + last 4 of phone',
-                      custom: customPasswords,
-                    })
-                );
-              }
-            } catch (rustErr) {
-              const msg =
-                `[${accountTag}] SafeGold statement Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}. ` +
-                describeAttemptedPasswords(sgPasswords, {
-                  derived: safegoldPassword,
-                  derivedLabel: 'first 4 of name + last 4 of phone',
-                  custom: customPasswords,
-                });
-              errors.push(msg);
-              logger.error(
-                { err: rustErr, account: accountTag },
-                '[Sync] Rust service failed for SafeGold statement'
-              );
-            }
-          }
+          const outcome = await parsePdfBatch({
+            parserType: 'safe_gold',
+            buffers: sgPdfs,
+            passwords: sgPasswords,
+            fromRust: goldTransactionFromRust,
+            parseText: parseSafeGoldTransactions,
+          });
+          allGoldTransactions.push(...outcome.transactions);
+          logger.info(
+            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+            '[Sync] SafeGold statement parsed'
+          );
+          errors.push(
+            ...describePdfBatchProblems(
+              `[${accountTag}] SafeGold statement`,
+              sgPdfs.length,
+              outcome,
+              describeAttemptedPasswords(sgPasswords, {
+                derived: safegoldPassword,
+                derivedLabel: 'first 4 of name + last 4 of phone',
+                custom: customPasswords,
+              })
+            )
+          );
         }
       } catch (e) {
         const msg = `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`;
@@ -611,7 +581,7 @@ async function runSyncInBackground(
         );
       }
 
-      // ── SafeGold invoices (Rust service) ─────────────────────────────────
+      // ── SafeGold invoices ─────────────────────────────────────────────────
       try {
         logger.info(
           { account: accountTag, afterDate: afterDate?.toISOString() },
@@ -627,43 +597,31 @@ async function runSyncInBackground(
         );
 
         if (sgInvoicePdfs.length > 0) {
-          if (useRustService) {
-            try {
-              const fileIds = await Promise.all(
-                sgInvoicePdfs.map((pdf) => uploadPdf(pdf, buildPasswordList(customPasswords)))
-              );
-              const rustJobId = await submitPdfJobByIds('safe_gold_invoice', fileIds);
-              const rustResult = await waitForPdfJob(rustJobId);
-              if (rustResult?.transactions) {
-                const goldTxs = (rustResult.transactions as RustGoldTx[]).map((tx) => ({
-                  date: new Date(tx.date),
-                  type: tx.transaction_type as 'credit' | 'debit',
-                  quantity: tx.grams,
-                  amount: tx.amount,
-                  goldPrice: tx.gold_price,
-                  tax: tx.tax,
-                  platform: 'SafeGold' as const,
-                }));
-                allGoldTransactions.push(...(goldTxs as typeof allGoldTransactions));
-                logger.info(
-                  { account: accountTag, count: goldTxs.length },
-                  '[Sync] SafeGold invoices parsed via Rust service'
-                );
-              }
-            } catch (rustErr) {
-              const msg = `[${accountTag}] SafeGold invoice Rust parse error: ${rustErr instanceof Error ? rustErr.message : String(rustErr)}`;
-              errors.push(msg);
-              logger.error(
-                { err: rustErr, account: accountTag },
-                '[Sync] Rust service failed for SafeGold invoices'
-              );
-            }
-          } else {
-            logger.warn(
-              { account: accountTag },
-              '[Sync] Rust PDF service not configured — SafeGold invoices skipped'
-            );
-          }
+          const invoicePasswords = buildPasswordList(customPasswords);
+          const outcome = await parsePdfBatch({
+            parserType: 'safe_gold_invoice',
+            buffers: sgInvoicePdfs,
+            passwords: invoicePasswords,
+            fromRust: goldTransactionFromRust,
+            parseText: (text) => {
+              const invoice = parseSafeGoldInvoice(text);
+              return invoice ? [invoice] : [];
+            },
+          });
+          allGoldTransactions.push(...outcome.transactions);
+          logger.info(
+            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+            '[Sync] SafeGold invoices parsed'
+          );
+          errors.push(
+            ...describePdfBatchProblems(
+              `[${accountTag}] SafeGold invoice`,
+              sgInvoicePdfs.length,
+              outcome,
+              describeAttemptedPasswords(invoicePasswords, { custom: customPasswords }),
+              { zeroTransactionsIsExpected: true }
+            )
+          );
         }
       } catch (e) {
         const msg = `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`;
@@ -1058,6 +1016,42 @@ function describeAttemptedPasswords(
     return `"${p}"`;
   });
   return `Tried ${labelled.length} password(s): ${labelled.join(', ')}`;
+}
+
+function describePdfBatchProblems(
+  label: string,
+  pdfCount: number,
+  outcome: PdfBatchResult<unknown>,
+  attemptedPasswords: string,
+  { zeroTransactionsIsExpected = false } = {}
+): string[] {
+  const problems: string[] = [];
+  const rustFailureNote = outcome.rustError
+    ? ` (PDF service unavailable: ${errorMessage(outcome.rustError)}; parsed locally instead)`
+    : '';
+
+  if (outcome.lockedPdfCount > 0) {
+    problems.push(
+      `${label}: could not open ${outcome.lockedPdfCount} of ${pdfCount} PDF(s) — wrong password.${rustFailureNote} ${attemptedPasswords}`
+    );
+  }
+  if (outcome.failedPdfCount > 0) {
+    problems.push(
+      `${label}: ${outcome.failedPdfCount} of ${pdfCount} PDF(s) could not be read.${rustFailureNote}`
+    );
+  }
+  const everyPdfAccountedFor = outcome.lockedPdfCount + outcome.failedPdfCount === pdfCount;
+  if (outcome.transactions.length === 0 && !everyPdfAccountedFor && !zeroTransactionsIsExpected) {
+    problems.push(
+      `${label}: parsed ${pdfCount} PDF(s) but found 0 transactions. ` +
+        `If these are password-protected, the password may be incorrect. ${attemptedPasswords}`
+    );
+  }
+  return problems;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 async function deduplicateMF(

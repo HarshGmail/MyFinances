@@ -18,11 +18,19 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { decryptItem, isVaultCryptoAvailable } from '@/utils/vaultCrypto';
+import { OwnershipLegend } from '../../OwnershipLegend';
 import { useVaultSession } from '../../useVaultSession';
+import { VaultFilterBar } from '../../VaultFilterBar';
 import { VaultItemCard } from '../../VaultItemCard';
 import { VaultLocked } from '../../VaultLocked';
 import { VaultUnsupported } from '../../VaultUnsupported';
-import { VaultDecryptedItem, getItemTitle } from '../../vaultTypes';
+import { EMPTY_VAULT_FILTERS, applyVaultFilters, buildFilterOptions } from '../../vaultFilters';
+import {
+  VAULT_FACE_GRID_CLASS,
+  VaultDecryptedItem,
+  getItemTitle,
+  hasCardFace,
+} from '../../vaultTypes';
 import { ShareWalletDialog } from '../ShareWalletDialog';
 import { WalletMembersDialog } from '../WalletMembersDialog';
 import { useWalletActions } from '../useWalletActions';
@@ -31,6 +39,8 @@ import { useWalletNames } from '../useWalletNames';
 interface WalletDetailPageProps {
   params: Promise<{ walletId: string }>;
 }
+
+const YOUR_ENTRIES_LABEL = 'Your entries';
 
 export default function WalletDetailPage({ params }: WalletDetailPageProps) {
   const { walletId } = use(params);
@@ -52,6 +62,7 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [pendingDeletion, setPendingDeletion] = useState<VaultDecryptedItem | null>(null);
+  const [filters, setFilters] = useState(EMPTY_VAULT_FILTERS);
 
   const { data: members, isLoading: isLoadingMembers } = useWalletMembersQuery(
     isMembersOpen ? walletId : null
@@ -110,6 +121,29 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
     if (!wallet || !isUnlocked) return;
     loadItems(wallet);
   }, [wallet, isUnlocked, loadItems]);
+
+  const ownerLabelOf = useCallback(
+    (item: VaultDecryptedItem) => {
+      const contributor = contributors[item.id];
+      if (!contributor) return '';
+      return contributor.isMine ? YOUR_ENTRIES_LABEL : contributor.name;
+    },
+    [contributors]
+  );
+
+  const filterOptions = useMemo(
+    () => buildFilterOptions(items, ownerLabelOf),
+    [items, ownerLabelOf]
+  );
+
+  const visibleItems = useMemo(
+    () => applyVaultFilters(items, filters, ownerLabelOf),
+    [items, filters, ownerLabelOf]
+  );
+
+  const isGridLayout =
+    visibleItems.length > 0 && visibleItems.every((item) => hasCardFace(item.category));
+  const hasOthersEntries = Object.values(contributors).some((contributor) => !contributor.isMine);
 
   const handleDelete = async () => {
     if (!pendingDeletion || !wallet) return;
@@ -216,26 +250,64 @@ export default function WalletDetailPage({ params }: WalletDetailPageProps) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {items.map((item) => {
-            const contributor = contributors[item.id];
-            const canRemove = wallet?.isOwner || contributor?.isMine;
-            return (
-              <div key={item.id} className="space-y-1">
-                <p className="text-xs text-muted-foreground px-1">
-                  {contributor?.isMine ? 'Shared by you' : `Shared by ${contributor?.name || '—'}`}
-                </p>
-                <VaultItemCard
-                  item={item}
-                  onEdit={() => toast.info('Edit this entry in your own vault, then re-share it')}
-                  onDelete={
-                    canRemove
-                      ? setPendingDeletion
-                      : () => toast.error('Only the person who shared this can remove it')
-                  }
-                />
-              </div>
-            );
-          })}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <VaultFilterBar
+              filters={filters}
+              onChange={setFilters}
+              bankLabel="Bank"
+              banks={filterOptions.banks}
+              networks={filterOptions.networks}
+              owners={filterOptions.owners}
+              matchCount={visibleItems.length}
+              totalCount={items.length}
+            />
+            <OwnershipLegend
+              mineLabel={YOUR_ENTRIES_LABEL}
+              othersLabel="Shared by others"
+              hasOthers={hasOthersEntries}
+            />
+          </div>
+
+          {visibleItems.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <p className="font-medium">Nothing matches these filters</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => setFilters(EMPTY_VAULT_FILTERS)}
+                >
+                  Clear filters
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className={isGridLayout ? VAULT_FACE_GRID_CLASS : 'space-y-4'}>
+              {visibleItems.map((item) => {
+                const contributor = contributors[item.id];
+                const canRemove = wallet?.isOwner || contributor?.isMine;
+                return (
+                  <VaultItemCard
+                    key={item.id}
+                    item={item}
+                    ownershipMark={{
+                      isMine: Boolean(contributor?.isMine),
+                      label: contributor?.isMine
+                        ? YOUR_ENTRIES_LABEL
+                        : `Shared by ${contributor?.name || 'someone'}`,
+                    }}
+                    onEdit={() => toast.info('Edit this entry in your own vault, then re-share it')}
+                    onDelete={
+                      canRemove
+                        ? setPendingDeletion
+                        : () => toast.error('Only the person who shared this can remove it')
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
