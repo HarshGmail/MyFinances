@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ObjectId } from 'mongodb';
+import { GOLD_CATEGORIES } from '../services/safegoldParser';
 
 // Zod schema for validation
 export const digitalGoldSchema = z.object({
@@ -7,11 +8,14 @@ export const digitalGoldSchema = z.object({
   userId: z.instanceof(ObjectId),
   type: z.enum(['credit', 'debit']),
   date: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
-  goldPrice: z.number().positive(),
+  goldPrice: z.number().nonnegative(),
   quantity: z.number().positive(),
   amount: z.number().nonnegative(),
   tax: z.number().nonnegative(),
   platform: z.string().optional(),
+  category: z.enum(GOLD_CATEGORIES).optional(),
+  borrower: z.string().optional(),
+  leasedGrams: z.number().positive().optional(),
 });
 
 // TypeScript type for digitalGold

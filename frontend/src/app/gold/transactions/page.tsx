@@ -8,6 +8,8 @@ import { Receipt, Edit3, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useDeleteGoldTransactionMutation } from '@/api/mutations/gold'; // adjust path if needed
+import { GoldCategory } from '@/api/dataInterface';
+import { GOLD_CATEGORY_LABELS, getGoldCategory } from '@/utils/goldCategories';
 
 interface GoldTransaction {
   _id?: string;
@@ -16,8 +18,19 @@ interface GoldTransaction {
   date?: string;
   quantity?: number;
   goldPrice?: number;
-  type: string;
+  type: 'credit' | 'debit';
   tax?: number;
+  category?: GoldCategory;
+  borrower?: string;
+}
+
+const PURCHASE_LABEL = GOLD_CATEGORY_LABELS.purchase;
+
+function netGrams(rows: Row[]): number {
+  return rows.reduce((sum, row) => {
+    if (typeof row.quantity !== 'number') return sum;
+    return sum + (row.type === 'credit' ? row.quantity : -row.quantity);
+  }, 0);
 }
 
 export default function GoldTransactionsPage() {
@@ -30,7 +43,14 @@ export default function GoldTransactionsPage() {
   const columns: Column[] = [
     { id: 'platform', label: 'Platform', type: 'string', allowFilter: true },
     { id: 'date', label: 'Date', type: 'date', allowFilter: true },
-    { id: 'quantity', label: 'Net Qty', type: 'number', units: 'gms', showTotal: true },
+    {
+      id: 'quantity',
+      label: 'Net Qty',
+      type: 'number',
+      units: 'gms',
+      showTotal: true,
+      customTotal: (rows) => `${netGrams(rows).toFixed(4)} gms`,
+    },
     {
       id: 'goldPrice',
       label: 'Purchase Cost/gm',
@@ -38,13 +58,16 @@ export default function GoldTransactionsPage() {
       units: 'rupee',
       showTotal: true,
       customTotal: (rows) => {
-        const totalInvestment = rows.reduce((sum, row) => sum + (row.amount ?? 0), 0);
-        const totalQty = rows.reduce((sum, row) => sum + (row.quantity ?? 0), 0);
+        const purchases = rows.filter((row) => row.category === PURCHASE_LABEL);
+        const totalInvestment = purchases.reduce((sum, row) => sum + (row.amount ?? 0), 0);
+        const totalQty = purchases.reduce((sum, row) => sum + (row.quantity ?? 0), 0);
         if (totalQty === 0) return '-';
         const avg = totalInvestment / totalQty;
         return `₹${avg.toFixed(2)}`;
       },
     },
+    { id: 'category', label: 'Category', type: 'string', allowFilter: true },
+    { id: 'borrower', label: 'Leased To', type: 'string', allowFilter: true },
     { id: 'type', label: 'Type', type: 'string', allowFilter: true, className: 'w-32' },
     { id: 'tax', label: 'Tax Paid Index', type: 'number' },
     { id: 'amount', label: 'Invest Amount', type: 'number', showTotal: true, units: 'rupee' },
@@ -58,7 +81,9 @@ export default function GoldTransactionsPage() {
       amount: tx.amount || 0,
       date: tx.date || '-',
       quantity: tx.quantity ?? '-',
-      goldPrice: tx.goldPrice ?? '-',
+      goldPrice: tx.goldPrice || '-',
+      category: GOLD_CATEGORY_LABELS[getGoldCategory(tx)],
+      borrower: tx.borrower || '-',
       type: tx.type,
       tax: tx.tax ?? '-',
     }));

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../configs';
-import { GoldTransaction, SafeGoldRatesResponse } from '@/api/dataInterface';
+import { GoldLeasesResponse, GoldTransaction, SafeGoldRatesResponse } from '@/api/dataInterface';
 
 export function useGoldTransactionsQuery() {
   return useQuery<GoldTransaction[]>({
@@ -10,6 +10,17 @@ export function useGoldTransactionsQuery() {
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // Uncomment to cache for 5 minutes
+  });
+}
+
+export function useGoldLeasesQuery() {
+  return useQuery<GoldLeasesResponse>({
+    queryKey: ['goldLeases'],
+    queryFn: async () => {
+      const response = await apiRequest({ endpoint: '/gold/leases', method: 'GET' });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

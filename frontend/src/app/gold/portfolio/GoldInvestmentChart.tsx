@@ -3,6 +3,7 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAppStore } from '@/store/useAppStore';
 import type { GoldTransaction, SafeGoldRatesResponse } from '@/api/dataInterface';
+import { getGoldCategory } from '@/utils/goldCategories';
 
 const MONTH_NAMES = [
   'Jan',
@@ -44,7 +45,7 @@ export default function GoldInvestmentChart({
 
     const monthMap = new Map<string, MonthGroup>();
     [...transactions]
-      .filter((tx) => tx.type === 'credit')
+      .filter((tx) => getGoldCategory(tx) === 'purchase')
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .forEach((tx) => {
         const d = new Date(tx.date);

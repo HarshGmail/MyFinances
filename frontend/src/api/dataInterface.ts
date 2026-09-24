@@ -244,6 +244,8 @@ export interface FixedDepositPayload {
   rateOfInterest: number;
 }
 
+export type GoldCategory = 'purchase' | 'sale' | 'lease_interest' | 'lease_tds';
+
 export interface GoldTransaction {
   id: string;
   type: 'credit' | 'debit';
@@ -253,6 +255,9 @@ export interface GoldTransaction {
   amount: number;
   tax: number;
   platform?: string;
+  category?: GoldCategory;
+  borrower?: string;
+  leasedGrams?: number;
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -382,6 +387,9 @@ export interface ParsedGoldTransaction {
   tax: number;
   type: 'credit' | 'debit';
   platform: string;
+  category?: GoldCategory;
+  borrower?: string;
+  leasedGrams?: number;
 }
 
 export interface ParsedMFTransaction {
@@ -426,6 +434,38 @@ export interface RecurringDepositPayload {
 export interface SafeGoldRate {
   date: string;
   rate: string;
+}
+
+export interface GoldLeasePayout {
+  date: string;
+  grams: number;
+}
+
+export interface GoldLease {
+  _id: string;
+  commitId: string;
+  borrower: string;
+  leasedGrams: number;
+  earnedGrams: number;
+  yieldPercent: number;
+  startDate: string;
+  endDate: string;
+  tenureDays: number;
+  remainingPayouts: number;
+  payouts: GoldLeasePayout[];
+  statementMonth: string | null;
+}
+
+export interface GoldAccountSummary {
+  asOf: string;
+  totalGold: number;
+  availableGold: number;
+  leasedGold: number;
+}
+
+export interface GoldLeasesResponse {
+  leases: GoldLease[];
+  accountSummary: GoldAccountSummary | null;
 }
 
 export interface SafeGoldRatesResponse {

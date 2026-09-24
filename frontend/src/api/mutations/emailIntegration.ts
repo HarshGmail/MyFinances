@@ -43,6 +43,7 @@ export function useEmailImportMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mfTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['goldTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['goldLeases'] });
       queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['cryptoTransactions'] });
     },

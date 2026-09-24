@@ -19,6 +19,7 @@ import {
   PortfolioMetrics,
   OwnedStock,
 } from './types';
+import { netGoldInvested, totalGoldGrams } from '@/utils/goldCategories';
 
 export const usePipData = (selectedCoins: string[], selectedStocks: string[] = []) => {
   // Crypto data queries
@@ -188,14 +189,8 @@ export const usePipData = (selectedCoins: string[], selectedStocks: string[] = [
   const goldPortfolioData: GoldPortfolioData | null = useMemo(() => {
     if (!goldTransactions) return null;
 
-    const totalGold = goldTransactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.quantity : -tx.quantity),
-      0
-    );
-    const totalInvested = goldTransactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
-      0
-    );
+    const totalGold = totalGoldGrams(goldTransactions);
+    const totalInvested = netGoldInvested(goldTransactions);
 
     let currentGoldRate = 0;
     if (goldRatesData?.data && goldRatesData.data.length > 0) {

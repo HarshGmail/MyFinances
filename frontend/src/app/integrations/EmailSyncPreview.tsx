@@ -5,8 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
-import { EmailSyncPreview } from '@/api/dataInterface';
+import { EmailSyncPreview, GoldCategory } from '@/api/dataInterface';
 import { useUrlBoolean } from '@/utils/useUrlState';
+import { getGoldCategory } from '@/utils/goldCategories';
+
+const GOLD_PREVIEW_LABELS: Record<GoldCategory, string> = {
+  purchase: 'Buy',
+  sale: 'Sell',
+  lease_interest: 'Interest',
+  lease_tds: 'TDS',
+};
 
 function PreviewTable({
   title,
@@ -145,14 +153,18 @@ export default function EmailSyncPreviewCard({
                       {format(new Date(tx.date), 'dd MMM yy')}
                     </td>
                     <td className="p-2 text-right">{tx.quantity.toFixed(4)}</td>
-                    <td className="p-2 text-right">₹{tx.goldPrice.toLocaleString('en-IN')}</td>
-                    <td className="p-2 text-right">₹{tx.amount.toLocaleString('en-IN')}</td>
+                    <td className="p-2 text-right">
+                      {tx.goldPrice ? `₹${tx.goldPrice.toLocaleString('en-IN')}` : '—'}
+                    </td>
+                    <td className="p-2 text-right">
+                      {tx.amount ? `₹${tx.amount.toLocaleString('en-IN')}` : '—'}
+                    </td>
                     <td className="p-2 text-center">
                       <Badge
                         variant={tx.type === 'credit' ? 'default' : 'secondary'}
                         className="text-xs px-1.5 py-0"
                       >
-                        {tx.type === 'credit' ? 'Buy' : 'Sell'}
+                        {GOLD_PREVIEW_LABELS[getGoldCategory(tx)]}
                       </Badge>
                     </td>
                   </tr>

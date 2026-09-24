@@ -43,6 +43,7 @@ export async function getCapitalGains(req: Request, res: Response) {
       date: doc.date,
       qty: doc.quantity,
       costPerUnit: doc.goldPrice,
+      isNonSaleOutflow: doc.category === 'lease_tds',
     }));
     const goldFifo = runFifo(goldTxs, 'gold');
     const goldByFY = computeAssetFYGains(goldFifo.realizedGains, 'gold');

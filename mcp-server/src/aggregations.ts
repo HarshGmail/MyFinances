@@ -89,6 +89,7 @@ export interface GoldTx {
   amount: number;
   tax?: number;
   platform?: string;
+  category?: string;
 }
 
 export interface GoldSummaryRow {
@@ -96,6 +97,8 @@ export interface GoldSummaryRow {
   grams_held: number;
   total_bought_grams: number;
   total_sold_grams: number;
+  lease_interest_grams: number;
+  lease_tds_grams: number;
   total_invested: number;
   total_proceeds: number;
   net_invested: number;
@@ -121,11 +124,17 @@ export function summarizeGoldTransactions(txs: GoldTx[]): GoldSummaryRow[] {
     let invested = 0;
     let proceeds = 0;
     let tax = 0;
+    let leaseInterest = 0;
+    let leaseTds = 0;
     let firstDate = group[0].date;
     let lastDate = group[0].date;
 
     for (const tx of group) {
-      if (isCredit(tx)) {
+      if (tx.category === 'lease_interest') {
+        leaseInterest += tx.quantity;
+      } else if (tx.category === 'lease_tds') {
+        leaseTds += tx.quantity;
+      } else if (isCredit(tx)) {
         bought += tx.quantity;
         invested += tx.amount;
         tax += tx.tax ?? 0;
@@ -139,9 +148,11 @@ export function summarizeGoldTransactions(txs: GoldTx[]): GoldSummaryRow[] {
 
     rows.push({
       platform,
-      grams_held: round(bought - sold, 4),
+      grams_held: round(bought - sold + leaseInterest - leaseTds, 4),
       total_bought_grams: round(bought, 4),
       total_sold_grams: round(sold, 4),
+      lease_interest_grams: round(leaseInterest, 4),
+      lease_tds_grams: round(leaseTds, 4),
       total_invested: round(invested),
       total_proceeds: round(proceeds),
       net_invested: round(invested - proceeds),

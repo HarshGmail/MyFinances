@@ -16,12 +16,15 @@ export interface PdfBatchResult<T> {
   failedPdfCount: number;
 }
 
-interface PdfBatchRequest<TRust, T> {
+interface LocalPdfBatchRequest<T> {
   parserType: ParserType;
   buffers: Buffer[];
   passwords: string[];
-  fromRust: (tx: TRust) => T;
   parseText: (text: string) => T[];
+}
+
+interface PdfBatchRequest<TRust, T> extends LocalPdfBatchRequest<T> {
+  fromRust: (tx: TRust) => T;
 }
 
 export async function parsePdfBatch<TRust, T>(
@@ -50,11 +53,11 @@ export async function parsePdfBatch<TRust, T>(
     }
   }
 
-  return { ...(await parseLocally(request)), rustError };
+  return { ...(await parsePdfBatchLocally(request)), rustError };
 }
 
-async function parseLocally<TRust, T>(
-  request: PdfBatchRequest<TRust, T>
+export async function parsePdfBatchLocally<T>(
+  request: LocalPdfBatchRequest<T>
 ): Promise<PdfBatchResult<T>> {
   const transactions: T[] = [];
   let lockedPdfCount = 0;

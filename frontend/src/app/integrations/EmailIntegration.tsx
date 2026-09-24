@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useUserProfileQuery,
   useEmailIntegrationStatusQuery,
@@ -78,6 +79,7 @@ export default function EmailIntegration({
   }, []);
 
   const { data: syncJobData } = useSyncJobStatusQuery(syncJobId);
+  const queryClient = useQueryClient();
   const isSyncing = isSyncSubmitting || (!!syncJobId && syncJobData?.status === 'processing');
 
   // When the job finishes, lift the results into preview state
@@ -86,6 +88,7 @@ export default function EmailIntegration({
     if (syncJobData.status === 'done' && syncJobData.result) {
       const result = syncJobData.result;
       setPreview(result);
+      queryClient.invalidateQueries({ queryKey: ['goldLeases'] });
       setSyncJobId(null);
       localStorage.removeItem('emailSync_activeJobId');
       const total =
@@ -109,7 +112,7 @@ export default function EmailIntegration({
       localStorage.removeItem('emailSync_activeJobId');
       toast.info('Sync stopped');
     }
-  }, [syncJobData]);
+  }, [syncJobData, queryClient]);
 
   const handleConnect = async () => {
     try {
@@ -302,8 +305,8 @@ export default function EmailIntegration({
               <div className="space-y-1">
                 <p className="font-medium text-foreground">SafeGold (monthly email)</p>
                 <p>
-                  Gold purchase and sale transactions. Password: first 4 letters of your name + last
-                  4 digits of your phone (set in Profile).
+                  Gold purchases, sales, lease interest and TDS. Password: first 4 letters of your
+                  name + last 4 digits of your phone (set in Profile).
                 </p>
               </div>
               <div className="space-y-1">

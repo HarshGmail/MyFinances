@@ -7,11 +7,23 @@ import { getUserFromRequest } from '../utils/jwtHelpers';
 import { GmailClient } from '../services/gmailService';
 import { parseCdslMFTransactions, ParsedMFTransaction } from '../services/cdslParser';
 import { ParsedStockHolding } from '../services/cdslStocksParser';
-import { parseSafeGoldTransactions, ParsedGoldTransaction } from '../services/safegoldParser';
+import {
+  parseSafeGoldTransactions,
+  parseSafeGoldAccountSummary,
+  ParsedGoldTransaction,
+  SafeGoldAccountSummary,
+  LEASE_CATEGORIES,
+  GoldCategory,
+} from '../services/safegoldParser';
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
 import { isPdfServiceAvailable } from '../services/pdfParsingClient';
-import { parsePdfBatch, PdfBatchResult } from '../services/emailPdfParsing';
+import {
+  parsePdfBatch,
+  parsePdfBatchLocally,
+  PdfBatchResult,
+} from '../services/emailPdfParsing';
+import { parseSafeGoldLeaseStatement, ParsedGoldLease } from '../services/safegoldLeaseParser';
 import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { decrypt } from '../utils/encryption';
 import {
@@ -444,6 +456,8 @@ async function runSyncInBackground(
   const allGoldTransactions: ReturnType<typeof parseSafeGoldTransactions> = [];
   const allStockHoldings: ParsedStockHolding[] = [];
   const allCryptoTrades: ParsedCoinDCXTrade[] = [];
+  const allLeases: ParsedGoldLease[] = [];
+  const accountSummaries: SafeGoldAccountSummary[] = [];
   logger.info(
     {
       jobId,
@@ -544,12 +558,15 @@ async function runSyncInBackground(
         );
 
         if (sgPdfs.length > 0) {
-          const outcome = await parsePdfBatch({
+          const outcome = await parsePdfBatchLocally({
             parserType: 'safe_gold',
             buffers: sgPdfs,
             passwords: sgPasswords,
-            fromRust: goldTransactionFromRust,
-            parseText: parseSafeGoldTransactions,
+            parseText: (text) => {
+              const summary = parseSafeGoldAccountSummary(text);
+              if (summary) accountSummaries.push(summary);
+              return parseSafeGoldTransactions(text);
+            },
           });
           allGoldTransactions.push(...outcome.transactions);
           logger.info(
@@ -635,6 +652,44 @@ async function runSyncInBackground(
         );
       }
 
+      // ── SafeGold lease statements ─────────────────────────────────────────
+      try {
+        const leasePdfs = await gmailClient.fetchPdfAttachments(
+          'from:noreply@safegold.in subject:"Lease Monthly Yield Payout" has:attachment',
+          afterDate
+        );
+        logger.info(
+          { account: accountTag, count: leasePdfs.length },
+          '[Sync] SafeGold lease statement PDFs fetched'
+        );
+
+        if (leasePdfs.length > 0) {
+          const leasePasswords = buildPasswordList([safegoldPassword, ...customPasswords]);
+          const outcome = await parsePdfBatchLocally({
+            parserType: 'safe_gold_lease',
+            buffers: leasePdfs,
+            passwords: leasePasswords,
+            parseText: parseSafeGoldLeaseStatement,
+          });
+          allLeases.push(...outcome.transactions);
+          errors.push(
+            ...describePdfBatchProblems(
+              `[${accountTag}] SafeGold lease statement`,
+              leasePdfs.length,
+              outcome,
+              describeAttemptedPasswords(leasePasswords, {
+                derived: safegoldPassword,
+                derivedLabel: 'first 4 of name + last 4 of phone',
+                custom: customPasswords,
+              })
+            )
+          );
+        }
+      } catch (e) {
+        errors.push(`[${accountTag}] SafeGold lease statement fetch error: ${errorMessage(e)}`);
+        logger.error({ err: e, account: accountTag }, '[Sync] SafeGold lease statement error');
+      }
+
       // ── CoinDCX (email body, not PDF — always in Node.js) ─────────────────
       try {
         logger.info(
@@ -689,6 +744,8 @@ async function runSyncInBackground(
     const { newStocks, skippedStocks } = await deduplicateStocks(db, userId, canonicalStocks);
 
     const { newCrypto, skippedCrypto } = await deduplicateCrypto(db, userId, allCryptoTrades);
+
+    await saveGoldLeaseSnapshot(db, userId, allLeases, accountSummaries);
 
     await db
       .collection('emailIntegrations')
@@ -808,8 +865,15 @@ export async function importTransactions(req: Request, res: Response) {
         amount: tx.amount,
         tax: tx.tax ?? 0,
         platform: tx.platform ?? 'SafeGold',
+        category: tx.category,
+        borrower: tx.borrower,
+        leasedGrams: tx.leasedGrams,
       }));
-      const { newGold } = await deduplicateGold(db, userId, goldDocs);
+      const { newGold } = await deduplicateGold(
+        db,
+        userId,
+        goldDocs as unknown as ParsedGoldTransaction[]
+      );
       if (newGold.length > 0) {
         await db.collection('digitalGold').insertMany(newGold.map(docForGold(userId)));
         importedGold = newGold.length;
@@ -1107,42 +1171,75 @@ async function deduplicateMF(
   return { newMF, skippedMF };
 }
 
+const GOLD_DEDUP_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+const GOLD_DEDUP_QTY_TOLERANCE = 0.01;
+const LEASE_DEDUP_QTY_TOLERANCE = 0.00005;
+
+function isLeaseRow(tx: { category?: string }): boolean {
+  return !!tx.category && LEASE_CATEGORIES.includes(tx.category as GoldCategory);
+}
+
+function leaseRowDedupQuery(userId: ObjectId, tx: ParsedGoldTransaction) {
+  return {
+    userId,
+    category: tx.category,
+    borrower: tx.borrower,
+    date: new Date(tx.date),
+    quantity: {
+      $gte: tx.quantity - LEASE_DEDUP_QTY_TOLERANCE,
+      $lte: tx.quantity + LEASE_DEDUP_QTY_TOLERANCE,
+    },
+  };
+}
+
+function tradeRowDedupQuery(userId: ObjectId, tx: ParsedGoldTransaction) {
+  const txTime = new Date(tx.date).getTime();
+  return {
+    userId,
+    type: tx.type,
+    category: { $nin: LEASE_CATEGORIES },
+    quantity: {
+      $gte: tx.quantity - GOLD_DEDUP_QTY_TOLERANCE,
+      $lte: tx.quantity + GOLD_DEDUP_QTY_TOLERANCE,
+    },
+    date: {
+      $gte: new Date(txTime - GOLD_DEDUP_WINDOW_MS),
+      $lte: new Date(txTime + GOLD_DEDUP_WINDOW_MS),
+    },
+  };
+}
+
+function isSameGoldRow(a: ParsedGoldTransaction, b: ParsedGoldTransaction): boolean {
+  const timeGap = Math.abs(new Date(a.date).getTime() - new Date(b.date).getTime());
+  if (isLeaseRow(a) || isLeaseRow(b)) {
+    return (
+      a.category === b.category &&
+      a.borrower === b.borrower &&
+      timeGap === 0 &&
+      Math.abs(a.quantity - b.quantity) <= LEASE_DEDUP_QTY_TOLERANCE
+    );
+  }
+  return (
+    a.type === b.type &&
+    timeGap <= GOLD_DEDUP_WINDOW_MS &&
+    Math.abs(a.quantity - b.quantity) <= GOLD_DEDUP_QTY_TOLERANCE
+  );
+}
+
 async function deduplicateGold(
   db: ReturnType<typeof import('../database').default.getDb>,
   userId: ObjectId,
-  txns: ReturnType<typeof parseSafeGoldTransactions>
+  txns: ParsedGoldTransaction[]
 ) {
-  const newGold: typeof txns = [];
+  const newGold: ParsedGoldTransaction[] = [];
   let skippedGold = 0;
 
   for (const tx of txns) {
-    const txDate = new Date(tx.date);
-    const dateMin = new Date(txDate);
-    dateMin.setDate(dateMin.getDate() - 2);
-    const dateMax = new Date(txDate);
-    dateMax.setDate(dateMax.getDate() + 2);
+    const query = isLeaseRow(tx) ? leaseRowDedupQuery(userId, tx) : tradeRowDedupQuery(userId, tx);
+    const existsInDb = await db.collection('digitalGold').findOne(query);
+    const existsInBatch = newGold.some((existing) => isSameGoldRow(existing, tx));
 
-    const existsInDb = await db.collection('digitalGold').findOne({
-      userId,
-      quantity: { $gte: tx.quantity - 0.01, $lte: tx.quantity + 0.01 },
-      type: tx.type,
-      date: { $gte: dateMin, $lte: dateMax },
-    });
-
-    if (existsInDb) {
-      skippedGold++;
-      continue;
-    }
-
-    const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
-    const existsInBatch = newGold.some(
-      (existing) =>
-        existing.type === tx.type &&
-        Math.abs(existing.quantity - tx.quantity) <= 0.01 &&
-        Math.abs(new Date(existing.date).getTime() - txDate.getTime()) <= TWO_DAYS_MS
-    );
-
-    if (existsInBatch) {
+    if (existsInDb || existsInBatch) {
       skippedGold++;
       continue;
     }
@@ -1176,7 +1273,54 @@ function docForGold(userId: ObjectId) {
     amount: tx.amount,
     tax: tx.tax ?? 0,
     platform: tx.platform ?? 'SafeGold',
+    category: tx.category ?? (tx.type === 'credit' ? 'purchase' : 'sale'),
+    ...(tx.borrower && { borrower: tx.borrower }),
+    ...(tx.leasedGrams && { leasedGrams: tx.leasedGrams }),
   });
+}
+
+async function saveGoldLeaseSnapshot(
+  db: ReturnType<typeof database.getDb>,
+  userId: ObjectId,
+  leases: ParsedGoldLease[],
+  accountSummaries: SafeGoldAccountSummary[]
+) {
+  const latestSummary = accountSummaries.reduce<SafeGoldAccountSummary | null>(
+    (latest, summary) => (!latest || summary.asOf > latest.asOf ? summary : latest),
+    null
+  );
+
+  const latestLeaseById = new Map<string, ParsedGoldLease>();
+  for (const lease of leases) {
+    const existing = latestLeaseById.get(lease.commitId);
+    const isNewer =
+      !existing || (lease.statementMonth?.getTime() ?? 0) >= (existing.statementMonth?.getTime() ?? 0);
+    if (isNewer) latestLeaseById.set(lease.commitId, lease);
+  }
+
+  if (latestLeaseById.size === 0 && !latestSummary) return;
+
+  const updatedAt = new Date();
+  const leaseWrites = [...latestLeaseById.values()].map((lease) => ({
+    updateOne: {
+      filter: { userId, commitId: lease.commitId },
+      update: { $set: { ...lease, userId, platform: 'SafeGold', updatedAt } },
+      upsert: true,
+    },
+  }));
+  if (leaseWrites.length > 0) {
+    await db.collection('goldLeases').bulkWrite(leaseWrites);
+  }
+
+  if (!latestSummary) return;
+  const summaries = db.collection('goldAccountSummaries');
+  const stored = await summaries.findOne({ userId, platform: 'SafeGold' });
+  if (stored && new Date(stored.asOf) > latestSummary.asOf) return;
+  await summaries.updateOne(
+    { userId, platform: 'SafeGold' },
+    { $set: { ...latestSummary, userId, platform: 'SafeGold', updatedAt } },
+    { upsert: true }
+  );
 }
 
 // ─── Stock Holdings Helpers ───────────────────────────────────────────────────

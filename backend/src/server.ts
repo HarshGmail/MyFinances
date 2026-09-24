@@ -108,6 +108,8 @@ app.use(errorHandler);
 const USER_SCOPED_COLLECTIONS = [
   'stocks',
   'digitalGold',
+  'goldLeases',
+  'goldAccountSummaries',
   'crypto',
   'mutualFunds',
   'mutualFundsInfo',

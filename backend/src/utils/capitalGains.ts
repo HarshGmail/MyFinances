@@ -60,6 +60,7 @@ interface RawTransaction {
   qty: number; // units/shares/grams
   costPerUnit: number; // price per unit at transaction time
   label?: string; // stockName / coinName / fundName (for grouping)
+  isNonSaleOutflow?: boolean;
 }
 
 export interface RealizedLot {
@@ -109,6 +110,12 @@ export function runFifo(transactions: RawTransaction[], assetType: AssetType): F
       while (remaining > 0 && queue.length > 0) {
         const lot = queue[0];
         const matched = Math.min(lot.units, remaining);
+        if (tx.isNonSaleOutflow) {
+          lot.units -= matched;
+          remaining -= matched;
+          if (lot.units <= 0) queue.shift();
+          continue;
+        }
         const gain = (salePrice - lot.costPerUnit) * matched;
         const holdingDays = Math.floor((txDate.getTime() - lot.date.getTime()) / 86400000);
 

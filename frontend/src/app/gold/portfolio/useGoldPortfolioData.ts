@@ -6,6 +6,13 @@ import xirr, { XirrTransaction } from '@/utils/xirr';
 import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
 import Highcharts from 'highcharts';
 import { useUrlState } from '@/utils/useUrlState';
+import {
+  getGoldCategory,
+  goldCashFlow,
+  isLeaseCategory,
+  netGoldInvested,
+  totalGoldGrams,
+} from '@/utils/goldCategories';
 
 export function useGoldPortfolioData() {
   const { theme } = useAppStore();
@@ -34,24 +41,17 @@ export function useGoldPortfolioData() {
   const goldStats = useMemo(() => {
     if (!transactions || !filteredRates.length) return null;
 
-    const totalGold = transactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.quantity : -tx.quantity),
-      0
-    );
-    const totalInvested = transactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
-      0
-    );
+    const totalGold = totalGoldGrams(transactions);
+    const totalInvested = netGoldInvested(transactions);
     const lastRate = parseFloat(filteredRates[filteredRates.length - 1].rate);
     const avgPrice = totalGold > 0 ? totalInvested / totalGold : 0;
     const currentValue = totalGold * lastRate;
     const profitLoss = currentValue - totalInvested;
     const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 
-    const cashFlows: XirrTransaction[] = transactions.map((tx) => ({
-      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-      when: new Date(tx.date),
-    }));
+    const cashFlows: XirrTransaction[] = transactions
+      .map((tx) => ({ amount: goldCashFlow(tx), when: new Date(tx.date) }))
+      .filter((flow) => flow.amount !== 0);
     cashFlows.push({ amount: currentValue, when: new Date() });
     let xirrValue: number | null = null;
     try {
@@ -95,6 +95,7 @@ export function useGoldPortfolioData() {
     });
 
     return transactions
+      .filter((tx) => !isLeaseCategory(getGoldCategory(tx)))
       .map((tx) => {
         const tMs = Date.parse(tx.date);
         if (Number.isNaN(tMs) || tMs < cutoff) return null;

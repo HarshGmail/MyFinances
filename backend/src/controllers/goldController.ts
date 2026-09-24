@@ -297,3 +297,23 @@ export async function getSafeGoldRates(req: Request, res: Response) {
     res.status(500).json({ success: false, message: 'Failed to fetch gold rates' });
   }
 }
+
+export async function getGoldLeases(req: Request, res: Response) {
+  try {
+    const user = getUserFromRequest(req);
+    if (!user || !user.userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+    const db = database.getDb();
+    const userId = new ObjectId(user.userId);
+    const [leases, accountSummary] = await Promise.all([
+      db.collection('goldLeases').find({ userId }).sort({ startDate: 1 }).toArray(),
+      db.collection('goldAccountSummaries').findOne({ userId, platform: 'SafeGold' }),
+    ]);
+    res.status(200).json({ success: true, data: { leases, accountSummary } });
+  } catch (error) {
+    logger.error({ err: error }, 'Fetch gold leases error');
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}

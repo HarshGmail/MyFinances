@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/numbers';
 import { useGoldPortfolioData } from './useGoldPortfolioData';
 import GoldPriceChart from './GoldPriceChart';
 import GoldInvestmentChart from './GoldInvestmentChart';
+import GoldLeaseSection from './GoldLeaseSection';
 import { StatsSkeleton, ChartSkeleton, InvestmentChartSkeleton } from './GoldPortfolioSkeletons';
 
 export default function GoldPortfolioPage() {
@@ -100,6 +101,10 @@ export default function GoldPortfolioPage() {
       ) : transactions?.length ? (
         <GoldInvestmentChart transactions={transactions} data={data} />
       ) : null}
+
+      {!isLoading && (
+        <GoldLeaseSection transactions={transactions} currentRate={goldStats?.currentPrice ?? 0} />
+      )}
 
       <div className="mt-6">
         <CapitalGainsSummary

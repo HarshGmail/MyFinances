@@ -3,6 +3,7 @@ import {
   addGoldTransaction,
   deleteGoldTransaction,
   deleteAllUserGoldTransactions,
+  getGoldLeases,
   getGoldTransactions,
   getSafeGoldRates,
   updateGoldTransaction,
@@ -23,6 +24,8 @@ router.get('/safe-gold-rates', getSafeGoldRates);
 
 // GET /gold/rates - MCP-optimized endpoint for gold rates (same as safe-gold-rates)
 router.get('/rates', getSafeGoldRates);
+
+router.get('/leases', getGoldLeases);
 
 router.put('/transaction/:id', updateGoldTransaction);
 router.delete('/transaction/:id', deleteGoldTransaction);

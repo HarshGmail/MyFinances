@@ -21,6 +21,7 @@ import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
 import { cagr, firstTransactionDate, earliestDate } from '@/utils/cagr';
 import { calcMFPortfolio, calcEPFPortfolio } from '@/utils/portfolioCalculations';
 import { buildAIInsightPrompt } from './aiCopy';
+import { goldCashFlow, netGoldInvested, totalGoldGrams } from '@/utils/goldCategories';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -116,14 +117,8 @@ export function useHomePortfolioData() {
 
   const goldPortfolioData = useMemo(() => {
     if (!goldTransactions) return [];
-    const totalGold = goldTransactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.quantity : -tx.quantity),
-      0
-    );
-    const totalInvested = goldTransactions.reduce(
-      (sum, tx) => sum + (tx.type === 'credit' ? tx.amount : -tx.amount),
-      0
-    );
+    const totalGold = totalGoldGrams(goldTransactions);
+    const totalInvested = netGoldInvested(goldTransactions);
     let currentGoldRate = 0;
     if (goldRatesData?.data?.length) {
       currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
@@ -382,10 +377,9 @@ export function useHomePortfolioData() {
 
   const goldXirr = useMemo(() => {
     if (!goldTransactions || !goldPortfolioData.length) return null;
-    const flows: XirrCashFlow[] = goldTransactions.map((tx) => ({
-      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-      when: new Date(tx.date),
-    }));
+    const flows: XirrCashFlow[] = goldTransactions
+      .map((tx) => ({ amount: goldCashFlow(tx), when: new Date(tx.date) }))
+      .filter((flow) => flow.amount !== 0);
     const value = portfolioSummary.gold.currentValue;
     if (value > 0) flows.push({ amount: value, when: new Date() });
     return calcXirr(flows);
@@ -410,9 +404,10 @@ export function useHomePortfolioData() {
     mutualFundsTransactionsData?.forEach((tx) =>
       flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
     );
-    goldTransactions?.forEach((tx) =>
-      flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
-    );
+    goldTransactions?.forEach((tx) => {
+      const amount = goldCashFlow(tx);
+      if (amount !== 0) flows.push({ amount, when: new Date(tx.date) });
+    });
     cryptoTransactions?.forEach((tx) =>
       flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
     );

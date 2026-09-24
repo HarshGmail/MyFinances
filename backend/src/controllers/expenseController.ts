@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import database from '../database';
+import { LEASE_CATEGORIES } from '../services/safegoldParser';
 import { expenseSchema } from '../schemas';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
@@ -262,7 +263,7 @@ export async function getMonthlyInvestmentSummary(req: Request, res: Response) {
       addToMonth(new Date(tx.date), 'stocks', tx.amount || 0);
     }
     for (const tx of gold) {
-      if (tx.type === 'debit') continue;
+      if (tx.type === 'debit' || LEASE_CATEGORIES.includes(tx.category)) continue;
       addToMonth(new Date(tx.date), 'gold', tx.amount || 0);
     }
     for (const tx of crypto) {
