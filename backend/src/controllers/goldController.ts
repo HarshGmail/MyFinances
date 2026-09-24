@@ -145,11 +145,53 @@ export async function deleteAllUserGoldTransactions(req: Request, res: Response)
 
 const TROY_OZ_TO_GRAM = 31.1035;
 const SAFEGOLD_MARKUP = 1.09;
-// SafeGold's effective per-gram price is ~4.6% above what the Yahoo-derived
-// rate (with SAFEGOLD_MARKUP) gives. Applied at read time so existing cache
-// rows stay valid; remove to revert.
-const SAFEGOLD_LIVE_BUMP = 1.046;
+const FALLBACK_SAFEGOLD_CALIBRATION = 1.046;
+const CALIBRATION_BOUNDS = { min: 0.9, max: 1.3 };
+const SAFEGOLD_LIVE_PRICE_URL = 'https://website-backend.safegold.com/api/v1/game/gold-price/live';
+const SAFEGOLD_LIVE_PRICE_TTL_MS = 5 * 60 * 1000;
+const SAFEGOLD_LIVE_PRICE_TIMEOUT_MS = 5000;
 const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0' };
+
+let safeGoldLivePriceCache: { price: number; fetchedAt: number } | null = null;
+let safeGoldCalibration = FALLBACK_SAFEGOLD_CALIBRATION;
+
+async function fetchSafeGoldLivePrice(): Promise<number | null> {
+  if (
+    safeGoldLivePriceCache &&
+    Date.now() - safeGoldLivePriceCache.fetchedAt < SAFEGOLD_LIVE_PRICE_TTL_MS
+  ) {
+    return safeGoldLivePriceCache.price;
+  }
+  try {
+    const response = await axios.get(SAFEGOLD_LIVE_PRICE_URL, {
+      headers: YAHOO_HEADERS,
+      timeout: SAFEGOLD_LIVE_PRICE_TIMEOUT_MS,
+    });
+    const price = Number(response.data?.data?.price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    safeGoldLivePriceCache = { price, fetchedAt: Date.now() };
+    return price;
+  } catch (error) {
+    logger.warn({ err: error }, 'SafeGold live price fetch failed, using Yahoo-derived rate');
+    return null;
+  }
+}
+
+function isPlausibleCalibration(factor: number) {
+  return (
+    Number.isFinite(factor) &&
+    factor >= CALIBRATION_BOUNDS.min &&
+    factor <= CALIBRATION_BOUNDS.max
+  );
+}
+
+async function findLatestYahooRate(cacheCollection: any, onOrBefore: string) {
+  const latest = await cacheCollection.findOne(
+    { date: { $lte: onOrBefore } },
+    { sort: { date: -1 } }
+  );
+  return latest ? parseFloat(latest.rate) : null;
+}
 
 // Fetches gold (USD/oz) + USD/INR from Yahoo Finance for a date range,
 // calculates INR/gram with markup, and bulk-upserts into the cache.
@@ -286,10 +328,27 @@ export async function getSafeGoldRates(req: Request, res: Response) {
       }
     }
 
+    const rangeIncludesToday = dates.includes(today);
+    const livePrice = rangeIncludesToday ? await fetchSafeGoldLivePrice() : null;
+    if (livePrice !== null) {
+      const latestYahooRate = await findLatestYahooRate(cacheCollection, today);
+      const fittedCalibration = latestYahooRate ? livePrice / latestYahooRate : NaN;
+      if (isPlausibleCalibration(fittedCalibration)) {
+        safeGoldCalibration = fittedCalibration;
+      }
+    }
+
     const adjusted = data.map((row) => ({
       date: row.date,
-      rate: (parseFloat(row.rate) * SAFEGOLD_LIVE_BUMP).toString(),
+      rate:
+        row.date === today && livePrice !== null
+          ? livePrice.toString()
+          : (parseFloat(row.rate) * safeGoldCalibration).toString(),
     }));
+
+    if (livePrice !== null && !adjusted.some((row) => row.date === today)) {
+      adjusted.push({ date: today, rate: livePrice.toString() });
+    }
 
     res.status(200).json({ success: true, data: adjusted });
   } catch (error) {
