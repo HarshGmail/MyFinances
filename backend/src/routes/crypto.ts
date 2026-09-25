@@ -11,6 +11,7 @@ import {
   deleteCryptoTransaction,
   deleteAllUserCryptoTransactions,
   getCryptoPrices,
+  getCryptoTickerChanges,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -30,6 +31,7 @@ router.post('/getCoinPrices', fetchMultipleCoinBalances);
 
 // POST /crypto/prices - MCP-optimized endpoint for fetching coin prices
 router.post('/prices', getCryptoPrices);
+router.post('/ticker-changes', getCryptoTickerChanges);
 
 // GET /crypto/candles - Public endpoint for coin candles
 router.get('/candles', getCoinCandles);

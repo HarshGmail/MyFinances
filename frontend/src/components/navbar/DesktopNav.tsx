@@ -22,6 +22,7 @@ import {
   BarChart3,
   ChevronRight,
   Lock,
+  Activity,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -85,6 +86,20 @@ export function DesktopNav({ user }: DesktopNavProps) {
               >
                 <ChartNoAxesCombined className="w-4 h-4 mr-2" />
                 Home
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
+
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                href="/today"
+                className={`flex flex-row items-center px-4 py-2 text-sm font-medium rounded ${
+                  pathname === '/today' ? 'bg-accent' : 'hover:bg-accent'
+                }`}
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Today
               </Link>
             </NavigationMenuLink>
           </NavigationMenuItem>

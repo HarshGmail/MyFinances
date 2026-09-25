@@ -18,11 +18,7 @@ import {
 import { parseCoinDCXTradeEmail, ParsedCoinDCXTrade } from '../services/coinDCXEmailParser';
 import { StocksService } from '../services/stocksService';
 import { isPdfServiceAvailable } from '../services/pdfParsingClient';
-import {
-  parsePdfBatch,
-  parsePdfBatchLocally,
-  PdfBatchResult,
-} from '../services/emailPdfParsing';
+import { parsePdfBatch, parsePdfBatchLocally, PdfBatchResult } from '../services/emailPdfParsing';
 import { parseSafeGoldLeaseStatement, ParsedGoldLease } from '../services/safegoldLeaseParser';
 import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
 import { decrypt } from '../utils/encryption';
@@ -1294,7 +1290,8 @@ async function saveGoldLeaseSnapshot(
   for (const lease of leases) {
     const existing = latestLeaseById.get(lease.commitId);
     const isNewer =
-      !existing || (lease.statementMonth?.getTime() ?? 0) >= (existing.statementMonth?.getTime() ?? 0);
+      !existing ||
+      (lease.statementMonth?.getTime() ?? 0) >= (existing.statementMonth?.getTime() ?? 0);
     if (isNewer) latestLeaseById.set(lease.commitId, lease);
   }
 

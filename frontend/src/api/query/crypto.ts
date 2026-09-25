@@ -7,6 +7,7 @@ import {
   CoinPricesResponse,
   CoinCandle,
   CoinSearchResult,
+  CoinTickerChangesResponse,
 } from '@/api/dataInterface';
 
 export function useCryptoTransactionsQuery() {
@@ -62,6 +63,21 @@ export function useCryptoCoinPricesQuery(coinNames: string[]) {
     refetchInterval: 60 * 1000 * 5, // Refetch every 5 minutes
     refetchIntervalInBackground: true,
     enabled: coinNames.length > 0, // Only run if coinNames array is not empty
+  });
+}
+
+export function useCryptoTickerChangesQuery(coinNames: string[]) {
+  return useQuery<CoinTickerChangesResponse>({
+    queryKey: ['crypto-ticker-changes', coinNames],
+    queryFn: () =>
+      apiRequest({
+        endpoint: '/crypto/ticker-changes',
+        method: 'POST',
+        body: { coinNames },
+      }),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    enabled: coinNames.length > 0,
   });
 }
 

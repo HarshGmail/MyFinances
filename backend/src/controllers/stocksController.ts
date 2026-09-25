@@ -15,6 +15,18 @@ import logger from '../utils/logger';
 
 const PORTFOLIO_PRICE_CACHE_MS = 60 * 1000;
 
+const MS_PER_SECOND = 1000;
+
+function toTradeTimeMs(raw: unknown): number | null {
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof raw === 'number') return raw * MS_PER_SECOND;
+  if (typeof raw === 'string') {
+    const parsed = Date.parse(raw);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
 // Strip exchange suffixes (.NS, .BO, etc.) that should not be stored — stocksService
 // appends .NS itself when calling Yahoo Finance.
 function normalizeSymbol(raw: string): string {
@@ -414,6 +426,13 @@ export async function getStocksPortfolio(req: Request, res: Response) {
         ? parseFloat(((totalOneDayChange / totalPreviousValue) * 100).toFixed(2))
         : 0;
 
+    const tradeTimes = stockNames
+      .map((name) => toTradeTimeMs(priceData[name]?.chart?.result?.[0]?.meta?.regularMarketTime))
+      .filter((t): t is number => t !== null);
+    const lastTradeTime = tradeTimes.length
+      ? new Date(Math.max(...tradeTimes)).toISOString()
+      : null;
+
     const includePriceData = req.query.priceData === '1';
 
     res.status(200).json({
@@ -428,6 +447,7 @@ export async function getStocksPortfolio(req: Request, res: Response) {
           totalProfitLossPercentage,
           totalOneDayChange,
           totalOneDayChangePercentage,
+          lastTradeTime,
         },
         transactions,
       },

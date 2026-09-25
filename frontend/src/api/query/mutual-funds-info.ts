@@ -88,6 +88,24 @@ export function useMfapiLatestNavQuery(schemeNumbers: (string | number)[]) {
   });
 }
 
+export function useMfapiRecentNavQuery(schemeNumbers: (string | number)[], latestCount = 2) {
+  return useQuery<MutualFundNavHistory>({
+    queryKey: ['mfapi-nav-recent', schemeNumbers, latestCount],
+    queryFn: async () => {
+      if (!schemeNumbers.length) return {};
+      const response = await apiRequest({
+        endpoint: '/funds/nav-history',
+        method: 'POST',
+        body: { schemeNumbers, latestCount },
+      });
+      return response.data;
+    },
+    enabled: schemeNumbers.length > 0,
+    staleTime: 30 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
+  });
+}
+
 export function useSingleMFNavHistoryQuery(schemeCode: string | number | null) {
   const result = useMfapiNavHistoryBatchQuery(schemeCode ? [schemeCode] : []);
   return {

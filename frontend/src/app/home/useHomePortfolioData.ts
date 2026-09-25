@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import _ from 'lodash';
 import { differenceInDays, differenceInMonths } from 'date-fns';
 import { useAppStore } from '@/store/useAppStore';
 import {
@@ -22,6 +21,7 @@ import { cagr, firstTransactionDate, earliestDate } from '@/utils/cagr';
 import { calcMFPortfolio, calcEPFPortfolio } from '@/utils/portfolioCalculations';
 import { buildAIInsightPrompt } from './aiCopy';
 import { goldCashFlow, netGoldInvested, totalGoldGrams } from '@/utils/goldCategories';
+import { groupCryptoHoldings, heldCoinSymbols } from '@/utils/cryptoHoldings';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -138,37 +138,12 @@ export function useHomePortfolioData() {
   }, [goldTransactions, goldRatesData]);
 
   // ===== CRYPTO =====
-  const cryptoInvestedMap = useMemo(() => {
-    if (!cryptoTransactions) return {};
-    const grouped = _.groupBy(
-      cryptoTransactions,
-      (tx) => tx.coinSymbol?.toUpperCase() || tx.coinName?.toUpperCase()
-    );
-    const map: Record<string, { invested: number; units: number; coinName: string }> = {};
-    Object.entries(grouped).forEach(([symbol, txs]) => {
-      let invested = 0,
-        units = 0,
-        coinName = '';
-      txs.forEach((tx) => {
-        if (tx.type === 'credit') {
-          invested += tx.amount;
-          units += tx.quantity ?? 0;
-        } else if (tx.type === 'debit') {
-          invested -= tx.amount;
-          units -= tx.quantity ?? 0;
-        }
-        coinName = tx.coinName;
-      });
-      map[symbol] = { invested, units, coinName };
-    });
-    return map;
-  }, [cryptoTransactions]);
+  const cryptoInvestedMap = useMemo(
+    () => (cryptoTransactions ? groupCryptoHoldings(cryptoTransactions) : {}),
+    [cryptoTransactions]
+  );
 
-  const validCoins = useMemo(() => {
-    return Object.entries(cryptoInvestedMap)
-      .filter(([, v]) => v.units > 0)
-      .map(([symbol]) => symbol);
-  }, [cryptoInvestedMap]);
+  const validCoins = useMemo(() => heldCoinSymbols(cryptoInvestedMap), [cryptoInvestedMap]);
 
   const coinPricesQuery = useCryptoCoinPricesQuery(validCoins);
   const { data: coinPrices } = coinPricesQuery;

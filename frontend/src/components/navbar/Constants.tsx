@@ -15,6 +15,7 @@ import {
   Receipt,
   Search,
   Lock,
+  Activity,
 } from 'lucide-react';
 
 export const MOBILE_MENU_ITEMS = [
@@ -22,6 +23,11 @@ export const MOBILE_MENU_ITEMS = [
     title: 'Home',
     icon: <ChartNoAxesCombined className="w-4 h-4" />,
     path: '/home',
+  },
+  {
+    title: 'Today',
+    icon: <Activity className="w-4 h-4" />,
+    path: '/today',
   },
   {
     title: 'Expenses',

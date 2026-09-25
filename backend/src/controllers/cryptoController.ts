@@ -204,6 +204,23 @@ export async function getCryptoPrices(req: Request, res: Response) {
   }
 }
 
+export async function getCryptoTickerChanges(req: Request, res: Response) {
+  try {
+    const { coinNames } = req.body;
+    if (!Array.isArray(coinNames) || !coinNames.length) {
+      res.status(400).json({ success: false, message: 'coinNames array required' });
+      return;
+    }
+
+    const changes = await coindcxService.getTickerChanges(coinNames);
+    res.status(200).json({ success: true, data: changes });
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error({ err: error }, 'Error while fetching crypto ticker changes');
+    res.status(500).json({ success: false, message: 'Error fetching crypto ticker changes' });
+  }
+}
+
 export async function getCoinCandles(req: Request, res: Response) {
   try {
     const { symbol, interval = '1d', limit = '365', startTime, endTime } = req.query;

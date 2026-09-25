@@ -49,6 +49,9 @@ frontend/src/
 │   ├── layout.tsx            Root layout with providers
 │   ├── providers.tsx         TanStack QueryClientProvider
 │   ├── home/page.tsx         Master dashboard (all assets combined)
+│   ├── today/                Daily movers: stocks / MF / gold / crypto change as a whole
+│   │   ├── page.tsx                Orchestrator — header, 4 class cards, contribution chart, top movers
+│   │   └── useTodayMovesData.ts    Queries + builders from utils/dailyMoves.ts; polls stocks 60s while NSE open
 │   ├── stocks/
 │   │   ├── page.tsx          Stocks landing (links to Portfolio, Analytics, Research, Transactions, Update)
 │   │   ├── analytics/        Portfolio-wide fundamental analysis (NEW)
@@ -166,6 +169,9 @@ frontend/src/
     ├── chartHelpers.ts       Highcharts helpers
     ├── text.ts               getProfitLossColor, etc.
     ├── useUrlState.ts        URL-persisted state (tabs, filters) via router.replace
+    ├── dailyMoves.ts         Pure builders for today's per-class change (stocks, MF, gold, crypto)
+    ├── marketHours.ts        getNseMarketStatus() in IST (pre-open / open / closed / weekend)
+    ├── cryptoHoldings.ts     groupCryptoHoldings() — net units + invested per coin symbol
     └── vaultCrypto.ts        WebCrypto PBKDF2 + AES-GCM for the vault (client-side only)
 ```
 
@@ -212,7 +218,7 @@ backend/src/
 | `/api/auth`                 | Login, signup                                                                             |
 | `/api/stocks`               | Stock transactions + NSE quotes + Yahoo Finance search + financials + portfolio analytics |
 | `/api/gold`                 | Gold transactions + SafeGold rates                                                        |
-| `/api/crypto`               | Crypto transactions + CoinDCX prices + candle data                                        |
+| `/api/crypto`               | Crypto transactions + CoinDCX prices + 24h ticker changes + candle data                   |
 | `/api/mutual-funds`         | MF transactions                                                                           |
 | `/api/funds`                | MF info (scheme numbers) + batch NAV history                                              |
 | `/api/epf`                  | EPF accounts + timeline                                                                   |
@@ -527,3 +533,5 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 41. **Face ID unlock stores the PIN wrapped under a WebAuthn PRF key, on the device only** — see `utils/vaultBiometrics.ts` and the Face ID section of `docs/Vault_Architecture.md`. Nothing new reaches the server. Two rules: PRF support is uneven (Safari has it from iOS 18 via iCloud Keychain, not with security keys), so it is feature-detected and the PIN always stays a working unlock path; and `changePin`/`destroy` must both call `clearBiometricUnlock()`, or Face ID unlocks with a stale PIN and fails the verifier for no visible reason.
 
 42. **Wide tables render as stacked cards below `md:`** — `components/custom/MobileDataCard.tsx` is the shared primitive; `TransactionsTable` and the stocks/crypto/FD/RD/MF/scorecard tables each render cards on mobile and keep `<Table className="hidden md:table">` for desktop. When adding a column to one of those tables, add it to the card too, or it silently disappears on the phone.
+
+43. **`/today` compares each class against a different baseline** — stocks: current price vs second-to-last daily close (weekends and holidays therefore show the last session; `summary.lastTradeTime` names it). MFs: latest NAV vs the one before, fetched via `latestCount: 2` on `/funds/nav-history`; a fund whose latest NAV date lags the others counts as unchanged. Gold: SafeGold live price vs the previous row of `/gold/safe-gold-rates`. Crypto: CoinDCX `change_24_hour`, a rolling 24h window (`POST /crypto/ticker-changes`). Labels on each card state the basis — keep them honest when changing a builder.

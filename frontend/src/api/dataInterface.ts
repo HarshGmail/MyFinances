@@ -61,6 +61,16 @@ export interface CoinSearchResult {
   type: 'coin' | 'token';
 }
 
+export interface CoinTickerChange {
+  price: number;
+  changePct24h: number;
+}
+
+export interface CoinTickerChangesResponse {
+  success: boolean;
+  data: { [coinName: string]: CoinTickerChange | null };
+}
+
 export interface CryptoPortfolioItem {
   coinName: string;
   totalQuantity: number;
@@ -244,7 +254,39 @@ export interface FixedDepositPayload {
   rateOfInterest: number;
 }
 
+export interface GoldAccountSummary {
+  asOf: string;
+  totalGold: number;
+  availableGold: number;
+  leasedGold: number;
+}
+
 export type GoldCategory = 'purchase' | 'sale' | 'lease_interest' | 'lease_tds';
+
+export interface GoldLease {
+  _id: string;
+  commitId: string;
+  borrower: string;
+  leasedGrams: number;
+  earnedGrams: number;
+  yieldPercent: number;
+  startDate: string;
+  endDate: string;
+  tenureDays: number;
+  remainingPayouts: number;
+  payouts: GoldLeasePayout[];
+  statementMonth: string | null;
+}
+
+export interface GoldLeasePayout {
+  date: string;
+  grams: number;
+}
+
+export interface GoldLeasesResponse {
+  leases: GoldLease[];
+  accountSummary: GoldAccountSummary | null;
+}
 
 export interface GoldTransaction {
   id: string;
@@ -436,38 +478,6 @@ export interface SafeGoldRate {
   rate: string;
 }
 
-export interface GoldLeasePayout {
-  date: string;
-  grams: number;
-}
-
-export interface GoldLease {
-  _id: string;
-  commitId: string;
-  borrower: string;
-  leasedGrams: number;
-  earnedGrams: number;
-  yieldPercent: number;
-  startDate: string;
-  endDate: string;
-  tenureDays: number;
-  remainingPayouts: number;
-  payouts: GoldLeasePayout[];
-  statementMonth: string | null;
-}
-
-export interface GoldAccountSummary {
-  asOf: string;
-  totalGold: number;
-  availableGold: number;
-  leasedGold: number;
-}
-
-export interface GoldLeasesResponse {
-  leases: GoldLease[];
-  accountSummary: GoldAccountSummary | null;
-}
-
 export interface SafeGoldRatesResponse {
   success: boolean;
   data: SafeGoldRate[];
@@ -620,6 +630,7 @@ export interface StocksPortfolioSummary {
   totalProfitLossPercentage: number;
   totalOneDayChange: number;
   totalOneDayChangePercentage: number;
+  lastTradeTime?: string | null;
 }
 
 export interface StockTransaction {

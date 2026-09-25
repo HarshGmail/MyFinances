@@ -179,9 +179,7 @@ async function fetchSafeGoldLivePrice(): Promise<number | null> {
 
 function isPlausibleCalibration(factor: number) {
   return (
-    Number.isFinite(factor) &&
-    factor >= CALIBRATION_BOUNDS.min &&
-    factor <= CALIBRATION_BOUNDS.max
+    Number.isFinite(factor) && factor >= CALIBRATION_BOUNDS.min && factor <= CALIBRATION_BOUNDS.max
   );
 }
 

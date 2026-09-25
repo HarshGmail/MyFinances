@@ -68,9 +68,11 @@ export async function getMutualFundInfo(req: Request, res: Response) {
   }
 }
 
+const MAX_LATEST_NAV_COUNT = 10;
+
 export async function getMfapiNavHistory(req: Request, res: Response) {
   try {
-    const { schemeNumbers, latestOnly } = req.body;
+    const { schemeNumbers, latestOnly, latestCount } = req.body;
 
     if (!schemeNumbers || !Array.isArray(schemeNumbers) || schemeNumbers.length === 0) {
       res.status(400).json({
@@ -90,6 +92,18 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
         return;
       }
     }
+
+    const isValidLatestCount =
+      latestCount === undefined ||
+      (Number.isInteger(latestCount) && latestCount >= 1 && latestCount <= MAX_LATEST_NAV_COUNT);
+    if (!isValidLatestCount) {
+      res.status(400).json({
+        success: false,
+        message: `latestCount must be an integer between 1 and ${MAX_LATEST_NAV_COUNT}`,
+      });
+      return;
+    }
+    const navsToKeep: number | undefined = latestCount ?? (latestOnly ? 1 : undefined);
 
     // Fetch NAV history for all scheme numbers in parallel.
     // MFAPI updates once a day, so serve from MongoDB cache if already fetched today.
@@ -127,8 +141,8 @@ export async function getMfapiNavHistory(req: Request, res: Response) {
     const navHistoryMap: Record<string, MutualFundNavHistoryItem> = {};
     results.forEach((result) => {
       navHistoryMap[result.schemeNumber] =
-        latestOnly && result.data?.data
-          ? { ...result.data, data: result.data.data.slice(0, 1) }
+        navsToKeep && result.data?.data
+          ? { ...result.data, data: result.data.data.slice(0, navsToKeep) }
           : result.data;
     });
 

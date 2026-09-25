@@ -51,7 +51,10 @@ export function useSearchStockByNameQuery(symbol: string) {
   });
 }
 
-export function useStocksPortfolioQuery(withPriceData = false) {
+export function useStocksPortfolioQuery(
+  withPriceData = false,
+  { refetchInterval }: { refetchInterval?: number } = {}
+) {
   return useQuery<StocksPortfolioResponse>({
     queryKey: ['stocks-portfolio', withPriceData],
     queryFn: async () => {
@@ -62,6 +65,7 @@ export function useStocksPortfolioQuery(withPriceData = false) {
       return response.data;
     },
     staleTime: 5 * 60 * 1000,
+    refetchInterval,
     refetchIntervalInBackground: true,
   });
 }

@@ -12,6 +12,12 @@ interface CoinDCXTicker {
   low: string;
   volume: string;
   timestamp: number;
+  change_24_hour: string;
+}
+
+export interface CoinTickerChange {
+  price: number;
+  changePct24h: number;
 }
 
 interface CoinCandle {
@@ -112,6 +118,22 @@ class CoinDCXService {
       logger.error({ err: error }, 'Error getting current prices');
       return {};
     }
+  }
+
+  async getTickerChanges(
+    coinNames: string[]
+  ): Promise<{ [coinName: string]: CoinTickerChange | null }> {
+    const tickers = await this.getTickers();
+    const tickersByMarket = new Map(tickers.map((t) => [t.market, t]));
+    const changes: { [coinName: string]: CoinTickerChange | null } = {};
+    for (const coinName of coinNames) {
+      const ticker = tickersByMarket.get(this.mapCoinToMarketPair(coinName));
+      const price = ticker ? parseFloat(ticker.last_price) : NaN;
+      const changePct24h = ticker ? parseFloat(ticker.change_24_hour) : NaN;
+      changes[coinName] =
+        Number.isFinite(price) && Number.isFinite(changePct24h) ? { price, changePct24h } : null;
+    }
+    return changes;
   }
 
   // Get user balances from CoinDCX (authenticated endpoint)
