@@ -41,6 +41,8 @@ interface CoinDCXUserData {
   timestamp: number;
 }
 
+const MAX_CANDLES_PER_REQUEST = 1000;
+
 class CoinDCXService {
   private baseUrl = 'https://api.coindcx.com';
   private apiKey: string;
@@ -207,12 +209,22 @@ class CoinDCXService {
         throw new Error('startTime and endTime are required and must be numbers');
       }
       const pair = `I-${symbol}_INR`;
-      const url = `https://public.coindcx.com/market_data/candles?pair=${pair}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${limit}`;
-      const response = await axios.get(url);
-      if (Array.isArray(response.data)) {
-        return response.data;
+      const candlesByTime = new Map<number, CoinCandle>();
+      let pageEndTime = endTime;
+      let remaining = limit;
+
+      while (remaining > 0 && pageEndTime > startTime) {
+        const pageLimit = Math.min(remaining, MAX_CANDLES_PER_REQUEST);
+        const url = `https://public.coindcx.com/market_data/candles?pair=${pair}&interval=${interval}&startTime=${startTime}&endTime=${pageEndTime}&limit=${pageLimit}`;
+        const response = await axios.get(url);
+        const page: CoinCandle[] = Array.isArray(response.data) ? response.data : [];
+        page.forEach((candle) => candlesByTime.set(candle.time, candle));
+        if (page.length < pageLimit) break;
+        remaining -= page.length;
+        pageEndTime = Math.min(...page.map((candle) => candle.time)) - 1;
       }
-      return [];
+
+      return [...candlesByTime.values()].sort((a, b) => b.time - a.time);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching coin candles from CoinDCX');
       return [];
