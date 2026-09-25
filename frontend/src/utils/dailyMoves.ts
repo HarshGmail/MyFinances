@@ -10,6 +10,7 @@ import {
 import { calcMFPortfolio, MFNavDataMap } from './portfolioCalculations';
 import { totalGoldGrams } from './goldCategories';
 import { CryptoHolding } from './cryptoHoldings';
+import { formatNavDate, parseNavDate } from './navDates';
 
 export type AssetClass = 'stocks' | 'mutualFunds' | 'gold' | 'crypto';
 
@@ -104,18 +105,6 @@ export function buildStockMove(portfolio: StocksPortfolioItem[], sessionLabel: s
     )
   );
   return summarise('stocks', sessionLabel, holdings, unpricedValue);
-}
-
-function parseNavDate(ddmmyyyy: string): number {
-  const [day, month, year] = ddmmyyyy.split('-').map(Number);
-  return new Date(year, month - 1, day).getTime();
-}
-
-function formatNavDate(ddmmyyyy: string): string {
-  return new Date(parseNavDate(ddmmyyyy)).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
 }
 
 export function buildMutualFundMove(

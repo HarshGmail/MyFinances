@@ -84,6 +84,7 @@ frontend/src/
 │   ├── mutual-funds/
 │   │   ├── page.tsx
 │   │   ├── dashboard/        MF dashboard with NAV history + XIRR
+│   │   │   └── MfTodaySection.tsx  Day move: breadth, top gainer/loser, per-fund contribution chart, NAV/1W/1M table
 │   │   ├── portfolio/
 │   │   └── transactions/
 │   ├── expenses/
@@ -158,6 +159,8 @@ frontend/src/
 │   │   ├── PerformerStatCard.tsx
 │   │   ├── TransactionsTable.tsx
 │   │   ├── FilterDrawer.tsx
+│   │   ├── ChangeBarChart.tsx   Diverging ₹-change bar chart (Today page + MF dashboard)
+│   │   ├── BreadthBar.tsx       Up/down proportion bar
 │   │   └── Tabs.tsx
 │   └── ui/                   shadcn/ui components
 ├── store/
@@ -172,6 +175,8 @@ frontend/src/
     ├── dailyMoves.ts         Pure builders for today's per-class change (stocks, MF, gold, crypto)
     ├── marketHours.ts        getNseMarketStatus() in IST (pre-open / open / closed / weekend)
     ├── cryptoHoldings.ts     groupCryptoHoldings() — net units + invested per coin symbol
+    ├── mfDailyMoves.ts       buildMfDailySummary() — per-fund day/1W/1M NAV change from NAV history
+    ├── navDates.ts           parseNavDate/formatNavDate for MFAPI "DD-MM-YYYY" dates
     └── vaultCrypto.ts        WebCrypto PBKDF2 + AES-GCM for the vault (client-side only)
 ```
 

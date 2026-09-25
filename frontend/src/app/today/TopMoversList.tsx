@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getProfitLossColor } from '@/utils/text';
 import { ASSET_CLASS_LABELS, HoldingMove } from '@/utils/dailyMoves';
-import { formatSignedCurrency, formatSignedPercent } from './formatMove';
+import { formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
 
 function MoverRow({ holding }: { holding: HoldingMove }) {
   return (

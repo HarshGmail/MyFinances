@@ -1,11 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
 import { PortfolioMove } from '@/utils/dailyMoves';
 import { formatIstSessionDate, NseMarketStatus } from '@/utils/marketHours';
 import RefreshIndicator from '@/app/home/RefreshIndicator';
-import { formatSignedCurrency, formatSignedPercent } from './formatMove';
 
 interface TodayHeaderProps {
   total: PortfolioMove;

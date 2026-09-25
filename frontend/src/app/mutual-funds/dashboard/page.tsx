@@ -28,6 +28,8 @@ import Highcharts from 'highcharts/highstock';
 import { useAppStore } from '@/store/useAppStore';
 import { formatCurrency } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
+import { buildMfDailySummary } from '@/utils/mfDailyMoves';
+import MfTodaySection from './MfTodaySection';
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });
 
@@ -199,7 +201,21 @@ export default function MutualFundsDashboardPage() {
       xirrValue,
     };
   }, [tableData, mutualFundsTransactionsData]);
-  // today, week and pie chart
+  const dailySummary = useMemo(() => {
+    if (!mfInfoData || !navHistoryBatch) return null;
+    return buildMfDailySummary(
+      tableData.map((row) => {
+        const schemeNumber = mfInfoData.find(
+          (info) => info.fundName === row.fundName
+        )?.schemeNumber;
+        return {
+          fundName: row.fundName,
+          units: row.totalUnits,
+          navHistory: schemeNumber ? navHistoryBatch[schemeNumber]?.data : undefined,
+        };
+      })
+    );
+  }, [tableData, mfInfoData, navHistoryBatch]);
 
   const getProfitLossBadgeVariant = (profitLoss: number | null) => {
     if (profitLoss === null) return 'default';
@@ -610,6 +626,7 @@ export default function MutualFundsDashboardPage() {
           }
         />
       </div>
+      {dailySummary && <MfTodaySection summary={dailySummary} />}
       {/* Mutual Fund Growth Chart */}
       {chartData.combined.length > 0 && (
         <div className="bg-card rounded-lg p-4 mb-6">

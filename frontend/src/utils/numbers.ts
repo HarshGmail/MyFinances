@@ -30,3 +30,17 @@ export const formatCurrency = (amount: number) => {
     minimumFractionDigits: 2,
   }).format(amount);
 };
+
+function signPrefix(value: number): string {
+  if (value > 0) return '+';
+  if (value < 0) return '−';
+  return '';
+}
+
+export function formatSignedCurrency(amount: number): string {
+  return `${signPrefix(amount)}${formatCurrency(Math.abs(amount))}`;
+}
+
+export function formatSignedPercent(pct: number): string {
+  return `${signPrefix(pct)}${Math.abs(pct).toFixed(2)}%`;
+}

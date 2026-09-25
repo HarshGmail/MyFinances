@@ -1,35 +1,17 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
 import { getProfitLossColor } from '@/utils/text';
 import { ASSET_CLASS_LABELS, AssetClass, AssetMove } from '@/utils/dailyMoves';
-import { formatSignedCurrency, formatSignedPercent } from './formatMove';
+import { BreadthBar } from '@/components/custom/BreadthBar';
 
 const PORTFOLIO_PATHS: Record<AssetClass, string> = {
   stocks: '/stocks/portfolio',
-  mutualFunds: '/mutual-funds/portfolio',
+  mutualFunds: '/mutual-funds/dashboard',
   gold: '/gold/portfolio',
   crypto: '/crypto/portfolio',
 };
-
-function BreadthBar({ advancers, decliners }: { advancers: number; decliners: number }) {
-  const counted = advancers + decliners;
-  if (counted === 0) return null;
-  const advancerShare = (advancers / counted) * 100;
-  return (
-    <div
-      className="flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full"
-      role="img"
-      aria-label={`${advancers} up, ${decliners} down`}
-    >
-      {advancers > 0 && (
-        <div className="rounded-full bg-green-600" style={{ width: `${advancerShare}%` }} />
-      )}
-      {decliners > 0 && <div className="flex-1 rounded-full bg-red-600" />}
-    </div>
-  );
-}
 
 export default function AssetMoveCard({ move }: { move: AssetMove }) {
   const holdingCount = move.holdings.length;
