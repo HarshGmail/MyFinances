@@ -4,8 +4,8 @@ import { useMemo, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { CheckSquare, KeyRound, Lock, Plus, ScanFace, Share2, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { VaultCategory, VaultItemContent, WalletSummary } from '@/api/dataInterface';
-import { useWalletsQuery } from '@/api/query';
+import { VaultCategory, VaultItemContent, WalletSummary } from '@myfinances/core/types';
+import { useWalletsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {

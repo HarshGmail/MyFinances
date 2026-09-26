@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePushConfigQuery } from '@/api/query';
+import { usePushConfigQuery } from '@myfinances/core/api';
 import { isStandaloneDisplayMode, isIosDevice } from '@/lib/pwa';
 import { InstallAppButton } from '@/components/custom/InstallAppButton';
 import {

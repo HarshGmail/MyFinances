@@ -30,8 +30,11 @@ import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { useAddStockTransactionMutation, useUpdateStockTransactionMutation } from '@/api/mutations';
-import { useSearchStockByNameQuery, useStockTransactionsQuery } from '@/api/query';
+import {
+  useAddStockTransactionMutation,
+  useUpdateStockTransactionMutation,
+} from '@myfinances/core/api';
+import { useSearchStockByNameQuery, useStockTransactionsQuery } from '@myfinances/core/api';
 import { debounce } from 'lodash';
 
 const formSchema = z.object({

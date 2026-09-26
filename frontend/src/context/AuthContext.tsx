@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { User } from '@/api/dataInterface';
+import { User } from '@myfinances/core/types';
 import { apiRequest } from '@/api/configs';
 import { clearQueryCache } from '@/lib/queryPersister';
 

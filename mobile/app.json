@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "MyFinances",
+    "slug": "myfinances",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myfinances",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0a0a",
+    "ios": {
+      "bundleIdentifier": "site.myfinances.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Unlock your vault with Face ID."
+      }
+    },
+    "android": {
+      "package": "site.myfinances.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0a0a0a"
+        }
+      ],
+      "react-native-quick-crypto",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Unlock your vault with Face ID."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://api.my-finances.site"
+    }
+  }
+}

@@ -15,16 +15,14 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { PasswordInput } from './ui/password-input';
-import { useLoginMutation } from '@/api/mutations';
+import { useLoginMutation } from '@myfinances/core/api';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { User } from '@/api/dataInterface';
+import { User } from '@myfinances/core/types';
 import { AlertCircle } from 'lucide-react';
+import { loginSchema } from '@myfinances/core/schemas/auth';
 
-const formSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-});
+const formSchema = loginSchema;
 
 export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({

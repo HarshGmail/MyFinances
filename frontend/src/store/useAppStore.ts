@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User } from '@/api/dataInterface';
+import { User } from '@myfinances/core/types';
 
 interface AppState {
   user: User | null;

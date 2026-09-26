@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight, Users, Wallet } from 'lucide-react';
-import { WalletSummary } from '@/api/dataInterface';
+import { WalletSummary } from '@myfinances/core/types';
 import { Badge } from '@/components/ui/badge';
 
 interface WalletRowProps {

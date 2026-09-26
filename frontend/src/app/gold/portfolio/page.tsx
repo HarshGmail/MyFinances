@@ -2,7 +2,7 @@
 
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 import { useGoldPortfolioData } from './useGoldPortfolioData';
 import GoldPriceChart from './GoldPriceChart';
 import GoldInvestmentChart from './GoldInvestmentChart';

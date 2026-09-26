@@ -1,8 +1,8 @@
 'use client';
 
-import { useFixedDepositsQuery } from '@/api/query';
-import { useFixedDepositMutation } from '@/api/mutations/fixed-deposits';
-import { FixedDeposit, FixedDepositPayload } from '@/api/dataInterface';
+import { useFixedDepositsQuery } from '@myfinances/core/api';
+import { useFixedDepositMutation } from '@myfinances/core/api/mutations/fixed-deposits';
+import { FixedDeposit, FixedDepositPayload } from '@myfinances/core/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { differenceInDays } from 'date-fns';
+import { simpleInterestAccrued } from '@myfinances/core/calc/deposits';
 import { Button } from '@/components/ui/button';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,8 +98,12 @@ export default function FixedDepositPage() {
       const daysRemaining = Math.max(totalDays - daysCompleted, 0);
 
       const annualRate = fd.rateOfInterest / 100;
-      const totalInterest = (fd.amountInvested * annualRate * totalDays) / 365;
-      const currentInterest = (fd.amountInvested * annualRate * daysCompleted) / 365;
+      const totalInterest = simpleInterestAccrued(fd.amountInvested, fd.rateOfInterest, totalDays);
+      const currentInterest = simpleInterestAccrued(
+        fd.amountInvested,
+        fd.rateOfInterest,
+        daysCompleted
+      );
       const maturityAmount = fd.amountInvested + totalInterest;
       const currentValue = fd.amountInvested + currentInterest;
 

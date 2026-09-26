@@ -1,7 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { usePortfolioAnalyticsQuery, useStocksPortfolioQuery } from '@/api/query/stocks';
+import {
+  usePortfolioAnalyticsQuery,
+  useStocksPortfolioQuery,
+} from '@myfinances/core/api/query/stocks';
 import { useAppStore } from '@/store/useAppStore';
 import { PortfolioSummaryBar } from './PortfolioSummaryBar';
 import { ValuationSection } from './ValuationSection';

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSearchMutualFundsQuery } from '@/api/query';
+import { useSearchMutualFundsQuery } from '@myfinances/core/api';
 import { OwnedMutualFund } from '../types';
 import { formatCurrency } from '../utils';
 

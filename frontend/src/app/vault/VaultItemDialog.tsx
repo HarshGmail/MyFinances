@@ -2,7 +2,7 @@
 
 import { UseFormReturn, useFieldArray } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
-import { VaultCategory } from '@/api/dataInterface';
+import { VaultCategory } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

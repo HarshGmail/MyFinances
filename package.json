@@ -40,14 +40,31 @@
     "fmt": "npm run prettier:all && npm run fmt:rust",
     "fmt:check": "npm run prettier:check && npm run fmt:rust:check",
     "deploy:check": "node scripts/deploy-check.js",
-    "deploy": "node scripts/deploy.js"
+    "deploy": "node scripts/deploy.js",
+    "test:core": "npm test -w @myfinances/core",
+    "typecheck:core": "npm run typecheck -w @myfinances/core"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "date-fns": "4.1.0",
+    "react-native-svg": "15.15.4"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
     "cors": "^2.8.5"
+  },
+  "workspaces": [
+    "packages/*",
+    "frontend",
+    "mobile"
+  ],
+  "overrides": {
+    "react-day-picker": {
+      "date-fns": "$date-fns"
+    },
+    "lucide-react-native": {
+      "react-native-svg": "$react-native-svg"
+    }
   }
 }

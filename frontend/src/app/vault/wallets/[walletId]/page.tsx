@@ -4,9 +4,9 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Share2, Trash2, Users, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import { VaultItemContent, WalletSummary } from '@/api/dataInterface';
-import { fetchWalletDetail } from '@/api/mutations';
-import { useWalletMembersQuery, useWalletsQuery } from '@/api/query';
+import { VaultItemContent, WalletSummary } from '@myfinances/core/types';
+import { fetchWalletDetail } from '@myfinances/core/api';
+import { useWalletMembersQuery, useWalletsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {

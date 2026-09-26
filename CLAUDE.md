@@ -8,7 +8,9 @@ Personal finance tracker for investments (stocks, gold, crypto, mutual funds, EP
 
 ```
 ourFinance/
+├── packages/core/     Shared TypeScript for web + mobile: types, calculations, API hooks, schemas, vault crypto
 ├── frontend/          Next.js 16 App Router, React 19, TypeScript
+├── mobile/            Expo SDK 57 (React Native) app for iOS + Android
 ├── backend/           Express.js, MongoDB, TypeScript
 ├── scripts/           Utility scripts (SMS ingestion, automation)
 └── docs/
@@ -40,6 +42,45 @@ ourFinance/
 
 ---
 
+## Shared Core (`packages/core`) and Workspaces
+
+The repo root is an npm workspace over `packages/*`, `frontend` and `mobile`, with one root `package-lock.json`. `backend/` and `mcp-server/` are **not** in the workspace and keep their own lockfiles (Render deploys them unchanged). React is 19.2.3 everywhere; Expo SDK 57 pins it, so bump web and mobile together.
+
+`@myfinances/core` is consumed as TypeScript source (Next `transpilePackages`, Metro resolves it directly). Import by subpath: `@myfinances/core/types`, `/api`, `/api/query/<file>`, `/api/mutations/<file>`, `/calc/<file>`, `/hooks/<file>`, `/schemas/<file>`, `/vault/<file>`.
+
+```
+packages/core/src/
+├── types/index.ts        All API interfaces (was frontend/src/api/dataInterface.ts)
+├── api/
+│   ├── client.ts         apiRequest() + configureApi() — transport is injected per app
+│   ├── persistence.ts    PERSISTENT_QUERY_KEYS, shouldPersistQuery (both apps)
+│   ├── mobileAuth.ts     /auth/mobile/* login, signup, demo, refresh
+│   ├── query/, mutations/  Every TanStack hook (moved from frontend/src/api)
+├── calc/                 Pure calculations: xirr, cagr, portfolioCalculations (MF rows, EPF),
+│                         deposits (FD/RD interest), holdingXirr, goldCategories (+ computeGoldStats),
+│                         cryptoHoldings (+ valueCryptoHoldings), dailyMoves, mfDailyMoves,
+│                         marketHours, navDates, numbers, financialMonth (+ summariseSpend), aiCopy
+├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData
+├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses
+└── vault/                crypto.ts (vault format over injected primitives), noblePrimitives.ts,
+                          vaultTypes.ts (field defs, no icons), inviteCode.ts
+```
+
+`npm test -w @myfinances/core` runs Vitest, including `vault/__tests__/webCompatibility.test.ts`, which executes the web `vaultCrypto.ts` on Node WebCrypto and checks the core implementation against it in both directions. **Run it after touching either vault crypto file.**
+
+Frontend keeps thin shims where it adds web-only pieces: `api/configs/configureWebApi.ts` (cookies, toast, 401 redirect), `app/vault/vaultTypes.ts` (adds lucide icons), `app/vault/wallets/inviteCode.ts` (re-export).
+
+## Mobile App (`mobile/`)
+
+Expo Router, NativeWind (Tailwind 3), TanStack Query persisted to MMKV, token in `expo-secure-store`.
+
+- **Auth:** bearer JWT from `/api/auth/mobile/login|signup|demo-login` (body, no cookie). `useTokenRefresh` calls `/api/auth/mobile/refresh` on launch and foreground; the server re-signs past half of `SESSION_DURATION_SECONDS`. `configureMobileApi.ts` wires `configureApi` with the token and a 401 → `/login` handler.
+- **Screens:** `app/(tabs)/` — `today`, `home`, `assets/` (stocks, mutual-funds, gold, crypto, epf, deposits, transactions, `forms/*`), `expenses/` (list, `add`), `more/` (profile, `vault/`).
+- **Vault:** `src/features/vault/` — `vaultCrypto.ts` (native PBKDF2 via react-native-quick-crypto + noble), `VaultSession.tsx`, `useWalletActions.ts`, `biometricPin.ts`. Locks on background and after 5 min idle, zeroes key bytes, blocks screenshots.
+- **Push:** `src/lib/pushNotifications.ts` registers an Expo push token at `POST /api/push/expo-token`; backend `sendPush` fans out to Expo tokens and Web Push.
+- **Builds:** EAS profiles in `eas.json` — `development` (dev client), `preview` (Android APK / iOS ad hoc), `production` (TestFlight). Native modules (quick-crypto, MMKV) mean **Expo Go cannot run it**; use a development build.
+- **Web-only for now:** goals, integrations, email import, EPF passbook upload, stock research — linked from More.
+
 ## Frontend Structure
 
 ```
@@ -51,7 +92,7 @@ frontend/src/
 │   ├── home/page.tsx         Master dashboard (all assets combined)
 │   ├── today/                Daily movers: stocks / MF / gold / crypto change as a whole
 │   │   ├── page.tsx                Orchestrator — header, 4 class cards, contribution chart, top movers
-│   │   └── useTodayMovesData.ts    Queries + builders from utils/dailyMoves.ts; polls stocks 60s while NSE open
+│   │   └── (data hook)             useTodayMovesData lives in packages/core/src/hooks
 │   ├── stocks/
 │   │   ├── page.tsx          Stocks landing (links to Portfolio, Analytics, Research, Transactions, Update)
 │   │   ├── analytics/        Portfolio-wide fundamental analysis (NEW)
@@ -92,8 +133,8 @@ frontend/src/
 │   │   ├── DashboardTab.tsx  Financial dashboard (display only, receives props)
 │   │   ├── TrackerTab.tsx    Daily expense logger
 │   │   ├── useDashboardData.ts  All dashboard calculations (useMemo)
-│   │   ├── useTrackerData.ts    Tracker chart calculations (useMemo)
-│   │   └── types.ts          Zod schemas, constants (EXPENSE_TAGS, FIXED_EXPENSE_TAGS)
+│   │   └── useTrackerData.ts    Tracker chart options; totals via core summariseSpend
+│   │                            (schemas + EXPENSE_TAGS now in packages/core/src/schemas/expenses.ts)
 │   ├── epf/                  EPF account management + passbook import
 │   │   ├── page.tsx                   Orchestrator; "Import Passbook" button + EpfPassbookImportDialog
 │   │   ├── EpfPassbookImportDialog.tsx Upload PDF passbooks → parse → confirm import
@@ -141,18 +182,11 @@ frontend/src/
 │   │   └── join/[token]/page.tsx   Invite landing page (reads #k= before any router call)
 │   └── popup/                Browser extension popup
 ├── api/
-│   ├── configs/
-│   │   ├── api.ts            apiRequest() — base fetch wrapper (handles 401 → redirect to /)
-│   │   └── baseUrl.ts        API_BASE_URL from env
-│   ├── query/
-│   │   ├── stocks.ts         useStockFinancialsQuery, useStockFullProfile, useStocksPortfolioQuery, usePortfolioAnalyticsQuery
-│   │   └── emailIntegration.ts  useEmailIntegrationStatusQuery, etc.
-│   ├── mutations/
-│   │   ├── stocks.ts         Stock transaction mutations
-│   │   └── emailIntegration.ts  useEmailSyncMutation, useEmailResetSyncMutation, etc.
-│   └── dataInterface.ts      ALL TypeScript interfaces:
-│       ├── StockFinancials — price, summaryDetail, defaultKeyStatistics, financialData, earningsTrend
-│       └── Others: CryptoTransaction, MutualFundInfo, ExpenseTransaction, etc.
+│   └── configs/
+│       ├── configureWebApi.ts  configureApi() for the web: cookies, demo toast, 401 → redirect to /
+│       ├── baseUrl.ts          API_BASE_URL from env
+│       └── index.ts            re-exports apiRequest from @myfinances/core/api/client
+│   (query/mutation hooks and all types moved to packages/core)
 ├── components/
 │   ├── custom/
 │   │   ├── SummaryStatCard.tsx
@@ -165,19 +199,11 @@ frontend/src/
 │   └── ui/                   shadcn/ui components
 ├── store/
 │   └── useAppStore.ts        Zustand: { user, theme, filters, tempFilters }
-└── utils/
-    ├── portfolioCalculations.ts  Shared calc functions (MF, EPF) — source of truth
-    ├── xirr.ts               XIRR via newton-raphson-method
-    ├── numbers.ts            formatCurrency, formatToPercentage, formatToTwoDecimals
-    ├── chartHelpers.ts       Highcharts helpers
-    ├── text.ts               getProfitLossColor, etc.
+└── utils/                    Web-only helpers (pure calculations moved to packages/core/src/calc)
     ├── useUrlState.ts        URL-persisted state (tabs, filters) via router.replace
-    ├── dailyMoves.ts         Pure builders for today's per-class change (stocks, MF, gold, crypto)
-    ├── marketHours.ts        getNseMarketStatus() in IST (pre-open / open / closed / weekend)
-    ├── cryptoHoldings.ts     groupCryptoHoldings() — net units + invested per coin symbol
-    ├── mfDailyMoves.ts       buildMfDailySummary() — per-fund day/1W/1M NAV change from NAV history
-    ├── navDates.ts           parseNavDate/formatNavDate for MFAPI "DD-MM-YYYY" dates
-    └── vaultCrypto.ts        WebCrypto PBKDF2 + AES-GCM for the vault (client-side only)
+    ├── vaultCrypto.ts        WebCrypto PBKDF2 + AES-GCM for the vault (client-side only)
+    ├── vaultBiometrics.ts    WebAuthn PRF Face ID unlock
+    └── webPush.ts            Service worker push subscription
 ```
 
 ---
@@ -220,7 +246,7 @@ backend/src/
 
 | Prefix                      | Domain                                                                                    |
 | --------------------------- | ----------------------------------------------------------------------------------------- |
-| `/api/auth`                 | Login, signup                                                                             |
+| `/api/auth`                 | Login, signup; `/mobile/*` variants return the JWT in the body for the app                |
 | `/api/stocks`               | Stock transactions + NSE quotes + Yahoo Finance search + financials + portfolio analytics |
 | `/api/gold`                 | Gold transactions + SafeGold rates                                                        |
 | `/api/crypto`               | Crypto transactions + CoinDCX prices + 24h ticker changes + candle data                   |
@@ -254,7 +280,7 @@ backend/src/
 
 ## TanStack Query Conventions
 
-Every query hook lives in `frontend/src/api/query/`. Conventions:
+Every query hook lives in `packages/core/src/api/query/`. Conventions:
 
 ```typescript
 // Standard cache — 5 minutes staleTime
@@ -424,7 +450,7 @@ MF fund names in transactions don't carry scheme numbers. `MutualFundInfo` (from
 
 ### FIXED_EXPENSE_TAGS
 
-Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills & Utilities']`. Expenses with these tags are counted as `fixedExpenses`; all others are `variableExpenses`.
+Defined in `packages/core/src/schemas/expenses.ts`: `['Rent', 'Insurance', 'Bills & Utilities']`. Expenses with these tags are counted as `fixedExpenses`; all others are `variableExpenses`.
 
 ---
 
@@ -461,7 +487,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 3. **Chart options are theme-aware** — every `useMemo` that builds Highcharts options takes `theme` from `useAppStore` as a dependency. `textColor` switches between `'#fff'` (dark) and `'#18181b'` (light). Always include `theme` in the dependency array.
 
-4. **`portfolioCalculations.ts` is the shared calculation source of truth** — both the home dashboard and individual portfolio pages import from here. Don't duplicate calculation logic in page files.
+4. **`packages/core/src/calc/` is the shared calculation source of truth** — the web pages, the home dashboard and the mobile app all import from here. Don't duplicate calculation logic in page files.
 
 5. **MF requires two-step data fetch** — you cannot fetch NAV history without scheme numbers, and scheme numbers come from the MF info endpoint. This creates an unavoidable dependent query chain.
 
@@ -473,13 +499,13 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 9. **CORS origins are hardcoded in `server.ts`** — `localhost:3000`, `localhost:5000`, and the production domain. Add new origins there.
 
-10. **`apiRequest()` is the only HTTP client** — don't use axios or raw fetch in new code. All API calls go through `apiRequest()` from `@/api/configs`.
+10. **`apiRequest()` is the only HTTP client** — don't use axios or raw fetch in new code. All API calls go through `apiRequest()` from `@myfinances/core/api/client` (re-exported by `@/api/configs` on web).
 
 11. **Email import is on-demand only** — there is no background cron. The user manually triggers a sync from the Integrations page. After the first sync, `lastSyncAt` is set and subsequent syncs only fetch emails received after that timestamp (incremental sync). A "Full re-sync" button resets `lastSyncAt` to null to force a complete history fetch.
 
 12. **CDSL eCAS parsing limitation** — only MF transactions are extracted from CDSL CAS PDFs. The equity holdings section is a point-in-time snapshot with no historical buy/sell data, so it is intentionally skipped.
 
-13. **SafeGold PDF parsing rules** — "Purchased"/"Sold" rows import as `category: 'purchase' | 'sale'`. Lease rental payouts import as `lease_interest` (credit, `amount: 0`, `goldPrice: 0`) and "deducted as TDS" rows as `lease_tds` (debit, `amount: 0`), each with `borrower`; the "Leased N grams to …" rows stay skipped because leasing only moves gold inside the wallet. Rows without `category` are legacy buys/sells — read them through `getGoldCategory()` in `frontend/src/utils/goldCategories.ts`. Lease rows add or remove grams but never cash: `goldCashFlow()`/`netGoldInvested()` exclude them from invested and XIRR, and capital-gains FIFO consumes TDS lots as `isNonSaleOutflow` rather than booking a sale at ₹0. Statements are parsed locally (`safegoldParser.ts`), not by the Rust service, whose `safegold.rs` still skips lease rows. The monthly "Lease Monthly Yield Payout" PDF (`safegoldLeaseParser.ts`, unprotected) is a per-lease snapshot upserted into `goldLeases` by `commitId`; the statement's account summary (leased vs available grams) goes to `goldAccountSummaries`. Both are served by `GET /api/gold/leases`.
+13. **SafeGold PDF parsing rules** — "Purchased"/"Sold" rows import as `category: 'purchase' | 'sale'`. Lease rental payouts import as `lease_interest` (credit, `amount: 0`, `goldPrice: 0`) and "deducted as TDS" rows as `lease_tds` (debit, `amount: 0`), each with `borrower`; the "Leased N grams to …" rows stay skipped because leasing only moves gold inside the wallet. Rows without `category` are legacy buys/sells — read them through `getGoldCategory()` in `packages/core/src/calc/goldCategories.ts`. Lease rows add or remove grams but never cash: `goldCashFlow()`/`netGoldInvested()` exclude them from invested and XIRR, and capital-gains FIFO consumes TDS lots as `isNonSaleOutflow` rather than booking a sale at ₹0. Statements are parsed locally (`safegoldParser.ts`), not by the Rust service, whose `safegold.rs` still skips lease rows. The monthly "Lease Monthly Yield Payout" PDF (`safegoldLeaseParser.ts`, unprotected) is a per-lease snapshot upserted into `goldLeases` by `commitId`; the statement's account summary (leased vs available grams) goes to `goldAccountSummaries`. Both are served by `GET /api/gold/leases`.
 
 14. **Email import deduplication** — before inserting a parsed transaction, a ±1 day window check is performed on the date combined with other matching fields (symbol/fund name/amount). Duplicates within that window are silently skipped.
 
@@ -507,7 +533,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 26. **Portfolio analytics uses a single batch backend call** — `GET /api/stocks/portfolio-analytics` fetches the user's transactions, extracts unique symbols, runs `StocksService.fetchFinancials()` for all in parallel, and returns `Record<symbol, StockFinancials>` in one response. The frontend hook `usePortfolioAnalyticsQuery()` (10 min staleTime) makes this single call. The analytics page also uses `useStocksPortfolioQuery()` for investment weights (portfolio beta weighting, scorecard sort).
 
-27. **Vault plaintext must never enter the TanStack Query cache** — `lib/queryPersister.ts` persists query state to IndexedDB, gated by the opt-in `PERSISTENT_QUERY_KEYS` whitelist in `providers.tsx`. The real protection is structural, not that list: decrypted vault content never goes through the query layer at all. Items are fetched imperatively by `useVaultSession` and decrypted into component state, so even if a vault key were added to the whitelist it would persist ciphertext. **Never add a vault query key to `PERSISTENT_QUERY_KEYS`.**
+27. **Vault plaintext must never enter the TanStack Query cache** — `lib/queryPersister.ts` persists query state to IndexedDB, gated by the opt-in `PERSISTENT_QUERY_KEYS` whitelist in `packages/core/src/api/persistence.ts` (used by web and mobile). The real protection is structural, not that list: decrypted vault content never goes through the query layer at all. Items are fetched imperatively by `useVaultSession` and decrypted into component state, so even if a vault key were added to the whitelist it would persist ciphertext. **Never add a vault query key to `PERSISTENT_QUERY_KEYS`.**
 
 28. **Never `await` a decrypt inside a clipboard handler** — Safari (desktop and iOS) allows `navigator.clipboard.writeText` only within the task that handled the user gesture. Any `await` first — including `await decryptItem(...)` — silently breaks the copy on iOS. This is why vault items are decrypted eagerly into state on unlock and `buildItemCopyText()` in `vaultTypes.ts` is synchronous.
 
@@ -519,7 +545,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 32. **Every vault user has an ECDH P-256 keypair, and the vault PIN guards it** — the public key sits in plaintext on the vault document; the private key is encrypted under the vault key, so unlocking the vault is what yields it. `ensureSharingKeys` in `useVaultSession` backfills it on unlock for vaults created before shared wallets existed. **`rekeyVault` must re-wrap `wrappedPrivateKey` under the new vault key** — forgetting that orphans every wallet the user belongs to. `POST /api/vault/keypair` matches on `publicKey: null` so it can never clobber an existing keypair.
 
-33. **Invites travel as a code by preference, not a link** — `MFW1.<token>.<base64url key>`, built and parsed by `frontend/src/app/vault/wallets/inviteCode.ts`. Two reasons the link is the fallback: chat apps (WhatsApp confirmed) strip the `#k=` fragment while generating a preview, leaving a link that cannot decrypt; and a tapped link opens the browser, which on iOS is a _different storage container_ from the Home Screen app, so the recipient signs in and unlocks a second time. iOS does not let a PWA capture links, so that part is unfixable — the code sidesteps it by being pasted into the already-open app (Vault → Wallets → Join, also reachable via the manifest shortcut `?join=1`). `parseWalletInvite` accepts either carrier, pulls one out of surrounding chat text, and raises `InviteKeyMissingError` when a link arrives with its fragment stripped so the UI names the real problem.
+33. **Invites travel as a code by preference, not a link** — `MFW1.<token>.<base64url key>`, built and parsed by `packages/core/src/vault/inviteCode.ts`. Two reasons the link is the fallback: chat apps (WhatsApp confirmed) strip the `#k=` fragment while generating a preview, leaving a link that cannot decrypt; and a tapped link opens the browser, which on iOS is a _different storage container_ from the Home Screen app, so the recipient signs in and unlocks a second time. iOS does not let a PWA capture links, so that part is unfixable — the code sidesteps it by being pasted into the already-open app (Vault → Wallets → Join, also reachable via the manifest shortcut `?join=1`). `parseWalletInvite` accepts either carrier, pulls one out of surrounding chat text, and raises `InviteKeyMissingError` when a link arrives with its fragment stripped so the UI names the real problem.
 
 34. **The wallet key rides in the URL fragment, never the path or query** — `/vault/join/<token>#k=<base64url>`. Browsers do not transmit the fragment, so it stays out of server logs, `Referer` headers and proxies. The join page must read `window.location.hash` in its first effect **before any router call**, because `useUrlState` uses `router.replace` and would drop it. Consequence worth stating plainly: the link is a bearer credential, and owner approval gates server-side access to the ciphertext rather than possession of the key.
 
@@ -529,7 +555,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 
 37. **Shared entries are per-field projections and are copies, not live links** — only ticked fields are encrypted into the wallet entry; the rest never leave the owner's vault. `VaultFieldDef.shareByDefault` ticks identifying fields by default and leaves `cardNumber`/`cvv`/`atmPin`/passwords unticked. Editing the vault entry does **not** update the shared copy (`sourceItemId` records the link); automatic propagation was rejected because it would silently re-share fields. Server-side, members may only edit entries where `addedBy` matches — enforced in the `arrayFilters`, not just hidden in the UI.
 
-38. **The app is an installable PWA, and that only works because frontend and API are same-site** — `www.my-finances.site` and `api.my-finances.site` share the registrable domain, so the `SameSite=Lax` cookie is first-party and installing to the Home Screen changes nothing about auth. Do **not** move the API to a different domain, and do not assume a Capacitor/WebView shell would work as-is: `capacitor://localhost` is cross-site against the API and would break the cookie, CORS and Gmail OAuth at once. `apiRequest()` already has the bearer-token seam (`api/configs/authToken.ts`) if that is ever needed; the backend has read `Authorization: Bearer` all along.
+38. **The app is an installable PWA, and that only works because frontend and API are same-site** — `www.my-finances.site` and `api.my-finances.site` share the registrable domain, so the `SameSite=Lax` cookie is first-party and installing to the Home Screen changes nothing about auth. Do **not** move the API to a different domain, and do not assume a Capacitor/WebView shell would work as-is: `capacitor://localhost` is cross-site against the API and would break the cookie, CORS and Gmail OAuth at once. The native app (`mobile/`) uses bearer tokens through `configureApi({ getToken })` for exactly this reason (see #44).
 
 39. **The service worker must never cache API responses** — `public/sw.js` returns early for any non-same-origin request, which excludes `api.my-finances.site` by construction. TanStack Query + `queryPersister.ts` already own data freshness and persistence; caching authenticated financial responses in the Cache API would duplicate that state with a second, separate eviction story. The service worker's job is the app shell only, which is what makes the already-persisted query cache reachable offline.
 
@@ -540,3 +566,7 @@ Defined in `frontend/src/app/expenses/types.ts`: `['Rent', 'Insurance', 'Bills &
 42. **Wide tables render as stacked cards below `md:`** — `components/custom/MobileDataCard.tsx` is the shared primitive; `TransactionsTable` and the stocks/crypto/FD/RD/MF/scorecard tables each render cards on mobile and keep `<Table className="hidden md:table">` for desktop. When adding a column to one of those tables, add it to the card too, or it silently disappears on the phone.
 
 43. **`/today` compares each class against a different baseline** — stocks: current price vs second-to-last daily close (weekends and holidays therefore show the last session; `summary.lastTradeTime` names it). MFs: latest NAV vs the one before, fetched via `latestCount: 2` on `/funds/nav-history`; a fund whose latest NAV date lags the others counts as unchanged. Gold: SafeGold live price vs the previous row of `/gold/safe-gold-rates`. Crypto: CoinDCX `change_24_hour`, a rolling 24h window (`POST /crypto/ticker-changes`). Labels on each card state the basis — keep them honest when changing a builder.
+
+44. **Mobile auth is bearer-only and never sets a cookie** — `/api/auth/mobile/login|signup|demo-login` share the credential logic of their web twins through `startSession(res, user, 'cookie' | 'body')` in `authController.ts`, so validation cannot drift, but only the web routes set the cookie and only the mobile routes put `token` in the body. `authenticateToken` already reads `Authorization: Bearer` first. Bearer tokens get no sliding refresh from the middleware; the app calls `/mobile/refresh`, which uses the same `reissueTokenIfStale` as the cookie path.
+
+45. **Expo Go cannot run the mobile app** — react-native-quick-crypto (native PBKDF2; 310k iterations in pure JS would take seconds) and MMKV are native modules. Use `eas build --profile development` once, then `npx expo start --dev-client`. `expo-doctor` must stay at 21/21; `react-native-svg` is pinned and deduped via a root `overrides` entry because lucide-react-native pulls its own.

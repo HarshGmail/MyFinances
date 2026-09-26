@@ -48,13 +48,25 @@ export function refreshAuthCookieIfStale(
   res: Response,
   payload: { name?: string; email?: string; userId: string; exp?: number }
 ): void {
-  if (!payload.exp || !payload.name || !payload.email) return;
+  const refreshed = reissueTokenIfStale(payload);
+  if (refreshed) setAuthCookie(res, refreshed);
+}
+
+export function tokenExpiresAt(token: string): string | null {
+  const decoded = jwt.decode(token) as { exp?: number } | null;
+  return decoded?.exp ? new Date(decoded.exp * 1000).toISOString() : null;
+}
+
+export function reissueTokenIfStale(payload: {
+  name?: string;
+  email?: string;
+  userId: string;
+  exp?: number;
+}): string | null {
+  if (!payload.exp || !payload.name || !payload.email) return null;
   const secondsUntilExpiry = payload.exp - Math.floor(Date.now() / 1000);
-  if (secondsUntilExpiry > SESSION_DURATION_SECONDS / 2) return;
-  setAuthCookie(
-    res,
-    generateToken({ name: payload.name, email: payload.email, id: payload.userId })
-  );
+  if (secondsUntilExpiry > SESSION_DURATION_SECONDS / 2) return null;
+  return generateToken({ name: payload.name, email: payload.email, id: payload.userId });
 }
 
 export function authenticateUser(res: Response, userData: UserData): string {

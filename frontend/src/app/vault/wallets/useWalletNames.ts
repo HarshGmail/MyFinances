@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { WalletSummary } from '@/api/dataInterface';
+import { WalletSummary } from '@myfinances/core/types';
 import { decryptItem } from '@/utils/vaultCrypto';
 
 type WalletKeyResolver = (

@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { Landmark } from 'lucide-react';
-import { VaultItemContent } from '@/api/dataInterface';
+import { VaultItemContent } from '@myfinances/core/types';
 import { maskValue } from './vaultTypes';
 
 interface PassbookFaceProps {

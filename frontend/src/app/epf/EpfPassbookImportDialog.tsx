@@ -5,9 +5,12 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useParseEpfPassbooksMutation, useBulkUpdateEpfAccountsMutation } from '@/api/mutations';
-import { EpfParsedSegment } from '@/api/dataInterface';
-import { formatCurrency } from '@/utils/numbers';
+import {
+  useParseEpfPassbooksMutation,
+  useBulkUpdateEpfAccountsMutation,
+} from '@myfinances/core/api';
+import { EpfParsedSegment } from '@myfinances/core/types';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 
 interface Props {
   open: boolean;

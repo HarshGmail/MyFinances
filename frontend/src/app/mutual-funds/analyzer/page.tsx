@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMutualFundInfoFetchQuery } from '@/api/query/mutual-funds-info';
+import { useMutualFundInfoFetchQuery } from '@myfinances/core/api/query/mutual-funds-info';
 import MFSearchBar from './[schemeCode]/MFSearchBar';
 
 export default function MFSearchLandingPage() {

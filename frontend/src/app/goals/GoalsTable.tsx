@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useUserGoalsQuery } from '@/api/query/userGoals';
+import { useUserGoalsQuery } from '@myfinances/core/api/query/userGoals';
 import {
   useStockTransactionsQuery,
   useMutualFundInfoFetchQuery,
@@ -11,13 +11,13 @@ import {
   useNseQuoteQuery,
   useSafeGoldRatesQuery,
   useGoldTransactionsQuery,
-} from '@/api/query';
+} from '@myfinances/core/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import _ from 'lodash';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 
 const getProgressColor = (percentage: number) => {
   if (percentage >= 100) return 'bg-green-500';

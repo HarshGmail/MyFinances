@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 import { Info } from 'lucide-react';
 
 interface FYGains {

@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { StocksPortfolioItem } from '@/api/dataInterface';
-import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
+import { StocksPortfolioItem } from '@myfinances/core/types';
+import {
+  formatCurrency,
+  formatToPercentage,
+  formatToTwoDecimals,
+} from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 
 interface StockPortfolioCardProps {

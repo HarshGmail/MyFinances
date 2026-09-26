@@ -1,18 +1,15 @@
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@/api/query';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
-import xirr, { XirrTransaction } from '@/utils/xirr';
-import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
+import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@myfinances/core/api';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
+import { getPastDate, getTimeframes } from '@myfinances/core/calc/chartHelpers';
 import Highcharts from 'highcharts';
 import { useUrlState } from '@/utils/useUrlState';
 import {
+  computeGoldStats,
   getGoldCategory,
-  goldCashFlow,
   isLeaseCategory,
-  netGoldInvested,
-  totalGoldGrams,
-} from '@/utils/goldCategories';
+} from '@myfinances/core/calc/goldCategories';
 
 export function useGoldPortfolioData() {
   const { theme } = useAppStore();
@@ -40,36 +37,7 @@ export function useGoldPortfolioData() {
 
   const goldStats = useMemo(() => {
     if (!transactions || !filteredRates.length) return null;
-
-    const totalGold = totalGoldGrams(transactions);
-    const totalInvested = netGoldInvested(transactions);
-    const lastRate = parseFloat(filteredRates[filteredRates.length - 1].rate);
-    const avgPrice = totalGold > 0 ? totalInvested / totalGold : 0;
-    const currentValue = totalGold * lastRate;
-    const profitLoss = currentValue - totalInvested;
-    const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
-
-    const cashFlows: XirrTransaction[] = transactions
-      .map((tx) => ({ amount: goldCashFlow(tx), when: new Date(tx.date) }))
-      .filter((flow) => flow.amount !== 0);
-    cashFlows.push({ amount: currentValue, when: new Date() });
-    let xirrValue: number | null = null;
-    try {
-      xirrValue = xirr(cashFlows) * 100;
-    } catch {
-      xirrValue = null;
-    }
-
-    return {
-      totalGold,
-      totalInvested,
-      currentValue,
-      profitLoss,
-      profitLossPercentage,
-      xirrValue,
-      avgPrice,
-      currentPrice: lastRate,
-    };
+    return computeGoldStats(transactions, parseFloat(filteredRates[filteredRates.length - 1].rate));
   }, [transactions, filteredRates]);
 
   const goldUnrealized = useMemo(() => {

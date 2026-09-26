@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAppStore } from '@/store/useAppStore';
-import type { GoldTransaction, SafeGoldRatesResponse } from '@/api/dataInterface';
-import { getGoldCategory } from '@/utils/goldCategories';
+import type { GoldTransaction, SafeGoldRatesResponse } from '@myfinances/core/types';
+import { getGoldCategory } from '@myfinances/core/calc/goldCategories';
 
 const MONTH_NAMES = [
   'Jan',

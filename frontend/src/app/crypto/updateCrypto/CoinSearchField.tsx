@@ -18,7 +18,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { useSearchCryptoQuery } from '@/api/query';
+import { useSearchCryptoQuery } from '@myfinances/core/api';
 
 interface CoinSearchFieldProps<T extends FieldValues> {
   control: Control<T>;

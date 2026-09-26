@@ -1,6 +1,6 @@
 'use client';
 
-import { useUserProfileQuery } from '@/api/query';
+import { useUserProfileQuery } from '@myfinances/core/api';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from 'react';

@@ -1,7 +1,7 @@
 'use client';
 
-import { useMutualFundTransactionsQuery } from '@/api/query';
-import { useDeleteMutualFundTransactionMutation } from '@/api/mutations/mutual-funds';
+import { useMutualFundTransactionsQuery } from '@myfinances/core/api';
+import { useDeleteMutualFundTransactionMutation } from '@myfinances/core/api/mutations/mutual-funds';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';

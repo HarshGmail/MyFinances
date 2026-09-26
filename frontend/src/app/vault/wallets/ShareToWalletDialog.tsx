@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
-import { WalletSummary } from '@/api/dataInterface';
+import { WalletSummary } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

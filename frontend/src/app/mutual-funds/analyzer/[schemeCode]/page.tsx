@@ -1,8 +1,8 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useSingleMFNavHistoryQuery } from '@/api/query/mutual-funds-info';
-import { useMutualFundInfoFetchQuery } from '@/api/query/mutual-funds-info';
+import { useSingleMFNavHistoryQuery } from '@myfinances/core/api/query/mutual-funds-info';
+import { useMutualFundInfoFetchQuery } from '@myfinances/core/api/query/mutual-funds-info';
 import MFSearchBar from './MFSearchBar';
 import MFHeader from './MFHeader';
 import MFNavChart from './MFNavChart';

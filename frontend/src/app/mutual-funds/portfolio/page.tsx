@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useId, useRef, useEffect } from 'react';
-import { useMutualFundInfoFetchQuery } from '@/api/query';
+import { useMutualFundInfoFetchQuery } from '@myfinances/core/api';
 import { AnimatePresence, motion } from 'motion/react';
 import { useOutsideClick } from '@/hooks/use-outside-click';
 import { CirclePlus } from 'lucide-react';
@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAddMutualFundInfoMutation } from '@/api/mutations';
+import { useAddMutualFundInfoMutation } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -23,8 +23,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { AddMfTransactionForm } from '@/app/mutual-funds/portfolio/AddMfTransactionForm';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
-import { MutualFundInfo } from '@/api/dataInterface';
-import { useSearchMutualFundsQuery } from '@/api/query';
+import { MutualFundInfo } from '@myfinances/core/types';
+import { useSearchMutualFundsQuery } from '@myfinances/core/api';
 import { debounce } from 'lodash';
 import {
   Command,

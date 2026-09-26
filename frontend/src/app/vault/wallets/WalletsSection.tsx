@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { LogIn, Plus, Wallet } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { WalletSummary } from '@/api/dataInterface';
+import { WalletSummary } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';

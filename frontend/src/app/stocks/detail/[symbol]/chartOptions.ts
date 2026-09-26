@@ -10,7 +10,7 @@ import { buildChartSeries } from './chartSeries';
 import { buildSRPlotLines } from './srPlotLines';
 import { buildTransactionPlotLines } from './transactionPlotLines';
 import { OverlayConfig } from './stockDetailStore';
-import { StockTransaction } from '@/api/dataInterface';
+import { StockTransaction } from '@myfinances/core/types';
 
 export interface BuildChartOptionsArgs {
   result: YahooChartResult | undefined;

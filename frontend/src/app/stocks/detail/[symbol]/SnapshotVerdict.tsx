@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info, HelpCircle } from 'lucide-react';
-import { StockFinancials } from '@/api/dataInterface';
+import { StockFinancials } from '@myfinances/core/types';
 import MetricEducationDrawer from './MetricEducationDrawer';
 import { getMetricCalculation } from './verdicts';
 import { useUrlNullableState } from '@/utils/useUrlState';

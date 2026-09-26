@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { VaultItemContent } from '@/api/dataInterface';
+import { VaultItemContent } from '@myfinances/core/types';
 import { getCardFace } from './vaultTypes';
 
 const NETWORK_THEMES: Record<string, string> = {

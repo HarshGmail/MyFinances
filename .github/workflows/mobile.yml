@@ -1,0 +1,47 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mobile.yml'
+
+jobs:
+  check:
+    name: Typecheck, lint & bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck -w mobile
+
+      - name: Lint
+        run: npm run lint -w mobile
+
+      - name: Bundle Android
+        run: npx expo export --platform android --output-dir /tmp/mobile-bundle
+        working-directory: mobile

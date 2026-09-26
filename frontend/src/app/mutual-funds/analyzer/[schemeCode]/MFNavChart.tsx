@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
-import { MutualFundNavHistoryData } from '@/api/dataInterface';
+import { MutualFundNavHistoryData } from '@myfinances/core/types';
 import { MF_INTERVALS, filterNavDataByInterval } from './mfVerdicts';
 import { useAppStore } from '@/store/useAppStore';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { useForgotPasswordMutation } from '@/api/mutations';
+import { useForgotPasswordMutation } from '@myfinances/core/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');

@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 
 export default function CapitalGainsCard({ cgData }: { cgData: any }) {
   const fy = cgData.summary?.currentFY ?? '';

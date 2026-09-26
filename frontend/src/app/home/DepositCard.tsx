@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
-import { formatCurrency } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
 
 type DepositSummary = {
   invested: number;

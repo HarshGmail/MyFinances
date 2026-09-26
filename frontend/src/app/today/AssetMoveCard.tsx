@@ -1,9 +1,13 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
-import { ASSET_CLASS_LABELS, AssetClass, AssetMove } from '@/utils/dailyMoves';
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  formatSignedPercent,
+} from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
+import { ASSET_CLASS_LABELS, AssetClass, AssetMove } from '@myfinances/core/calc/dailyMoves';
 import { BreadthBar } from '@/components/custom/BreadthBar';
 
 const PORTFOLIO_PATHS: Record<AssetClass, string> = {

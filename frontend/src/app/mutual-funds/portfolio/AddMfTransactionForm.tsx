@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { useAddMutualFundTransactionMutation } from '@/api/mutations/mutual-funds';
+import { useAddMutualFundTransactionMutation } from '@myfinances/core/api/mutations/mutual-funds';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
 
 interface AddMfTransactionFormProps {

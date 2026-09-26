@@ -1,4 +1,4 @@
-import { EpfTimelineSummary } from '@/api/dataInterface';
+import { EpfTimelineSummary } from '@myfinances/core/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface EpfContributionTimelineProps {

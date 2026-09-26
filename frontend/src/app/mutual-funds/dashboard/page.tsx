@@ -3,12 +3,11 @@
 import {
   useMutualFundInfoFetchQuery,
   useMfapiNavHistoryBatchQuery,
-} from '@/api/query/mutual-funds-info';
-import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+} from '@myfinances/core/api/query/mutual-funds-info';
+import { useMutualFundTransactionsQuery } from '@myfinances/core/api/query/mutual-funds';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import { useMemo } from 'react';
-import groupBy from 'lodash/groupBy';
 import { useUrlState } from '@/utils/useUrlState';
 import {
   Table,
@@ -20,15 +19,16 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
+import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
+import { buildMfFundRows, latestNavMap } from '@myfinances/core/calc/portfolioCalculations';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { useAppStore } from '@/store/useAppStore';
-import { formatCurrency } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
-import { buildMfDailySummary } from '@/utils/mfDailyMoves';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
+import { buildMfDailySummary } from '@myfinances/core/calc/mfDailyMoves';
 import MfTodaySection from './MfTodaySection';
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });
@@ -49,83 +49,15 @@ export default function MutualFundsDashboardPage() {
   const { data: navHistoryBatch, isLoading: navHistoryLoading } =
     useMfapiNavHistoryBatchQuery(schemeNumbers);
 
-  // Build navDataMap from batch query
-  const navDataMap = useMemo(() => {
-    const map: Record<string, { nav: number; navDate: string } | null> = {};
-    schemeNumbers.forEach((schemeNumber) => {
-      const navData = navHistoryBatch?.[schemeNumber];
-      if (navData && navData.data && navData.data.length > 0) {
-        map[schemeNumber] = {
-          nav: parseFloat(navData.data[0].nav),
-          navDate: navData.data[0].date,
-        };
-      } else {
-        map[schemeNumber] = null;
-      }
-    });
-    return map;
-  }, [schemeNumbers, navHistoryBatch]);
+  const navDataMap = useMemo(
+    () => latestNavMap(schemeNumbers, navHistoryBatch),
+    [schemeNumbers, navHistoryBatch]
+  );
 
-  // Group transactions by fundName
-  const grouped = useMemo(() => {
-    if (!mutualFundsTransactionsData) return {};
-    return groupBy(mutualFundsTransactionsData, 'fundName');
-  }, [mutualFundsTransactionsData]);
-
-  // Prepare table data
   const tableData = useMemo(() => {
     if (!mutualFundsTransactionsData || !mfInfoData) return [];
-    return Object.entries(grouped).map(([fundName, txs]) => {
-      const totalCreditUnits = txs
-        .filter((tx) => tx.type === 'credit')
-        .reduce((s, tx) => s + tx.numOfUnits, 0);
-      const totalCreditAmount = txs
-        .filter((tx) => tx.type === 'credit')
-        .reduce((s, tx) => s + tx.amount, 0);
-      const avgCostPerUnit = totalCreditUnits > 0 ? totalCreditAmount / totalCreditUnits : 0;
-
-      const totalUnits = txs.reduce(
-        (sum, tx) => sum + (tx.type === 'credit' ? tx.numOfUnits : -tx.numOfUnits),
-        0
-      );
-      const remainingUnits = Math.max(0, totalUnits);
-      const totalInvested = remainingUnits * avgCostPerUnit;
-
-      // Find schemeNumber for this fundName
-      const info = mfInfoData.find((info) => info.fundName === fundName);
-      const schemeNumber = info?.schemeNumber;
-      const navInfo = schemeNumber ? navDataMap[schemeNumber] : null;
-      const currentNav = navInfo ? navInfo.nav : null;
-      const currentValue = currentNav !== null ? remainingUnits * currentNav : null;
-      const profitLoss = currentValue !== null ? currentValue - totalInvested : null;
-      const profitLossPercentage =
-        profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;
-      // XIRR calculation for this fund
-      let fundXirr: number | null = null;
-      if (txs.length > 0 && currentValue !== null) {
-        const cashFlows: XirrCashFlow[] = txs.map((tx) => ({
-          amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-          when: new Date(tx.date),
-        }));
-        cashFlows.push({ amount: currentValue, when: new Date() });
-        try {
-          fundXirr = xirr(cashFlows) * 100;
-        } catch {
-          fundXirr = null;
-        }
-      }
-      return {
-        fundName,
-        totalUnits,
-        totalInvested,
-        currentNav,
-        currentValue,
-        profitLoss,
-        profitLossPercentage,
-        fundXirr,
-      };
-    });
-  }, [grouped, mfInfoData, mutualFundsTransactionsData, navDataMap]);
+    return buildMfFundRows(mutualFundsTransactionsData, mfInfoData, navDataMap);
+  }, [mfInfoData, mutualFundsTransactionsData, navDataMap]);
 
   const mfUnrealized = useMemo(() => {
     const lots = cgData?.byAsset?.mutualFunds?.currentLots ?? [];
@@ -178,23 +110,10 @@ export default function MutualFundsDashboardPage() {
   const summary = useMemo(() => {
     const totalInvested = tableData.reduce((sum, row) => sum + row.totalInvested, 0);
     const totalCurrentValue = tableData.reduce((sum, row) => sum + (row.currentValue ?? 0), 0);
-    // XIRR for all funds combined
-    let allTxs: XirrCashFlow[] = [];
-    if (mutualFundsTransactionsData && tableData.length > 0) {
-      allTxs = mutualFundsTransactionsData.map((tx) => ({
-        amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-        when: new Date(tx.date),
-      }));
-      allTxs.push({ amount: totalCurrentValue, when: new Date() });
-    }
-    let xirrValue: number | null = null;
-    if (allTxs.length > 1) {
-      try {
-        xirrValue = xirr(allTxs) * 100;
-      } catch {
-        xirrValue = null;
-      }
-    }
+    const xirrValue =
+      mutualFundsTransactionsData && tableData.length > 0
+        ? holdingXirrPercent(mutualFundsTransactionsData, totalCurrentValue)
+        : null;
     return {
       totalInvested,
       totalCurrentValue,
@@ -202,20 +121,15 @@ export default function MutualFundsDashboardPage() {
     };
   }, [tableData, mutualFundsTransactionsData]);
   const dailySummary = useMemo(() => {
-    if (!mfInfoData || !navHistoryBatch) return null;
+    if (!navHistoryBatch) return null;
     return buildMfDailySummary(
-      tableData.map((row) => {
-        const schemeNumber = mfInfoData.find(
-          (info) => info.fundName === row.fundName
-        )?.schemeNumber;
-        return {
-          fundName: row.fundName,
-          units: row.totalUnits,
-          navHistory: schemeNumber ? navHistoryBatch[schemeNumber]?.data : undefined,
-        };
-      })
+      tableData.map((row) => ({
+        fundName: row.fundName,
+        units: row.totalUnits,
+        navHistory: row.schemeNumber ? navHistoryBatch[row.schemeNumber]?.data : undefined,
+      }))
     );
-  }, [tableData, mfInfoData, navHistoryBatch]);
+  }, [tableData, navHistoryBatch]);
 
   const getProfitLossBadgeVariant = (profitLoss: number | null) => {
     if (profitLoss === null) return 'default';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useUserProfileQuery } from '@/api/query';
+import { useUserProfileQuery } from '@myfinances/core/api';
 import { Badge } from '@/components/ui/badge';
 import { Smartphone, Bot, Mail, Bell, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';

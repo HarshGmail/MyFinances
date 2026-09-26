@@ -13,12 +13,12 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAddGoalMutation } from '@/api/mutations';
+import { useAddGoalMutation } from '@myfinances/core/api';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useStockTransactionsQuery } from '@/api/query/stocks';
-import { useMutualFundInfoFetchQuery } from '@/api/query/mutual-funds-info';
-import { useCryptoTransactionsQuery } from '@/api/query/crypto';
+import { useStockTransactionsQuery } from '@myfinances/core/api/query/stocks';
+import { useMutualFundInfoFetchQuery } from '@myfinances/core/api/query/mutual-funds-info';
+import { useCryptoTransactionsQuery } from '@myfinances/core/api/query/crypto';
 import { Badge } from '@/components/ui/badge';
 import { useMemo, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

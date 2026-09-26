@@ -1,0 +1,632 @@
+import { useMemo } from 'react';
+import { differenceInMonths } from 'date-fns';
+import {
+  useMutualFundTransactionsQuery,
+  useSafeGoldRatesQuery,
+  useGoldTransactionsQuery,
+  useCryptoTransactionsQuery,
+  useCryptoCoinPricesQuery,
+  useMutualFundInfoFetchQuery,
+  useMfapiLatestNavQuery,
+  useEpfQuery,
+  useEpfTimelineQuery,
+  useFixedDepositsQuery,
+  useRecurringDepositsQuery,
+} from '../api';
+import { useStocksPortfolioQuery } from '../api/query/stocks';
+import { useCapitalGainsQuery } from '../api/query/capitalGains';
+import xirr, { XirrTransaction as XirrCashFlow } from '../calc/xirr';
+import { cagr, firstTransactionDate, earliestDate } from '../calc/cagr';
+import { calcMFPortfolio, calcEPFPortfolio } from '../calc/portfolioCalculations';
+import { buildAIInsightPrompt } from '../calc/aiCopy';
+import { goldCashFlow, netGoldInvested, totalGoldGrams } from '../calc/goldCategories';
+import { groupCryptoHoldings, heldCoinSymbols, valueCryptoHoldings } from '../calc/cryptoHoldings';
+import { summariseFixedDeposits, summariseRecurringDeposits } from '../calc/deposits';
+
+interface CryptoPortfolioItem {
+  coinName: string;
+  currency: string;
+  balance: number;
+  currentPrice: number;
+  investedAmount: number;
+  currentValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const LATEST_GOLD_RATE_LOOKBACK_DAYS = 7;
+
+export function useHomePortfolioData(userName: string | null | undefined) {
+  const capitalGainsQuery = useCapitalGainsQuery();
+  const stocksPortfolioQuery = useStocksPortfolioQuery();
+  const mfTransactionsQuery = useMutualFundTransactionsQuery();
+  const mfInfoQuery = useMutualFundInfoFetchQuery();
+  const goldTransactionsQuery = useGoldTransactionsQuery();
+  const cryptoTransactionsQuery = useCryptoTransactionsQuery();
+  const epfQuery = useEpfQuery();
+  const epfTimelineQuery = useEpfTimelineQuery();
+  const fdQuery = useFixedDepositsQuery();
+  const rdQuery = useRecurringDepositsQuery();
+
+  const { data: cgData } = capitalGainsQuery;
+  const { data: stocksPortfolioData } = stocksPortfolioQuery;
+  const { data: mutualFundsTransactionsData } = mfTransactionsQuery;
+  const { data: mfInfoData } = mfInfoQuery;
+  const { data: goldTransactions } = goldTransactionsQuery;
+  const { data: cryptoTransactions } = cryptoTransactionsQuery;
+  const { data: epfData } = epfQuery;
+  const { data: epfTimelineData } = epfTimelineQuery;
+  const { data: fdData } = fdQuery;
+  const { data: rdData } = rdQuery;
+
+  const stockPortfolioData = useMemo(
+    () => stocksPortfolioData?.portfolio ?? [],
+    [stocksPortfolioData?.portfolio]
+  );
+  const stockTransactions = useMemo(
+    () => stocksPortfolioData?.transactions,
+    [stocksPortfolioData?.transactions]
+  );
+
+  // ===== MUTUAL FUNDS =====
+  const schemeNumbers = useMemo(() => {
+    if (!mfInfoData) return [];
+    return Array.from(new Set(mfInfoData.map((info) => info.schemeNumber)));
+  }, [mfInfoData]);
+
+  const navHistoryQuery = useMfapiLatestNavQuery(schemeNumbers);
+  const { data: navHistoryBatch } = navHistoryQuery;
+
+  const navDataMap = useMemo(() => {
+    const map: Record<string, { nav: number; navDate: string } | null> = {};
+    schemeNumbers.forEach((schemeNumber) => {
+      const navData = navHistoryBatch?.[schemeNumber];
+      map[schemeNumber] = navData?.data?.length
+        ? { nav: parseFloat(navData.data[0].nav), navDate: navData.data[0].date }
+        : null;
+    });
+    return map;
+  }, [schemeNumbers, navHistoryBatch]);
+
+  const mfPortfolioData = useMemo(() => {
+    if (!mutualFundsTransactionsData || !mfInfoData) return [];
+    return calcMFPortfolio(mutualFundsTransactionsData, mfInfoData, navDataMap).fundData;
+  }, [mfInfoData, mutualFundsTransactionsData, navDataMap]);
+
+  // ===== GOLD =====
+  const endDate = new Date().toISOString().slice(0, 10);
+  const startDate = new Date(Date.now() - LATEST_GOLD_RATE_LOOKBACK_DAYS * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10);
+  const goldRatesQuery = useSafeGoldRatesQuery({ startDate, endDate });
+  const { data: goldRatesData } = goldRatesQuery;
+
+  const goldPortfolioData = useMemo(() => {
+    if (!goldTransactions) return [];
+    const totalGold = totalGoldGrams(goldTransactions);
+    const totalInvested = netGoldInvested(goldTransactions);
+    let currentGoldRate = 0;
+    if (goldRatesData?.data?.length) {
+      currentGoldRate = parseFloat(goldRatesData.data[goldRatesData.data.length - 1].rate);
+    }
+    const currentValue = totalGold * currentGoldRate;
+    const profitLoss = currentValue - totalInvested;
+    return [
+      {
+        totalGold,
+        totalInvested,
+        currentValue,
+        profitLoss,
+        profitLossPercentage: totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0,
+        currentGoldRate,
+      },
+    ];
+  }, [goldTransactions, goldRatesData]);
+
+  // ===== CRYPTO =====
+  const cryptoInvestedMap = useMemo(
+    () => (cryptoTransactions ? groupCryptoHoldings(cryptoTransactions) : {}),
+    [cryptoTransactions]
+  );
+
+  const validCoins = useMemo(() => heldCoinSymbols(cryptoInvestedMap), [cryptoInvestedMap]);
+
+  const coinPricesQuery = useCryptoCoinPricesQuery(validCoins);
+  const { data: coinPrices } = coinPricesQuery;
+
+  const cryptoPortfolioData = useMemo<CryptoPortfolioItem[]>(
+    () => (coinPrices?.data ? valueCryptoHoldings(cryptoInvestedMap, coinPrices.data) : []),
+    [coinPrices, cryptoInvestedMap]
+  );
+
+  // ===== EPF =====
+  const epfPortfolioData = useMemo(() => {
+    const monthlyContribution = epfData?.length ? (epfData.at(-1)?.epfAmount ?? 0) : 0;
+    const base = {
+      invested: 0,
+      currentValue: 0,
+      profitLoss: 0,
+      profitLossPercentage: 0,
+      monthlyContribution,
+      annualContribution: monthlyContribution * 12,
+    };
+    if (!epfTimelineData) return base;
+    return {
+      ...calcEPFPortfolio(epfTimelineData),
+      monthlyContribution,
+      annualContribution: monthlyContribution * 12,
+    };
+  }, [epfTimelineData, epfData]);
+
+  // ===== FD =====
+  const fdPortfolioData = useMemo(() => summariseFixedDeposits(fdData ?? []), [fdData]);
+
+  // ===== RD =====
+  const rdPortfolioData = useMemo(() => summariseRecurringDeposits(rdData ?? []), [rdData]);
+
+  // ===== PORTFOLIO SUMMARY =====
+  const portfolioSummary = useMemo(() => {
+    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+    const pct = (pnl: number, inv: number) => (inv > 0 ? (pnl / inv) * 100 : 0);
+
+    const stocksInvested = sum(stockPortfolioData.map((s) => s.investedAmount));
+    const stocksValue = sum(stockPortfolioData.map((s) => s.currentValuation));
+    const mfInvested = sum(mfPortfolioData.map((f) => f.totalInvested));
+    const mfValue = sum(mfPortfolioData.map((f) => f.currentValue ?? 0));
+    const goldInvested = sum(goldPortfolioData.map((g) => g.totalInvested));
+    const goldValue = sum(goldPortfolioData.map((g) => g.currentValue));
+    const cryptoInvested = sum(cryptoPortfolioData.map((c) => c.investedAmount));
+    const cryptoValue = sum(cryptoPortfolioData.map((c) => c.currentValue));
+
+    const totalInvested =
+      stocksInvested +
+      mfInvested +
+      goldInvested +
+      cryptoInvested +
+      epfPortfolioData.invested +
+      fdPortfolioData.invested +
+      rdPortfolioData.invested;
+    const totalCurrentValue =
+      stocksValue +
+      mfValue +
+      goldValue +
+      cryptoValue +
+      epfPortfolioData.currentValue +
+      fdPortfolioData.currentValue +
+      rdPortfolioData.currentValue;
+    const totalProfitLoss = totalCurrentValue - totalInvested;
+
+    return {
+      stocks: {
+        invested: stocksInvested,
+        currentValue: stocksValue,
+        profitLoss: stocksValue - stocksInvested,
+        profitLossPercentage: pct(stocksValue - stocksInvested, stocksInvested),
+      },
+      mutualFunds: {
+        invested: mfInvested,
+        currentValue: mfValue,
+        profitLoss: mfValue - mfInvested,
+        profitLossPercentage: pct(mfValue - mfInvested, mfInvested),
+      },
+      gold: {
+        invested: goldInvested,
+        currentValue: goldValue,
+        profitLoss: goldValue - goldInvested,
+        profitLossPercentage: pct(goldValue - goldInvested, goldInvested),
+      },
+      crypto: {
+        invested: cryptoInvested,
+        currentValue: cryptoValue,
+        profitLoss: cryptoValue - cryptoInvested,
+        profitLossPercentage: pct(cryptoValue - cryptoInvested, cryptoInvested),
+      },
+      epf: epfPortfolioData,
+      fd: fdPortfolioData,
+      rd: rdPortfolioData,
+      total: {
+        invested: totalInvested,
+        currentValue: totalCurrentValue,
+        profitLoss: totalProfitLoss,
+        profitLossPercentage: pct(totalProfitLoss, totalInvested),
+      },
+    };
+  }, [
+    stockPortfolioData,
+    mfPortfolioData,
+    goldPortfolioData,
+    cryptoPortfolioData,
+    epfPortfolioData,
+    fdPortfolioData,
+    rdPortfolioData,
+  ]);
+
+  // ===== XIRR =====
+  const calcXirr = (cashFlows: XirrCashFlow[]) => {
+    try {
+      return cashFlows.length > 1 ? xirr(cashFlows) * 100 : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const stockXirr = useMemo(() => {
+    if (!stockTransactions || !stockPortfolioData.length) return null;
+    const flows: XirrCashFlow[] = stockTransactions.map((tx) => ({
+      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+      when: new Date(tx.date),
+    }));
+    const value = portfolioSummary.stocks.currentValue;
+    if (value > 0) flows.push({ amount: value, when: new Date() });
+    return calcXirr(flows);
+  }, [stockTransactions, stockPortfolioData, portfolioSummary.stocks.currentValue]);
+
+  const mfXirr = useMemo(() => {
+    if (!mutualFundsTransactionsData || !mfPortfolioData.length) return null;
+    const flows: XirrCashFlow[] = mutualFundsTransactionsData.map((tx) => ({
+      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+      when: new Date(tx.date),
+    }));
+    const value = portfolioSummary.mutualFunds.currentValue;
+    if (value > 0) flows.push({ amount: value, when: new Date() });
+    return calcXirr(flows);
+  }, [mutualFundsTransactionsData, mfPortfolioData, portfolioSummary.mutualFunds.currentValue]);
+
+  const goldXirr = useMemo(() => {
+    if (!goldTransactions || !goldPortfolioData.length) return null;
+    const flows: XirrCashFlow[] = goldTransactions
+      .map((tx) => ({ amount: goldCashFlow(tx), when: new Date(tx.date) }))
+      .filter((flow) => flow.amount !== 0);
+    const value = portfolioSummary.gold.currentValue;
+    if (value > 0) flows.push({ amount: value, when: new Date() });
+    return calcXirr(flows);
+  }, [goldTransactions, goldPortfolioData, portfolioSummary.gold.currentValue]);
+
+  const cryptoXirr = useMemo(() => {
+    if (!cryptoTransactions || !cryptoPortfolioData.length) return null;
+    const flows: XirrCashFlow[] = cryptoTransactions.map((tx) => ({
+      amount: tx.type === 'credit' ? -tx.amount : tx.amount,
+      when: new Date(tx.date),
+    }));
+    const value = portfolioSummary.crypto.currentValue;
+    if (value > 0) flows.push({ amount: value, when: new Date() });
+    return calcXirr(flows);
+  }, [cryptoTransactions, cryptoPortfolioData, portfolioSummary.crypto.currentValue]);
+
+  const overallXirr = useMemo(() => {
+    const flows: XirrCashFlow[] = [];
+    stockTransactions?.forEach((tx) =>
+      flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
+    );
+    mutualFundsTransactionsData?.forEach((tx) =>
+      flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
+    );
+    goldTransactions?.forEach((tx) => {
+      const amount = goldCashFlow(tx);
+      if (amount !== 0) flows.push({ amount, when: new Date(tx.date) });
+    });
+    cryptoTransactions?.forEach((tx) =>
+      flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
+    );
+    epfData?.forEach((epf, index) => {
+      const epfStart = new Date(epf.startDate);
+      const nextDate =
+        index < epfData.length - 1 ? new Date(epfData[index + 1].startDate) : new Date();
+      const monthsDiff = differenceInMonths(nextDate, epfStart);
+      for (let i = 0; i < monthsDiff; i++) {
+        const d = new Date(epfStart);
+        d.setMonth(d.getMonth() + i);
+        d.setDate(epf.creditDay);
+        if (d <= new Date()) flows.push({ amount: -epf.epfAmount, when: d });
+      }
+    });
+    fdData?.forEach((fd) =>
+      flows.push({ amount: -fd.amountInvested, when: new Date(fd.dateOfCreation) })
+    );
+    rdData?.forEach((rd) =>
+      flows.push({ amount: -rd.amountInvested, when: new Date(rd.dateOfCreation) })
+    );
+    if (portfolioSummary.total.currentValue > 0)
+      flows.push({ amount: portfolioSummary.total.currentValue, when: new Date() });
+    return calcXirr(flows);
+  }, [
+    stockTransactions,
+    mutualFundsTransactionsData,
+    goldTransactions,
+    cryptoTransactions,
+    epfData,
+    fdData,
+    rdData,
+    portfolioSummary.total.currentValue,
+  ]);
+
+  // ===== CAGR =====
+  // Naive single-bucket reference shown next to XIRR. Uses cost basis of
+  // currently held positions vs. current value over years since first txn.
+  const stockFirstDate = useMemo(
+    () => firstTransactionDate(stockTransactions ?? []),
+    [stockTransactions]
+  );
+  const mfFirstDate = useMemo(
+    () => firstTransactionDate(mutualFundsTransactionsData ?? []),
+    [mutualFundsTransactionsData]
+  );
+  const goldFirstDate = useMemo(
+    () => firstTransactionDate(goldTransactions ?? []),
+    [goldTransactions]
+  );
+  const cryptoFirstDate = useMemo(
+    () => firstTransactionDate(cryptoTransactions ?? []),
+    [cryptoTransactions]
+  );
+
+  const toPct = (r: number | null) => (r === null ? null : r * 100);
+
+  const stockCagr = useMemo(
+    () =>
+      stockFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.stocks.invested,
+              currentValue: portfolioSummary.stocks.currentValue,
+              startDate: stockFirstDate,
+            })
+          )
+        : null,
+    [stockFirstDate, portfolioSummary.stocks.invested, portfolioSummary.stocks.currentValue]
+  );
+
+  const mfCagr = useMemo(
+    () =>
+      mfFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.mutualFunds.invested,
+              currentValue: portfolioSummary.mutualFunds.currentValue,
+              startDate: mfFirstDate,
+            })
+          )
+        : null,
+    [mfFirstDate, portfolioSummary.mutualFunds.invested, portfolioSummary.mutualFunds.currentValue]
+  );
+
+  const goldCagr = useMemo(
+    () =>
+      goldFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.gold.invested,
+              currentValue: portfolioSummary.gold.currentValue,
+              startDate: goldFirstDate,
+            })
+          )
+        : null,
+    [goldFirstDate, portfolioSummary.gold.invested, portfolioSummary.gold.currentValue]
+  );
+
+  const cryptoCagr = useMemo(
+    () =>
+      cryptoFirstDate
+        ? toPct(
+            cagr({
+              netInvested: portfolioSummary.crypto.invested,
+              currentValue: portfolioSummary.crypto.currentValue,
+              startDate: cryptoFirstDate,
+            })
+          )
+        : null,
+    [cryptoFirstDate, portfolioSummary.crypto.invested, portfolioSummary.crypto.currentValue]
+  );
+
+  const overallCagr = useMemo(() => {
+    const start = earliestDate([stockFirstDate, mfFirstDate, goldFirstDate, cryptoFirstDate]);
+    if (!start) return null;
+    return toPct(
+      cagr({
+        netInvested: portfolioSummary.total.invested,
+        currentValue: portfolioSummary.total.currentValue,
+        startDate: start,
+      })
+    );
+  }, [
+    stockFirstDate,
+    mfFirstDate,
+    goldFirstDate,
+    cryptoFirstDate,
+    portfolioSummary.total.invested,
+    portfolioSummary.total.currentValue,
+  ]);
+
+  // ===== AI PROMPT =====
+  const aiPrompt = useMemo(
+    () =>
+      buildAIInsightPrompt({
+        userName: userName ?? 'Investor',
+        asOf: new Date(),
+        total: {
+          invested: portfolioSummary.total.invested,
+          currentValue: portfolioSummary.total.currentValue,
+          pnl: portfolioSummary.total.profitLoss,
+          pnlPct: portfolioSummary.total.profitLossPercentage,
+          xirr: overallXirr,
+        },
+        stocks: {
+          ...portfolioSummary.stocks,
+          xirr: stockXirr,
+          holdings: stockPortfolioData.map((s) => ({
+            name: s.stockName,
+            shares: s.numOfShares,
+            avgCost: Number(s.avgPrice),
+            currentPrice: s.currentPrice,
+            currentValue: s.currentValuation,
+            invested: s.investedAmount,
+            pnl: s.profitLoss,
+            pnlPct: s.profitLossPercentage,
+            dataOk: s.isDataAvailable,
+          })),
+        },
+        mutualFunds: {
+          ...portfolioSummary.mutualFunds,
+          xirr: mfXirr,
+          holdings: mfPortfolioData.map((f) => ({
+            name: f.fundName,
+            units: f.totalUnits,
+            invested: f.totalInvested,
+            currentNav: f.currentNav ?? null,
+            currentValue: f.currentValue ?? null,
+            pnl: f.profitLoss ?? null,
+            pnlPct: f.profitLossPercentage ?? null,
+          })),
+        },
+        gold: {
+          ...portfolioSummary.gold,
+          xirr: goldXirr,
+          currentRatePerGram: goldPortfolioData[0]?.currentGoldRate ?? null,
+        },
+        crypto: {
+          ...portfolioSummary.crypto,
+          xirr: cryptoXirr,
+          coins: cryptoPortfolioData.map((c) => ({
+            name: c.coinName,
+            symbol: c.currency,
+            units: c.balance,
+            invested: c.investedAmount,
+            currentPrice: c.currentPrice,
+            currentValue: c.currentValue,
+            pnl: c.profitLoss,
+            pnlPct: c.profitLossPercentage,
+          })),
+        },
+        epf: {
+          invested: portfolioSummary.epf.invested,
+          currentValue: portfolioSummary.epf.currentValue,
+          monthlyContribution: portfolioSummary.epf.monthlyContribution,
+          annualContribution: portfolioSummary.epf.annualContribution,
+        },
+        fd: {
+          invested: portfolioSummary.fd.invested,
+          currentValue: portfolioSummary.fd.currentValue,
+          pnl: portfolioSummary.fd.profitLoss,
+          pnlPct: portfolioSummary.fd.profitLossPercentage,
+          list: fdData ?? [],
+        },
+        rd: {
+          invested: portfolioSummary.rd.invested,
+          currentValue: portfolioSummary.rd.currentValue,
+          pnl: portfolioSummary.rd.profitLoss,
+          pnlPct: portfolioSummary.rd.profitLossPercentage,
+          list: rdData ?? [],
+        },
+      }),
+    [
+      userName,
+      portfolioSummary,
+      stockPortfolioData,
+      mfPortfolioData,
+      goldPortfolioData,
+      cryptoPortfolioData,
+      fdData,
+      rdData,
+      stockXirr,
+      mfXirr,
+      goldXirr,
+      cryptoXirr,
+      overallXirr,
+    ]
+  );
+
+  // ===== CHART DATA =====
+  const polarCategories = ['Stocks', 'Mutual Funds', 'Gold', 'Crypto', 'EPF', 'FD', 'RD'];
+  const investedData = [
+    portfolioSummary.stocks.invested,
+    portfolioSummary.mutualFunds.invested,
+    portfolioSummary.gold.invested,
+    portfolioSummary.crypto.invested,
+    portfolioSummary.epf.invested,
+    portfolioSummary.fd.invested,
+    portfolioSummary.rd.invested,
+  ];
+  const currentValueData = [
+    portfolioSummary.stocks.currentValue,
+    portfolioSummary.mutualFunds.currentValue,
+    portfolioSummary.gold.currentValue,
+    portfolioSummary.crypto.currentValue,
+    portfolioSummary.epf.currentValue,
+    portfolioSummary.fd.currentValue,
+    portfolioSummary.rd.currentValue,
+  ];
+
+  const dashboardQueries = [
+    capitalGainsQuery,
+    stocksPortfolioQuery,
+    mfTransactionsQuery,
+    mfInfoQuery,
+    navHistoryQuery,
+    goldTransactionsQuery,
+    goldRatesQuery,
+    cryptoTransactionsQuery,
+    coinPricesQuery,
+    epfQuery,
+    epfTimelineQuery,
+    fdQuery,
+    rdQuery,
+  ];
+
+  const coreDataArrived = [
+    stocksPortfolioQuery,
+    mfTransactionsQuery,
+    mfInfoQuery,
+    goldTransactionsQuery,
+    cryptoTransactionsQuery,
+    epfQuery,
+    epfTimelineQuery,
+    fdQuery,
+    rdQuery,
+  ].every((query) => query.data !== undefined);
+
+  const navPricesReady = schemeNumbers.length === 0 || navHistoryBatch !== undefined;
+  const goldRatesReady = !goldTransactions?.length || goldRatesData !== undefined;
+  const coinPricesReady = validCoins.length === 0 || coinPrices !== undefined;
+
+  const isInitialLoad = !coreDataArrived || !navPricesReady || !goldRatesReady || !coinPricesReady;
+
+  const isRefreshing = dashboardQueries.some((query) => query.isFetching);
+
+  const updateTimestamps = dashboardQueries
+    .map((query) => query.dataUpdatedAt)
+    .filter((timestamp) => timestamp > 0);
+  const lastUpdatedAt = updateTimestamps.length ? Math.min(...updateTimestamps) : null;
+
+  return {
+    userName,
+    cgData,
+    stockPortfolioData,
+    stockTransactions,
+    mfPortfolioData,
+    goldPortfolioData,
+    cryptoPortfolioData,
+    epfData,
+    epfPortfolioData,
+    fdData,
+    rdData,
+    portfolioSummary,
+    stockXirr,
+    mfXirr,
+    goldXirr,
+    cryptoXirr,
+    overallXirr,
+    stockCagr,
+    mfCagr,
+    goldCagr,
+    cryptoCagr,
+    overallCagr,
+    polarCategories,
+    investedData,
+    currentValueData,
+    isInitialLoad,
+    isRefreshing,
+    lastUpdatedAt,
+    aiPrompt,
+  };
+}

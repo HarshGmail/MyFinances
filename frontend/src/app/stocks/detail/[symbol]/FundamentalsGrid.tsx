@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StockFinancials } from '@/api/dataInterface';
+import { StockFinancials } from '@myfinances/core/types';
 import { buildMetricCards, getMetricCalculation } from './verdicts';
 import MetricEducationDrawer from './MetricEducationDrawer';
 import { HelpCircle } from 'lucide-react';

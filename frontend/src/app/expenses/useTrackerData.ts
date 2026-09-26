@@ -1,22 +1,13 @@
 import { useMemo } from 'react';
-import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  startOfDay,
-  endOfDay,
-  eachDayOfInterval,
-  subDays,
-} from 'date-fns';
+import { format, startOfDay, endOfDay, eachDayOfInterval, subDays } from 'date-fns';
 import Highcharts from 'highcharts';
-import { ExpenseTransaction, UserProfile } from '@/api/dataInterface';
+import { ExpenseTransaction, UserProfile } from '@myfinances/core/types';
 import {
-  getFinancialMonthBoundaries,
+  summariseSpend,
   getFinancialMonthKey,
-  getCurrentFinancialMonthKey,
   getRecentFinancialMonthKeys,
   financialMonthKeyToLabelDate,
-} from '@/utils/financialMonth';
+} from '@myfinances/core/calc/financialMonth';
 
 interface UseTrackerDataParams {
   expenseTransactions: ExpenseTransaction[] | undefined;
@@ -29,29 +20,8 @@ export function useTrackerData({ expenseTransactions, theme }: UseTrackerDataPar
   const textColor = theme === 'dark' ? '#fff' : '#18181b';
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    const { start: fmStart, end: fmEnd } = getFinancialMonthBoundaries(
-      getCurrentFinancialMonthKey()
-    );
-
-    const inRange = (date: Date, start: Date, end: Date) => date >= start && date <= end;
-
-    return {
-      toDay: txs
-        .filter((t) => inRange(new Date(t.date), todayStart, todayEnd))
-        .reduce((s, t) => s + t.amount, 0),
-      thisWeek: txs
-        .filter((t) => inRange(new Date(t.date), weekStart, weekEnd))
-        .reduce((s, t) => s + t.amount, 0),
-      thisMonth: txs
-        .filter((t) => inRange(new Date(t.date), fmStart, fmEnd))
-        .reduce((s, t) => s + t.amount, 0),
-      total: txs.reduce((s, t) => s + t.amount, 0),
-    };
+    const { today, thisWeek, thisMonth, total } = summariseSpend(txs);
+    return { toDay: today, thisWeek, thisMonth, total };
   }, [txs]);
 
   const timelineOptions = useMemo(() => {

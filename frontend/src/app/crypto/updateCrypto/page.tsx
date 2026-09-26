@@ -23,8 +23,8 @@ import { toast } from 'sonner';
 import {
   useAddCryptoTransactionMutation,
   useUpdateCryptoTransactionMutation,
-} from '@/api/mutations';
-import { useCryptoTransactionsQuery } from '@/api/query';
+} from '@myfinances/core/api';
+import { useCryptoTransactionsQuery } from '@myfinances/core/api';
 import { NumericFormField } from './NumericFormField';
 import { CoinSearchField } from './CoinSearchField';
 

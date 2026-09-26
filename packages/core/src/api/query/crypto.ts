@@ -1,0 +1,160 @@
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '../client';
+import {
+  CryptoTransaction,
+  CryptoPortfolioResponse,
+  CoinDCXUserBalanceResponse,
+  CoinPricesResponse,
+  CoinCandle,
+  CoinSearchResult,
+  CoinTickerChangesResponse,
+} from '../../types';
+
+export function useCryptoTransactionsQuery() {
+  return useQuery<CryptoTransaction[]>({
+    queryKey: ['crypto-transactions'],
+    queryFn: async () => {
+      const response = await apiRequest({ endpoint: '/crypto/transactions', method: 'GET' });
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+export function useCryptoPortfolioQuery() {
+  return useQuery<CryptoPortfolioResponse>({
+    queryKey: ['crypto-portfolio'],
+    queryFn: async () => {
+      const response = await apiRequest({ endpoint: '/crypto/portfolio', method: 'GET' });
+      return response;
+    },
+    staleTime: 30 * 1000, // Cache for 30 seconds (frequent price updates)
+    refetchInterval: 60 * 1000, // Refetch every minute for live prices
+  });
+}
+
+export function useCryptoUserBalanceQuery() {
+  return useQuery<CoinDCXUserBalanceResponse>({
+    queryKey: ['crypto-user-balances'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: '/crypto/getUserCryptoBalance',
+        method: 'GET',
+      });
+      return response;
+    },
+    staleTime: 60 * 1000 * 5, // Cache for 5 minutes
+    refetchInterval: 60 * 1000 * 10, // Refetch every 10 minutes
+  });
+}
+
+export function useCryptoCoinPricesQuery(coinNames: string[]) {
+  return useQuery<CoinPricesResponse>({
+    queryKey: ['crypto-prices', coinNames],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: '/crypto/getCoinPrices',
+        method: 'POST',
+        body: coinNames,
+      });
+      return response;
+    },
+    staleTime: 60 * 1000 * 2, // Cache for 2 minutes
+    refetchInterval: 60 * 1000 * 5, // Refetch every 5 minutes
+    refetchIntervalInBackground: true,
+    enabled: coinNames.length > 0, // Only run if coinNames array is not empty
+  });
+}
+
+export function useCryptoTickerChangesQuery(coinNames: string[]) {
+  return useQuery<CoinTickerChangesResponse>({
+    queryKey: ['crypto-ticker-changes', coinNames],
+    queryFn: () =>
+      apiRequest({
+        endpoint: '/crypto/ticker-changes',
+        method: 'POST',
+        body: { coinNames },
+      }),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    enabled: coinNames.length > 0,
+  });
+}
+
+// Helper to round to nearest 5 minutes
+function getRoundedEndTime(minutes = 5) {
+  const now = Date.now();
+  return now - (now % (minutes * 60 * 1000));
+}
+
+export function useCoinCandlesQuery(symbol: string, interval: string = '1d', limit: number = 365) {
+  const endTime = getRoundedEndTime(5); // 5 minutes
+  const startTime = endTime - limit * 24 * 60 * 60 * 1000;
+
+  return useQuery<CoinCandle[]>({
+    queryKey: ['coin-candles', symbol, interval, limit, endTime],
+    queryFn: async () => {
+      if (!symbol) return [];
+      const params = new URLSearchParams({
+        symbol,
+        interval,
+        limit: String(limit),
+        startTime: String(startTime),
+        endTime: String(endTime),
+      });
+      const response = await apiRequest({
+        endpoint: `/crypto/candles?${params.toString()}`,
+        method: 'GET',
+      });
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!symbol,
+  });
+}
+
+const MAX_CANDLE_DAYS = 1825; // 5Y — fetch once, filter client-side
+
+export function useMultipleCoinCandlesQuery(symbols: string[], interval: string = '1d') {
+  const endTime = getRoundedEndTime(5); // 5 minutes
+  const startTime = endTime - MAX_CANDLE_DAYS * 24 * 60 * 60 * 1000;
+
+  return useQuery<Record<string, CoinCandle[]>>({
+    queryKey: ['multiple-coin-candles', symbols, interval, endTime],
+    queryFn: async () => {
+      if (!symbols || symbols.length === 0) return {};
+      const params = new URLSearchParams({
+        symbols: symbols.join(','),
+        interval,
+        limit: String(MAX_CANDLE_DAYS),
+        startTime: String(startTime),
+        endTime: String(endTime),
+      });
+
+      const response = await apiRequest({
+        endpoint: `/crypto/multipleCoinCandles?${params.toString()}`,
+        method: 'GET',
+      });
+
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: symbols.length > 0,
+  });
+}
+
+export function useSearchCryptoQuery(query: string) {
+  return useQuery<CoinSearchResult[]>({
+    queryKey: ['search-crypto', query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      const response = await apiRequest({
+        endpoint: `/crypto/search?query=${encodeURIComponent(query)}`,
+        method: 'GET',
+      });
+      return response.data || [];
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 60 * 1000,
+  });
+}

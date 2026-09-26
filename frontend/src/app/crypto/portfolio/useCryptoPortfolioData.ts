@@ -1,10 +1,14 @@
 import { useMemo, useCallback, useRef } from 'react';
-import groupBy from 'lodash/groupBy';
-import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@/api/query';
-import { useMultipleCoinCandlesQuery } from '@/api/query/crypto';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
-import { CryptoTransaction } from '@/api/dataInterface';
+import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@myfinances/core/api';
+import { useMultipleCoinCandlesQuery } from '@myfinances/core/api/query/crypto';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
+import { CryptoTransaction } from '@myfinances/core/types';
+import {
+  groupCryptoHoldings,
+  heldCoinSymbols,
+  valueCryptoHoldings,
+} from '@myfinances/core/calc/cryptoHoldings';
 import { useUrlState } from '@/utils/useUrlState';
 
 export interface PortfolioItem {
@@ -71,39 +75,9 @@ export function useCryptoPortfolioData() {
   } = useCryptoTransactionsQuery();
   const { data: cgData, isLoading: cgLoading } = useCapitalGainsQuery();
 
-  const investedMap = useMemo(() => {
-    if (!transactions) return {};
-    const grouped = groupBy(
-      transactions,
-      (tx) => tx.coinSymbol?.toUpperCase() || tx.coinName?.toUpperCase()
-    );
-    const map: Record<string, { invested: number; units: number; coinName: string }> = {};
-    Object.entries(grouped).forEach(([symbol, txs]) => {
-      let invested = 0,
-        units = 0,
-        coinName = '';
-      txs.forEach((tx) => {
-        if (tx.type === 'credit') {
-          invested += tx.amount;
-          units += tx.quantity ?? 0;
-        } else if (tx.type === 'debit') {
-          invested -= tx.amount;
-          units -= tx.quantity ?? 0;
-        }
-        coinName = tx.coinName;
-      });
-      map[symbol] = { invested, units, coinName };
-    });
-    return map;
-  }, [transactions]);
+  const investedMap = useMemo(() => groupCryptoHoldings(transactions ?? []), [transactions]);
 
-  const validCoins = useMemo(
-    () =>
-      Object.entries(investedMap)
-        .filter(([, v]) => v.units > 0)
-        .map(([s]) => s),
-    [investedMap]
-  );
+  const validCoins = useMemo(() => heldCoinSymbols(investedMap), [investedMap]);
 
   const {
     data: coinPrices,
@@ -111,25 +85,10 @@ export function useCryptoPortfolioData() {
     error: pricesError,
   } = useCryptoCoinPricesQuery(validCoins);
 
-  const portfolioData = useMemo<PortfolioItem[]>(() => {
-    if (!coinPrices?.data) return [];
-    return validCoins.map((coinSymbol) => {
-      const { coinName, invested: investedAmount, units } = investedMap[coinSymbol];
-      const currentPrice = coinPrices.data[coinSymbol] || 0;
-      const currentValue = units * currentPrice;
-      const profitLoss = currentValue - investedAmount;
-      return {
-        coinName,
-        currency: coinSymbol,
-        balance: units,
-        currentPrice,
-        investedAmount,
-        currentValue,
-        profitLoss,
-        profitLossPercentage: investedAmount > 0 ? (profitLoss / investedAmount) * 100 : 0,
-      };
-    });
-  }, [coinPrices, investedMap, validCoins]);
+  const portfolioData = useMemo<PortfolioItem[]>(
+    () => (coinPrices?.data ? valueCryptoHoldings(investedMap, coinPrices.data) : []),
+    [coinPrices, investedMap]
+  );
 
   const cryptoUnrealized = useMemo(() => {
     const lots = cgData?.byAsset?.crypto?.currentLots ?? [];

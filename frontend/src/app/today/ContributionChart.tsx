@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ChangeBarChart from '@/components/custom/ChangeBarChart';
-import { ASSET_CLASS_LABELS, AssetMove } from '@/utils/dailyMoves';
+import { ASSET_CLASS_LABELS, AssetMove } from '@myfinances/core/calc/dailyMoves';
 
 export default function ContributionChart({ moves }: { moves: AssetMove[] }) {
   const bars = useMemo(

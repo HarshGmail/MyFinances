@@ -1,8 +1,8 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getProfitLossColor } from '@/utils/text';
-import { ASSET_CLASS_LABELS, HoldingMove } from '@/utils/dailyMoves';
-import { formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
+import { ASSET_CLASS_LABELS, HoldingMove } from '@myfinances/core/calc/dailyMoves';
+import { formatSignedCurrency, formatSignedPercent } from '@myfinances/core/calc/numbers';
 
 function MoverRow({ holding }: { holding: HoldingMove }) {
   return (

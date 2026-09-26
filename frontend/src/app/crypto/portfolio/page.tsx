@@ -2,8 +2,8 @@
 
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
-import { formatCurrency, formatToPercentage } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
+import { formatCurrency, formatToPercentage } from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
 import { useCryptoPortfolioData } from './useCryptoPortfolioData';
 import CryptoPerformanceChart from './CryptoPerformanceChart';
 import CryptoPortfolioTable from './CryptoPortfolioTable';

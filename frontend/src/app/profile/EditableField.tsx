@@ -4,7 +4,7 @@ import { Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { OtpDateInput } from '@/components/ui/otp-date-input';
-import { UpdateUserProfile } from '@/api/mutations';
+import { UpdateUserProfile } from '@myfinances/core/api';
 import { convertToISODate, convertFromISODate } from './profileTypes';
 
 interface EditableFieldProps {

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCustomPdfPasswordsQuery } from '@/api/query';
-import { useUpdateCustomPdfPasswordsMutation } from '@/api/mutations';
+import { useCustomPdfPasswordsQuery } from '@myfinances/core/api';
+import { useUpdateCustomPdfPasswordsMutation } from '@myfinances/core/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -1,4 +1,4 @@
-import { VaultCategory, VaultItemContent } from '@/api/dataInterface';
+import { VaultCategory, VaultItemContent } from '@myfinances/core/types';
 import { VaultDecryptedItem, getCategoryDef } from './vaultTypes';
 
 export const ALL_FILTER_VALUE = 'all';

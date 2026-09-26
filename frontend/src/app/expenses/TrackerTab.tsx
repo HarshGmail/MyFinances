@@ -5,8 +5,8 @@ import {
   useAddExpenseTransactionMutation,
   useUpdateExpenseTransactionMutation,
   useDeleteExpenseTransactionMutation,
-} from '@/api/mutations';
-import { ExpenseTransaction } from '@/api/dataInterface';
+} from '@myfinances/core/api';
+import { ExpenseTransaction } from '@myfinances/core/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -37,7 +37,7 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Pencil, Trash2, Activity } from 'lucide-react';
 import { format } from 'date-fns';
-import { trackerSchema, TrackerFormValues, EXPENSE_TAGS } from './types';
+import { trackerSchema, TrackerFormValues, EXPENSE_TAGS } from '@myfinances/core/schemas/expenses';
 
 interface TrackerTabProps {
   expenseTransactions: ExpenseTransaction[] | undefined;

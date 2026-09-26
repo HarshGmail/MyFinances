@@ -1,5 +1,5 @@
 import type { XAxisPlotLinesOptions } from 'highcharts/highstock';
-import { StockTransaction } from '@/api/dataInterface';
+import { StockTransaction } from '@myfinances/core/types';
 
 const BUY_COLOR = '#16a34a';
 const SELL_COLOR = '#dc2626';
