@@ -51,6 +51,7 @@ const corsOptions: CorsOptions = {
     'https://www.my-finances.site',
     'https://my-finances.site',
     'https://mcp.my-finances.site',
+    'https://preview.my-finances.site',
   ],
   credentials: true,
   optionsSuccessStatus: 200,
