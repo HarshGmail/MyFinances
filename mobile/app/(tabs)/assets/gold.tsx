@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import {
   useGoldLeasesQuery,
@@ -24,11 +24,16 @@ function grams(value: number) {
   return `${value.toFixed(GRAM_DECIMALS)} g`;
 }
 
+function rateWindow() {
+  const now = new Date();
+  return {
+    endDate: now.toISOString().slice(0, 10),
+    startDate: new Date(now.getTime() - RATE_LOOKBACK_DAYS * MS_PER_DAY).toISOString().slice(0, 10),
+  };
+}
+
 export default function GoldScreen() {
-  const endDate = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(Date.now() - RATE_LOOKBACK_DAYS * MS_PER_DAY)
-    .toISOString()
-    .slice(0, 10);
+  const [{ startDate, endDate }] = useState(rateWindow);
   const ratesQuery = useSafeGoldRatesQuery({ startDate, endDate });
   const transactionsQuery = useGoldTransactionsQuery();
   const leasesQuery = useGoldLeasesQuery();

@@ -1,5 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../client';
+
+function invalidateStockQueries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+  queryClient.invalidateQueries({ queryKey: ['stocks-portfolio'] });
+}
 
 export interface StockTransactionPayload {
   type: 'credit' | 'debit';
@@ -36,7 +41,7 @@ export function useAddStockTransactionMutation() {
   const mutation = useMutation({
     mutationFn: addStockTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      invalidateStockQueries(queryClient);
     },
   });
 
@@ -58,7 +63,7 @@ export function useUpdateStockTransactionMutation() {
   const mutation = useMutation({
     mutationFn: updateStockTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      invalidateStockQueries(queryClient);
     },
   });
 
@@ -82,7 +87,7 @@ export function useDeleteStockTransactionMutation() {
   return useMutation({
     mutationFn: deleteStockTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      invalidateStockQueries(queryClient);
     },
   });
 }

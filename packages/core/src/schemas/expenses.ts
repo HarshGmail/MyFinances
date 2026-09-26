@@ -61,3 +61,19 @@ export const EXPENSE_FREQUENCIES = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
 ] as const;
+
+export const trackerEntrySchema = trackerSchema.omit({ date: true }).extend({
+  date: z.date({ required_error: 'Date is required' }),
+});
+
+export type TrackerEntryValues = z.infer<typeof trackerEntrySchema>;
+
+function toIsoDay(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export function trackerEntryPayload(values: TrackerEntryValues): TrackerFormValues {
+  return { ...values, date: toIsoDay(values.date) };
+}

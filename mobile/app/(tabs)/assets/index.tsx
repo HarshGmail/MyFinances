@@ -11,6 +11,11 @@ const ASSET_LINKS: { label: string; description: string; href: Href }[] = [
   { label: 'Crypto', description: 'Coins at CoinDCX prices', href: '/assets/crypto' },
   { label: 'EPF', description: 'Balance, contributions, interest', href: '/assets/epf' },
   { label: 'Deposits', description: 'Fixed and recurring deposits', href: '/assets/deposits' },
+  {
+    label: 'Transactions',
+    description: 'Add, edit and delete buys and sells',
+    href: '/assets/transactions',
+  },
 ];
 
 export default function AssetsHub() {

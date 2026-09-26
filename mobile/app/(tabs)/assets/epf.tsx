@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 import { useEpfQuery, useEpfTimelineQuery } from '@myfinances/core/api/query/epf';
 import { calcEPFPortfolio } from '@myfinances/core/calc/portfolioCalculations';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
-import { Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components/ui';
+import { router } from 'expo-router';
+import { AddButton, Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components/ui';
 import { SummaryCard } from '@/components/HoldingCard';
 
 function formatDate(value?: string) {
@@ -43,6 +44,8 @@ export default function EpfScreen() {
       ) : (
         <EmptyState message="No EPF accounts yet." />
       )}
+
+      <AddButton label="Add EPF account" onPress={() => router.push('/assets/forms/epf-account')} />
 
       {(accountsQuery.data ?? []).length > 0 && (
         <Card>

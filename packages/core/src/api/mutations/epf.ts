@@ -15,7 +15,8 @@ export function useAddEpfAccountMutation() {
   const mutation = useMutation({
     mutationFn: addEpfAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epfAccounts-addition'] });
+      queryClient.invalidateQueries({ queryKey: ['epf-account'] });
+      queryClient.invalidateQueries({ queryKey: ['epf-timeline'] });
     },
   });
 

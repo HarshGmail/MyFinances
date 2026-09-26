@@ -15,12 +15,12 @@ export function useRecurringDepositMutation() {
   const mutation = useMutation({
     mutationFn: recurringDeposit,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurringDeposit-addition'] });
+      queryClient.invalidateQueries({ queryKey: ['recurring-deposits-fetch'] });
     },
   });
 
   const cancelRequest = () => {
-    queryClient.cancelQueries({ queryKey: ['recurringDeposit-addition'] });
+    queryClient.cancelQueries({ queryKey: ['recurring-deposits-fetch'] });
   };
 
   return {

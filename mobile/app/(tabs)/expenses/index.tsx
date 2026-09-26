@@ -2,19 +2,19 @@ import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { useExpenseTransactionsQuery } from '@myfinances/core/api/query/expenseTransactions';
 import { useExpensesQuery } from '@myfinances/core/api/query/expenses';
+import { useDeleteExpenseTransactionMutation } from '@myfinances/core/api/mutations/expenseTransactions';
+import { TransactionRow } from '@/components/TransactionRow';
 import { summariseSpend } from '@myfinances/core/calc/financialMonth';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
-import { Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components/ui';
+import { router } from 'expo-router';
+import { AddButton, Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components/ui';
 
 const RECENT_COUNT = 30;
-
-function formatDay(value: string) {
-  return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
 
 export default function ExpensesScreen() {
   const transactionsQuery = useExpenseTransactionsQuery();
   const recurringQuery = useExpensesQuery();
+  const deleteMutation = useDeleteExpenseTransactionMutation();
 
   const transactions = useMemo(
     () =>
@@ -51,24 +51,25 @@ export default function ExpensesScreen() {
         ))}
       </View>
 
+      <AddButton label="Log expense" onPress={() => router.push('/expenses/add')} />
+
       <Card>
         <Text className="text-base font-semibold text-foreground">Recent</Text>
+        <Label>Long press to delete</Label>
         {transactions.length ? (
-          transactions.slice(0, RECENT_COUNT).map((tx) => (
-            <View key={tx._id} className="flex-row justify-between border-t border-border py-2">
-              <View className="flex-1 pr-3">
-                <Text className="text-sm text-foreground" numberOfLines={1}>
-                  {tx.name}
-                </Text>
-                <Label>
-                  {tx.category} · {formatDay(tx.date)}
-                </Label>
-              </View>
-              <Text className="text-sm font-medium text-foreground">
-                {formatCurrency(tx.amount)}
-              </Text>
-            </View>
-          ))
+          transactions
+            .slice(0, RECENT_COUNT)
+            .map((tx) => (
+              <TransactionRow
+                key={tx._id}
+                title={tx.name}
+                subtitle={tx.category}
+                date={tx.date}
+                amount={tx.amount}
+                isCredit
+                onDelete={() => deleteMutation.mutateAsync(tx._id)}
+              />
+            ))
         ) : (
           <EmptyState message="No expenses logged yet." />
         )}

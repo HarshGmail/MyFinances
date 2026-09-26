@@ -8,7 +8,8 @@ import {
   summariseRecurringDeposits,
 } from '@myfinances/core/calc/deposits';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
-import { Card, EmptyState, LoadingState, Row, Screen } from '@/components/ui';
+import { router } from 'expo-router';
+import { AddButton, Card, EmptyState, LoadingState, Row, Screen } from '@/components/ui';
 import { SummaryCard } from '@/components/HoldingCard';
 
 const FULL_PROGRESS = 100;
@@ -51,6 +52,14 @@ export default function DepositsScreen() {
       }}
     >
       {!fds.length && !rds.length && <EmptyState message="No fixed or recurring deposits yet." />}
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          <AddButton label="FD" onPress={() => router.push('/assets/forms/fixed-deposit')} />
+        </View>
+        <View className="flex-1">
+          <AddButton label="RD" onPress={() => router.push('/assets/forms/recurring-deposit')} />
+        </View>
+      </View>
 
       {fds.length > 0 && (
         <>

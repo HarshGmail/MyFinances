@@ -15,12 +15,12 @@ export function useFixedDepositMutation() {
   const mutation = useMutation({
     mutationFn: fixedDeposit,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fixedDeposit-addition'] });
+      queryClient.invalidateQueries({ queryKey: ['fixed-deposits-fetch'] });
     },
   });
 
   const cancelRequest = () => {
-    queryClient.cancelQueries({ queryKey: ['fixedDeposit-addition'] });
+    queryClient.cancelQueries({ queryKey: ['fixed-deposits-fetch'] });
   };
 
   return {

@@ -143,3 +143,15 @@ export function Row({ label, value }: { label: string; value: ReactNode }) {
     </View>
   );
 }
+
+export function AddButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="h-11 flex-row items-center justify-center rounded-lg border border-dashed border-border"
+      accessibilityRole="button"
+    >
+      <Text className="text-sm text-foreground">+ {label}</Text>
+    </Pressable>
+  );
+}

@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { colors } from '@/lib/theme';
 
-export default function ExpensesLayout() {
+export default function FormsLayout() {
   return (
     <Stack
       screenOptions={{
@@ -10,9 +10,6 @@ export default function ExpensesLayout() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
-    >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="add" options={{ presentation: 'modal' }} />
-    </Stack>
+    />
   );
 }

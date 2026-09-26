@@ -26,24 +26,16 @@ const navigationTheme = {
   },
 };
 
-function QueryProvider({ children }: { children: React.ReactNode }) {
-  const user = useSession((state) => state.user);
-  const cacheKey = queryCacheKey(user);
-  const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { gcTime: QUERY_CACHE_MAX_AGE_MS } } })
-  );
-  const [persister, setPersister] = useState(() =>
-    createAsyncStoragePersister({ storage: asyncAppStorage, key: cacheKey })
-  );
-
-  useEffect(() => {
-    queryClient.clear();
-    setPersister(createAsyncStoragePersister({ storage: asyncAppStorage, key: cacheKey }));
-  }, [cacheKey, queryClient]);
+function QueryProvider({ cacheKey, children }: { cacheKey: string; children: React.ReactNode }) {
+  const [{ queryClient, persister }] = useState(() => ({
+    queryClient: new QueryClient({
+      defaultOptions: { queries: { gcTime: QUERY_CACHE_MAX_AGE_MS } },
+    }),
+    persister: createAsyncStoragePersister({ storage: asyncAppStorage, key: cacheKey }),
+  }));
 
   return (
     <PersistQueryClientProvider
-      key={cacheKey}
       client={queryClient}
       persistOptions={{
         persister,
@@ -58,6 +50,7 @@ function QueryProvider({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const isRestored = useSession((state) => state.isRestored);
+  const cacheKey = queryCacheKey(useSession((state) => state.user));
   const restore = useSession((state) => state.restore);
   useTokenRefresh();
 
@@ -69,7 +62,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={navigationTheme}>
-      <QueryProvider>
+      <QueryProvider key={cacheKey} cacheKey={cacheKey}>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }} />
       </QueryProvider>
