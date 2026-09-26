@@ -3,9 +3,9 @@
 import {
   useMutualFundInfoFetchQuery,
   useMfapiNavHistoryBatchQuery,
-} from '@/api/query/mutual-funds-info';
-import { useMutualFundTransactionsQuery } from '@/api/query/mutual-funds';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+} from '@myfinances/core/api/query/mutual-funds-info';
+import { useMutualFundTransactionsQuery } from '@myfinances/core/api/query/mutual-funds';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import { useMemo } from 'react';
 import groupBy from 'lodash/groupBy';
@@ -20,15 +20,15 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { useAppStore } from '@/store/useAppStore';
-import { formatCurrency } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
-import { buildMfDailySummary } from '@/utils/mfDailyMoves';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
+import { buildMfDailySummary } from '@myfinances/core/calc/mfDailyMoves';
 import MfTodaySection from './MfTodaySection';
 
 const HighchartsReact = dynamic(() => import('highcharts-react-official'), { ssr: false });

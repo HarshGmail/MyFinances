@@ -23,10 +23,10 @@ import { cn } from '@/lib/utils';
 import {
   useAddGoldTransactionMutation,
   useUpdateGoldTransactionMutation,
-} from '@/api/mutations/gold';
+} from '@myfinances/core/api/mutations/gold';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { useGoldTransactionsQuery } from '@/api/query';
+import { useGoldTransactionsQuery } from '@myfinances/core/api';
 
 const formSchema = z.object({
   type: z.enum(['credit', 'debit'], { required_error: 'Type is required' }),

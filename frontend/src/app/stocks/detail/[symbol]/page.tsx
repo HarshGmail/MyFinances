@@ -1,7 +1,10 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useStockFinancialsQuery, useStocksPortfolioQuery } from '@/api/query/stocks';
+import {
+  useStockFinancialsQuery,
+  useStocksPortfolioQuery,
+} from '@myfinances/core/api/query/stocks';
 import CompanySearchBar from './CompanySearchBar';
 import CompanyHeader from './CompanyHeader';
 import PriceChart from './PriceChart';

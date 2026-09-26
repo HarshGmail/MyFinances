@@ -13,7 +13,7 @@ import {
   useDeleteAllEpfMutation,
   useDeleteAllFixedDepositsMutation,
   useDeleteAllRecurringDepositsMutation,
-} from '@/api/mutations';
+} from '@myfinances/core/api';
 
 export function DataManagementCard() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);

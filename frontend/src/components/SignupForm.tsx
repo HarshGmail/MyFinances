@@ -14,25 +14,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { PasswordInput } from './ui/password-input';
-import { useSignupMutation } from '@/api/mutations';
+import { useSignupMutation } from '@myfinances/core/api';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
+import { signupSchema } from '@myfinances/core/schemas/auth';
 
-const formSchema = z
-  .object({
-    name: z
-      .string()
-      .min(2, { message: 'Name is required' })
-      .max(50, { message: 'Name cannot be longer than 50 characters' }),
-    email: z.string().email({ message: 'Invalid email address' }),
-    password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-    confirmPassword: z.string().min(6, { message: 'Confirm your password' }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
+const formSchema = signupSchema;
 
 export function SignupForm() {
   const form = useForm<z.infer<typeof formSchema>>({

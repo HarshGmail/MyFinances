@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
-import { useChangePasswordMutation } from '@/api/mutations';
+import { useChangePasswordMutation } from '@myfinances/core/api';
 
 export function ChangePasswordDialog() {
   const [open, setOpen] = useState(false);

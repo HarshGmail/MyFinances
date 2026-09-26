@@ -11,9 +11,9 @@ import {
   useEpfTimelineQuery,
   useInflationQuery,
   useUserProfileQuery,
-} from '@/api/query';
-import { useAddEpfAccountMutation } from '@/api/mutations';
-import { EpfAccountPayload } from '@/api/dataInterface';
+} from '@myfinances/core/api';
+import { useAddEpfAccountMutation } from '@myfinances/core/api';
+import { EpfAccountPayload } from '@myfinances/core/types';
 import { useAppStore } from '@/store/useAppStore';
 
 import { calculateEPFGrowth } from './useEpfCalculations';

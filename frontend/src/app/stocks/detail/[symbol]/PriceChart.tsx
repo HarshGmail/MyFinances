@@ -6,7 +6,7 @@ import 'highcharts/esm/highcharts-more';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useStockFullProfile, useStockTransactionsQuery } from '@/api/query/stocks';
+import { useStockFullProfile, useStockTransactionsQuery } from '@myfinances/core/api/query/stocks';
 import { useAppStore } from '@/store/useAppStore';
 import { useUrlBoolean } from '@/utils/useUrlState';
 import { INTERVALS, Interval } from './verdicts';

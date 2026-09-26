@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSearchMutualFundsQuery } from '@/api/query/mutual-funds-info';
-import { MutualFundInfo, MutualFundSearchResponse } from '@/api/dataInterface';
+import { useSearchMutualFundsQuery } from '@myfinances/core/api/query/mutual-funds-info';
+import { MutualFundInfo, MutualFundSearchResponse } from '@myfinances/core/types';
 import { Input } from '@/components/ui/input';
 import {
   Command,

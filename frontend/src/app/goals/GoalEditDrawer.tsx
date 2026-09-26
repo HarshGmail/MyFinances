@@ -1,6 +1,6 @@
 import GoalForm, { FormValues } from './GoalForm';
-import { useUpdateGoalMutation } from '@/api/mutations';
-import { UserGoal } from '@/api/dataInterface';
+import { useUpdateGoalMutation } from '@myfinances/core/api';
+import { UserGoal } from '@myfinances/core/types';
 
 interface AssetOption {
   type: 'stock' | 'mutualFund' | 'crypto' | 'allStocks' | 'allMutualFunds' | 'allCrypto';

@@ -1,7 +1,7 @@
 'use client';
 
-import { useStocksPortfolioQuery } from '@/api/query/stocks';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
+import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
 import { CapitalGainsSummary } from '@/components/custom/CapitalGainsSummary';
 import {
   Table,
@@ -12,19 +12,23 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { useMemo, useRef } from 'react';
-import { formatCurrency, formatToPercentage, formatToTwoDecimals } from '@/utils/numbers';
+import {
+  formatCurrency,
+  formatToPercentage,
+  formatToTwoDecimals,
+} from '@myfinances/core/calc/numbers';
 import { useUrlState } from '@/utils/useUrlState';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
 import { Skeleton } from '@/components/ui/skeleton';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAppStore } from '@/store/useAppStore';
-import { getTimeframes, getPastDate } from '@/utils/chartHelpers';
+import { getTimeframes, getPastDate } from '@myfinances/core/calc/chartHelpers';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getProfitLossColor } from '@/utils/text';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
 import Link from 'next/link';
-import { StockTransaction } from '@/api/dataInterface';
+import { StockTransaction } from '@myfinances/core/types';
 import { StockPortfolioCard } from './StockPortfolioCard';
 
 export default function StocksPortfolioPage() {

@@ -1,5 +1,5 @@
 import { CreditCard, KeyRound, Landmark, ShieldCheck, Wallet, LucideIcon } from 'lucide-react';
-import { VaultCategory, VaultCustomField, VaultItemContent } from '@/api/dataInterface';
+import { VaultCategory, VaultCustomField, VaultItemContent } from '@myfinances/core/types';
 
 export interface VaultDecryptedItem {
   id: string;

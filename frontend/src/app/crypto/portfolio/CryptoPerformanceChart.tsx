@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppStore } from '@/store/useAppStore';
-import { CryptoTransaction } from '@/api/dataInterface';
+import { CryptoTransaction } from '@myfinances/core/types';
 import { PortfolioItem, CRYPTO_TIMEFRAMES } from './useCryptoPortfolioData';
 
 type MultipleCoinCandles = Record<string, { time: number; close: number }[]>;

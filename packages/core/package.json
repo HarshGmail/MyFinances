@@ -1,0 +1,35 @@
+{
+  "name": "@myfinances/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api/index.ts",
+    "./api/*": "./src/api/*.ts",
+    "./calc/*": "./src/calc/*.ts",
+    "./types": "./src/types/index.ts",
+    "./schemas/*": "./src/schemas/*.ts",
+    "./hooks/*": "./src/hooks/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.81.5",
+    "react": "*"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "date-fns": "4.1.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4",
+    "typescript": "5.8.3",
+    "typescript-eslint": "^8.35.0",
+    "eslint": "^9"
+  }
+}

@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { format, startOfMonth } from 'date-fns';
 import Highcharts from 'highcharts';
-import { Expense, UserProfile, MonthlyInvestmentSummaryItem } from '@/api/dataInterface';
+import { Expense, UserProfile, MonthlyInvestmentSummaryItem } from '@myfinances/core/types';
 import { MonthlyData, FIXED_EXPENSE_TAGS } from './types';
 import {
   getFinancialMonthKey,
   getRecentFinancialMonthKeys,
   getSalaryMonthForFinancialMonth,
   financialMonthKeyToLabelDate,
-} from '@/utils/financialMonth';
+} from '@myfinances/core/calc/financialMonth';
 
 interface UseDashboardDataParams {
   user: UserProfile | undefined;

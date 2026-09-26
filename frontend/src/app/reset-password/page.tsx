@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
-import { useResetPasswordMutation } from '@/api/mutations';
+import { useResetPasswordMutation } from '@myfinances/core/api';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { GoldLease, GoldTransaction } from '@/api/dataInterface';
-import { getGoldCategory } from '@/utils/goldCategories';
+import type { GoldLease, GoldTransaction } from '@myfinances/core/types';
+import { getGoldCategory } from '@myfinances/core/calc/goldCategories';
 
 export interface LeaseMonth {
   key: string;

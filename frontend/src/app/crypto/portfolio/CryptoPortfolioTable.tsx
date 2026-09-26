@@ -11,10 +11,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/store/useAppStore';
-import { CryptoTransaction } from '@/api/dataInterface';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
-import { formatCurrency, formatToPercentage } from '@/utils/numbers';
-import { getProfitLossColor } from '@/utils/text';
+import { CryptoTransaction } from '@myfinances/core/types';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
+import { formatCurrency, formatToPercentage } from '@myfinances/core/calc/numbers';
+import { getProfitLossColor } from '@myfinances/core/calc/text';
 import { PortfolioItem } from './useCryptoPortfolioData';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
 

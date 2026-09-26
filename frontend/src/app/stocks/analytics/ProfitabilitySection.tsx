@@ -5,7 +5,7 @@ import { useUrlNullableState } from '@/utils/useUrlState';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StockFinancials } from '@/api/dataInterface';
+import { StockFinancials } from '@myfinances/core/types';
 import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
 import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';
 

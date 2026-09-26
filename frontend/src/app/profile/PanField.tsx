@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pencil, Check, X, Eye, EyeOff, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UpdateUserProfile } from '@/api/mutations';
+import { UpdateUserProfile } from '@myfinances/core/api';
 import { toast } from 'sonner';
 
 export function PanField({

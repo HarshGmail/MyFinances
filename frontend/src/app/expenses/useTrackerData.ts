@@ -9,14 +9,14 @@ import {
   subDays,
 } from 'date-fns';
 import Highcharts from 'highcharts';
-import { ExpenseTransaction, UserProfile } from '@/api/dataInterface';
+import { ExpenseTransaction, UserProfile } from '@myfinances/core/types';
 import {
   getFinancialMonthBoundaries,
   getFinancialMonthKey,
   getCurrentFinancialMonthKey,
   getRecentFinancialMonthKeys,
   financialMonthKeyToLabelDate,
-} from '@/utils/financialMonth';
+} from '@myfinances/core/calc/financialMonth';
 
 interface UseTrackerDataParams {
   expenseTransactions: ExpenseTransaction[] | undefined;

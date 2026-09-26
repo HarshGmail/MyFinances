@@ -1,8 +1,8 @@
 'use client';
 
-import { useRecurringDepositsQuery } from '@/api/query';
-import { useRecurringDepositMutation } from '@/api/mutations/recurring-deposits';
-import { RecurringDeposit, RecurringDepositPayload } from '@/api/dataInterface';
+import { useRecurringDepositsQuery } from '@myfinances/core/api';
+import { useRecurringDepositMutation } from '@myfinances/core/api/mutations/recurring-deposits';
+import { RecurringDeposit, RecurringDepositPayload } from '@myfinances/core/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { differenceInDays, differenceInMonths } from 'date-fns';
+import { quarterlyCompoundInterest } from '@myfinances/core/calc/deposits';
 
 import { Button } from '@/components/ui/button';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
@@ -52,24 +53,6 @@ const convertToISODate = (dateStr: string) => {
   const month = dateStr.substring(2, 4);
   const year = dateStr.substring(4, 8);
   return `${year}-${month}-${day}`;
-};
-
-// Helper function to calculate compound interest for RD (quarterly compounding)
-const calculateCompoundInterest = (principal: number, rate: number, timeInMonths: number) => {
-  const quarterlyRate = rate / 400; // Convert annual rate to quarterly decimal
-  const quarters = Math.floor(timeInMonths / 3);
-  const remainingMonths = timeInMonths % 3;
-
-  // Calculate compound interest for complete quarters
-  let amount = principal * Math.pow(1 + quarterlyRate, quarters);
-
-  // Add simple interest for remaining months (less than a quarter)
-  if (remainingMonths > 0) {
-    const monthlyRate = rate / 1200; // Monthly rate
-    amount = amount * (1 + monthlyRate * remainingMonths);
-  }
-
-  return amount - principal; // Return interest only
 };
 
 export default function RecurringDepositPage() {
@@ -122,12 +105,12 @@ export default function RecurringDepositPage() {
       const monthsCompleted = Math.min(differenceInMonths(currentDate, creationDate), totalMonths);
 
       // Calculate compound interest
-      const totalInterest = calculateCompoundInterest(
+      const totalInterest = quarterlyCompoundInterest(
         rd.amountInvested,
         rd.rateOfInterest,
         totalMonths
       );
-      const currentInterest = calculateCompoundInterest(
+      const currentInterest = quarterlyCompoundInterest(
         rd.amountInvested,
         rd.rateOfInterest,
         monthsCompleted
@@ -226,7 +209,7 @@ export default function RecurringDepositPage() {
       while (currentDate <= endDate) {
         const monthsFromStart = differenceInMonths(currentDate, startDate);
         if (monthsFromStart > 0 && monthsFromStart % 3 === 0) {
-          const interestAtPoint = calculateCompoundInterest(
+          const interestAtPoint = quarterlyCompoundInterest(
             rd.amountInvested,
             rd.rateOfInterest,
             monthsFromStart

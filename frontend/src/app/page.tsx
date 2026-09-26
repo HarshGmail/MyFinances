@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { SignupForm, LoginForm, SectionTabs } from '@/components';
 import { Button } from '@/components/ui/button';
-import { useDemoLoginMutation } from '@/api/mutations';
+import { useDemoLoginMutation } from '@myfinances/core/api';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from 'sonner';
 import {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { differenceInDays, differenceInMonths } from 'date-fns';
+import { differenceInMonths } from 'date-fns';
 import { useAppStore } from '@/store/useAppStore';
 import {
   useMutualFundTransactionsQuery,
@@ -13,15 +13,20 @@ import {
   useEpfTimelineQuery,
   useFixedDepositsQuery,
   useRecurringDepositsQuery,
-} from '@/api/query';
-import { useStocksPortfolioQuery } from '@/api/query/stocks';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
-import { cagr, firstTransactionDate, earliestDate } from '@/utils/cagr';
-import { calcMFPortfolio, calcEPFPortfolio } from '@/utils/portfolioCalculations';
+} from '@myfinances/core/api';
+import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
+import { cagr, firstTransactionDate, earliestDate } from '@myfinances/core/calc/cagr';
+import { calcMFPortfolio, calcEPFPortfolio } from '@myfinances/core/calc/portfolioCalculations';
 import { buildAIInsightPrompt } from './aiCopy';
-import { goldCashFlow, netGoldInvested, totalGoldGrams } from '@/utils/goldCategories';
-import { groupCryptoHoldings, heldCoinSymbols } from '@/utils/cryptoHoldings';
+import {
+  goldCashFlow,
+  netGoldInvested,
+  totalGoldGrams,
+} from '@myfinances/core/calc/goldCategories';
+import { groupCryptoHoldings, heldCoinSymbols } from '@myfinances/core/calc/cryptoHoldings';
+import { summariseFixedDeposits, summariseRecurringDeposits } from '@myfinances/core/calc/deposits';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -36,17 +41,6 @@ interface CryptoPortfolioItem {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const LATEST_GOLD_RATE_LOOKBACK_DAYS = 7;
-
-const calculateCompoundInterest = (principal: number, rate: number, timeInMonths: number) => {
-  const quarterlyRate = rate / 400;
-  const quarters = Math.floor(timeInMonths / 3);
-  const remainingMonths = timeInMonths % 3;
-  let amount = principal * Math.pow(1 + quarterlyRate, quarters);
-  if (remainingMonths > 0) {
-    amount = amount * (1 + (rate / 1200) * remainingMonths);
-  }
-  return amount - principal;
-};
 
 export function useHomePortfolioData() {
   const user = useAppStore((state) => state.user);
@@ -188,59 +182,10 @@ export function useHomePortfolioData() {
   }, [epfTimelineData, epfData]);
 
   // ===== FD =====
-  const fdPortfolioData = useMemo(() => {
-    if (!fdData?.length)
-      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
-    const processed = fdData.map((fd) => {
-      const totalDays = differenceInDays(new Date(fd.dateOfMaturity), new Date(fd.dateOfCreation));
-      const daysCompleted = Math.min(
-        differenceInDays(new Date(), new Date(fd.dateOfCreation)),
-        totalDays
-      );
-      const currentInterest = (fd.amountInvested * (fd.rateOfInterest / 100) * daysCompleted) / 365;
-      return { ...fd, currentValue: fd.amountInvested + currentInterest };
-    });
-    const invested = processed.reduce((s, fd) => s + fd.amountInvested, 0);
-    const currentValue = processed.reduce((s, fd) => s + fd.currentValue, 0);
-    const profitLoss = currentValue - invested;
-    return {
-      invested,
-      currentValue,
-      profitLoss,
-      profitLossPercentage: invested > 0 ? (profitLoss / invested) * 100 : 0,
-    };
-  }, [fdData]);
+  const fdPortfolioData = useMemo(() => summariseFixedDeposits(fdData ?? []), [fdData]);
 
   // ===== RD =====
-  const rdPortfolioData = useMemo(() => {
-    if (!rdData?.length)
-      return { invested: 0, currentValue: 0, profitLoss: 0, profitLossPercentage: 0 };
-    const processed = rdData.map((rd) => {
-      const totalMonths = differenceInMonths(
-        new Date(rd.dateOfMaturity),
-        new Date(rd.dateOfCreation)
-      );
-      const monthsCompleted = Math.min(
-        differenceInMonths(new Date(), new Date(rd.dateOfCreation)),
-        totalMonths
-      );
-      const currentInterest = calculateCompoundInterest(
-        rd.amountInvested,
-        rd.rateOfInterest,
-        monthsCompleted
-      );
-      return { ...rd, currentValue: rd.amountInvested + currentInterest };
-    });
-    const invested = processed.reduce((s, rd) => s + rd.amountInvested, 0);
-    const currentValue = processed.reduce((s, rd) => s + rd.currentValue, 0);
-    const profitLoss = currentValue - invested;
-    return {
-      invested,
-      currentValue,
-      profitLoss,
-      profitLossPercentage: invested > 0 ? (profitLoss / invested) * 100 : 0,
-    };
-  }, [rdData]);
+  const rdPortfolioData = useMemo(() => summariseRecurringDeposits(rdData ?? []), [rdData]);
 
   // ===== PORTFOLIO SUMMARY =====
   const portfolioSummary = useMemo(() => {

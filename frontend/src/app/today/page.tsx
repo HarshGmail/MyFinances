@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useTodayMovesData } from './useTodayMovesData';
+import { useTodayMovesData } from '@myfinances/core/hooks/useTodayMovesData';
 import TodayHeader from './TodayHeader';
 import AssetMoveCard from './AssetMoveCard';
 import TopMoversList from './TopMoversList';

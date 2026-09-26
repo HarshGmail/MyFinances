@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSearchCryptoQuery } from '@/api/query';
-import { CoinSearchResult } from '@/api/dataInterface';
+import { useSearchCryptoQuery } from '@myfinances/core/api';
+import { CoinSearchResult } from '@myfinances/core/types';
 import { OwnedCoin } from '../types';
 
 interface CryptoTabProps {

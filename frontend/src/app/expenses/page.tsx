@@ -7,8 +7,8 @@ import {
   useMonthlyInvestmentSummaryQuery,
   useExpenseTransactionsQuery,
   useExpenseTransactionNamesQuery,
-} from '@/api/query';
-import { useUpiEmailSyncMutation } from '@/api/mutations';
+} from '@myfinances/core/api';
+import { useUpiEmailSyncMutation } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -18,7 +18,7 @@ import {
 import {
   useUpdateIngestSenderEmailMutation,
   useRegenerateIngestTokenMutation,
-} from '@/api/mutations';
+} from '@myfinances/core/api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface UpiIntegrationProps {

@@ -1,4 +1,4 @@
-import { StockFinancials } from '@/api/dataInterface';
+import { StockFinancials } from '@myfinances/core/types';
 
 export type Verdict = { text: string; color: string };
 

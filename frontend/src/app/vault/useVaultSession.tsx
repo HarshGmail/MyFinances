@@ -10,8 +10,8 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { VaultCategory, VaultItemContent, WrappedWalletKey } from '@/api/dataInterface';
-import { useVaultMetaQuery } from '@/api/query';
+import { VaultCategory, VaultItemContent, WrappedWalletKey } from '@myfinances/core/types';
+import { useVaultMetaQuery } from '@myfinances/core/api';
 import {
   confirmVaultUnlock,
   fetchVaultItems,
@@ -22,7 +22,7 @@ import {
   useRekeyVaultMutation,
   useSaveVaultItemMutation,
   useSaveVaultKeyPairMutation,
-} from '@/api/mutations';
+} from '@myfinances/core/api';
 import {
   VAULT_KDF_ITERATIONS,
   VaultWrongPinError,

@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MFMetrics, buildMFMetricCards, getMFMetricCalculation } from './mfVerdicts';
 import MFMetricEducationDrawer from './MFMetricEducationDrawer';
 import CustomCAGRCalculator from './CustomCAGRCalculator';
-import { MutualFundNavHistoryData } from '@/api/dataInterface';
+import { MutualFundNavHistoryData } from '@myfinances/core/types';
 import { HelpCircle } from 'lucide-react';
 import { useUrlNullableState } from '@/utils/useUrlState';
 

@@ -7,8 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import _ from 'lodash';
 
 // Queries: mirror usage from your stocks pages
-import { useStockTransactionsQuery } from '@/api/query/stocks';
-import { useSearchStockByNameQuery } from '@/api/query';
+import { useStockTransactionsQuery } from '@myfinances/core/api/query/stocks';
+import { useSearchStockByNameQuery } from '@myfinances/core/api';
 
 type StockSuggestion = {
   symbol: string; // e.g. "TCS.NS" or "RELIANCE.NS"

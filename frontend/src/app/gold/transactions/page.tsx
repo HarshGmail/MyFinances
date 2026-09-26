@@ -1,15 +1,15 @@
 'use client';
 
-import { useGoldTransactionsQuery } from '@/api/query';
+import { useGoldTransactionsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
 import { Receipt, Edit3, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { useDeleteGoldTransactionMutation } from '@/api/mutations/gold'; // adjust path if needed
-import { GoldCategory } from '@/api/dataInterface';
-import { GOLD_CATEGORY_LABELS, getGoldCategory } from '@/utils/goldCategories';
+import { useDeleteGoldTransactionMutation } from '@myfinances/core/api/mutations/gold'; // adjust path if needed
+import { GoldCategory } from '@myfinances/core/types';
+import { GOLD_CATEGORY_LABELS, getGoldCategory } from '@myfinances/core/calc/goldCategories';
 
 interface GoldTransaction {
   _id?: string;

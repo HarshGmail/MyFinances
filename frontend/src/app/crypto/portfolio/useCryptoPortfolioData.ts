@@ -1,10 +1,10 @@
 import { useMemo, useCallback, useRef } from 'react';
 import groupBy from 'lodash/groupBy';
-import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@/api/query';
-import { useMultipleCoinCandlesQuery } from '@/api/query/crypto';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
-import xirr, { XirrTransaction as XirrCashFlow } from '@/utils/xirr';
-import { CryptoTransaction } from '@/api/dataInterface';
+import { useCryptoCoinPricesQuery, useCryptoTransactionsQuery } from '@myfinances/core/api';
+import { useMultipleCoinCandlesQuery } from '@myfinances/core/api/query/crypto';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
+import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
+import { CryptoTransaction } from '@myfinances/core/types';
 import { useUrlState } from '@/utils/useUrlState';
 
 export interface PortfolioItem {

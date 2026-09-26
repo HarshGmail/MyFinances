@@ -1,13 +1,13 @@
 'use client';
 
-import { useStockTransactionsQuery } from '@/api/query';
+import { useStockTransactionsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
 import { TrendingUp, Edit3, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { useDeleteStockTransactionMutation } from '@/api/mutations';
+import { useDeleteStockTransactionMutation } from '@myfinances/core/api';
 
 interface StockTransaction {
   _id?: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { MutualFundNavHistoryData } from '@/api/dataInterface';
+import { MutualFundNavHistoryData } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';

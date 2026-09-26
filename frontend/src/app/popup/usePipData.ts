@@ -10,7 +10,7 @@ import {
   useMfapiLatestNavQuery,
   useStockTransactionsQuery,
   useNseQuoteQuery,
-} from '@/api/query';
+} from '@myfinances/core/api';
 import {
   OwnedCoin,
   OwnedMutualFund,
@@ -19,7 +19,7 @@ import {
   PortfolioMetrics,
   OwnedStock,
 } from './types';
-import { netGoldInvested, totalGoldGrams } from '@/utils/goldCategories';
+import { netGoldInvested, totalGoldGrams } from '@myfinances/core/calc/goldCategories';
 
 export const usePipData = (selectedCoins: string[], selectedStocks: string[] = []) => {
   // Crypto data queries

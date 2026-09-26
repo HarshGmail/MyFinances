@@ -1,5 +1,5 @@
 import { differenceInYears } from 'date-fns';
-import { EpfAccount } from '@/api/dataInterface';
+import { EpfAccount } from '@myfinances/core/types';
 
 export interface EpfYearlyDataPoint {
   year: number;

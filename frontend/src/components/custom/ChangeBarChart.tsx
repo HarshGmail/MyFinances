@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAppStore } from '@/store/useAppStore';
-import { formatSignedCurrency, formatSignedPercent } from '@/utils/numbers';
+import { formatSignedCurrency, formatSignedPercent } from '@myfinances/core/calc/numbers';
 
 export interface ChangeBar {
   label: string;

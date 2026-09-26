@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Info } from 'lucide-react';
-import { StockFinancials, StocksPortfolioItem } from '@/api/dataInterface';
+import { StockFinancials, StocksPortfolioItem } from '@myfinances/core/types';
 import { getVerdict } from '@/app/stocks/detail/[symbol]/verdicts';
 import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
 import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';

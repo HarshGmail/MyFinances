@@ -1,0 +1,39 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { UserProfile } from '../../types';
+import { apiRequest } from '../client';
+
+export type UpdateUserProfile = Partial<UserProfile>;
+
+async function updateUserProfile(data: UpdateUserProfile) {
+  return apiRequest({
+    endpoint: `/auth/profile`,
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export function useRegenerateIngestTokenMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiRequest({ endpoint: '/auth/ingest-token/regenerate', method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+  });
+}
+
+export function useUpdateUserProfileMutation() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ data }: { data: UpdateUserProfile }) => updateUserProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-goals'] });
+    },
+  });
+  return {
+    ...mutation,
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+  };
+}

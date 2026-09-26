@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { useLogoutMutation } from '@/api/mutations';
+import { useLogoutMutation } from '@myfinances/core/api';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 

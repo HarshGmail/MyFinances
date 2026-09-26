@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Check, TriangleAlert, UserMinus, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { WalletMemberRecord } from '@/api/dataInterface';
+import { WalletMemberRecord } from '@myfinances/core/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {

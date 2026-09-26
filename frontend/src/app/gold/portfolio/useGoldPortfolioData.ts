@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@/api/query';
-import { useCapitalGainsQuery } from '@/api/query/capitalGains';
-import xirr, { XirrTransaction } from '@/utils/xirr';
-import { getPastDate, getTimeframes } from '@/utils/chartHelpers';
+import { useSafeGoldRatesQuery, useGoldTransactionsQuery } from '@myfinances/core/api';
+import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
+import xirr, { XirrTransaction } from '@myfinances/core/calc/xirr';
+import { getPastDate, getTimeframes } from '@myfinances/core/calc/chartHelpers';
 import Highcharts from 'highcharts';
 import { useUrlState } from '@/utils/useUrlState';
 import {
@@ -12,7 +12,7 @@ import {
   isLeaseCategory,
   netGoldInvested,
   totalGoldGrams,
-} from '@/utils/goldCategories';
+} from '@myfinances/core/calc/goldCategories';
 
 export function useGoldPortfolioData() {
   const { theme } = useAppStore();

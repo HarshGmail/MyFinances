@@ -13,13 +13,37 @@ import {
   SalaryRecord,
   MonthlyPayment,
 } from '../schemas';
-import { authenticateUser, clearAuthCookie, getUserFromRequest } from '../utils/jwtHelpers';
+import {
+  authenticateUser,
+  clearAuthCookie,
+  generateToken,
+  getUserFromRequest,
+  reissueTokenIfStale,
+  tokenExpiresAt,
+} from '../utils/jwtHelpers';
 import { encrypt, decrypt } from '../utils/encryption';
 import { sendPasswordResetEmail } from '../utils/emailService';
 import config from '../config';
 import logger from '../utils/logger';
 
-export async function signup(req: Request, res: Response) {
+type SessionDelivery = 'cookie' | 'body';
+
+interface SessionUser {
+  name: string;
+  email: string;
+  id: string;
+}
+
+function startSession(res: Response, user: SessionUser, delivery: SessionDelivery) {
+  if (delivery === 'cookie') {
+    authenticateUser(res, user);
+    return {};
+  }
+  const token = generateToken(user);
+  return { token, expiresAt: tokenExpiresAt(token) };
+}
+
+async function signupWith(req: Request, res: Response, delivery: SessionDelivery) {
   try {
     let userInput: UserInput;
     try {
@@ -60,12 +84,11 @@ export async function signup(req: Request, res: Response) {
     // Save user to database
     const result = await usersCollection.insertOne(userData);
 
-    // Authenticate user (generate token and set cookie)
-    authenticateUser(res, {
-      name: userData.name,
-      email: userData.email,
-      id: result.insertedId.toString(),
-    });
+    const session = startSession(
+      res,
+      { name: userData.name, email: userData.email, id: result.insertedId.toString() },
+      delivery
+    );
 
     res.status(201).json({
       success: true,
@@ -75,6 +98,7 @@ export async function signup(req: Request, res: Response) {
         email: userData.email,
         name: userData.name,
       },
+      ...session,
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -86,7 +110,10 @@ export async function signup(req: Request, res: Response) {
   }
 }
 
-export async function login(req: Request, res: Response) {
+export const signup = (req: Request, res: Response) => signupWith(req, res, 'cookie');
+export const mobileSignup = (req: Request, res: Response) => signupWith(req, res, 'body');
+
+async function loginWith(req: Request, res: Response, delivery: SessionDelivery) {
   try {
     const { email, password } = req.body;
 
@@ -135,8 +162,11 @@ export async function login(req: Request, res: Response) {
       return;
     }
 
-    // Authenticate user (generate token and set cookie)
-    authenticateUser(res, { name: user.name, email: user.email, id: user._id.toString() });
+    const session = startSession(
+      res,
+      { name: user.name, email: user.email, id: user._id.toString() },
+      delivery
+    );
 
     res.status(200).json({
       success: true,
@@ -146,6 +176,7 @@ export async function login(req: Request, res: Response) {
         email: user.email,
         name: user.name,
       },
+      ...session,
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -155,6 +186,23 @@ export async function login(req: Request, res: Response) {
       message: 'Internal server error',
     });
   }
+}
+
+export const login = (req: Request, res: Response) => loginWith(req, res, 'cookie');
+export const mobileLogin = (req: Request, res: Response) => loginWith(req, res, 'body');
+
+export function mobileRefresh(req: Request, res: Response) {
+  const payload = getUserFromRequest(req);
+  if (!payload) {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return;
+  }
+  const token = reissueTokenIfStale(payload);
+  res.status(200).json({
+    success: true,
+    token,
+    expiresAt: token ? tokenExpiresAt(token) : null,
+  });
 }
 
 export function logout(req: Request, res: Response) {
@@ -723,7 +771,7 @@ export async function resetPassword(req: Request, res: Response) {
   }
 }
 
-export async function demoLogin(req: Request, res: Response) {
+async function demoLoginWith(req: Request, res: Response, delivery: SessionDelivery) {
   try {
     const DEMO_EMAIL = 'testuser@gmail.com';
     const db = database.getDb();
@@ -740,12 +788,11 @@ export async function demoLogin(req: Request, res: Response) {
       return;
     }
 
-    // Authenticate user (generate token and set cookie)
-    authenticateUser(res, {
-      name: demoUser.name,
-      email: demoUser.email,
-      id: demoUser._id.toString(),
-    });
+    const session = startSession(
+      res,
+      { name: demoUser.name, email: demoUser.email, id: demoUser._id.toString() },
+      delivery
+    );
 
     res.status(200).json({
       success: true,
@@ -756,6 +803,7 @@ export async function demoLogin(req: Request, res: Response) {
         name: demoUser.name,
         isDemo: true,
       },
+      ...session,
     });
   } catch (err: unknown) {
     logger.error({ err }, 'Demo login error');
@@ -765,3 +813,6 @@ export async function demoLogin(req: Request, res: Response) {
     });
   }
 }
+
+export const demoLogin = (req: Request, res: Response) => demoLoginWith(req, res, 'cookie');
+export const mobileDemoLogin = (req: Request, res: Response) => demoLoginWith(req, res, 'body');

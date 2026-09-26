@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
-import { EmailSyncPreview, GoldCategory } from '@/api/dataInterface';
+import { EmailSyncPreview, GoldCategory } from '@myfinances/core/types';
 import { useUrlBoolean } from '@/utils/useUrlState';
-import { getGoldCategory } from '@/utils/goldCategories';
+import { getGoldCategory } from '@myfinances/core/calc/goldCategories';
 
 const GOLD_PREVIEW_LABELS: Record<GoldCategory, string> = {
   purchase: 'Buy',

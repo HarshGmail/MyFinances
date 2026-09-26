@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { VaultCategory, VaultItemContent, WalletSummary } from '@/api/dataInterface';
+import { VaultCategory, VaultItemContent, WalletSummary } from '@myfinances/core/types';
 import {
   fetchUserPublicKey,
   fetchWalletDetail,
@@ -14,7 +14,7 @@ import {
   useJoinWalletMutation,
   useRotateWalletKeyMutation,
   useSaveWalletItemMutation,
-} from '@/api/mutations';
+} from '@myfinances/core/api';
 import {
   decodeWalletKeyFromLink,
   decryptItem,

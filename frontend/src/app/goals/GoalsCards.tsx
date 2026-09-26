@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useUserGoalsQuery } from '@/api/query/userGoals';
+import { useUserGoalsQuery } from '@myfinances/core/api/query/userGoals';
 import {
   useStockTransactionsQuery,
   useMutualFundInfoFetchQuery,
@@ -12,7 +12,7 @@ import {
   useGoldTransactionsQuery,
   useCryptoCoinPricesQuery,
   useUserProfileQuery,
-} from '@/api/query';
+} from '@myfinances/core/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -53,7 +53,7 @@ import {
 } from 'lucide-react';
 import GoalEditDrawer from './GoalEditDrawer';
 import type { AssetOption } from './GoalAssetSelector';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAppStore } from '@/store/useAppStore';

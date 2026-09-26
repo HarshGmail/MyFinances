@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useSafeGoldRatesQuery } from '@/api/query';
+import { useSafeGoldRatesQuery } from '@myfinances/core/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
-import { formatCurrency } from '@/utils/numbers';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
 import { computeGoldMarketMetrics, buildGoldMarketCards } from './goldMetrics';
 import GoldMetricsGrid from './GoldMetricsGrid';
 import GoldPriceChartAnalyzer from './GoldPriceChartAnalyzer';

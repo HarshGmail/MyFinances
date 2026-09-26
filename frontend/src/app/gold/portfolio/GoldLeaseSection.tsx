@@ -16,10 +16,10 @@ import {
 } from '@/components/ui/table';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
 import { MobileDataCard, MobileDataMetric } from '@/components/custom/MobileDataCard';
-import { useGoldLeasesQuery } from '@/api/query';
+import { useGoldLeasesQuery } from '@myfinances/core/api';
 import { useAppStore } from '@/store/useAppStore';
-import { formatCurrency } from '@/utils/numbers';
-import type { GoldAccountSummary, GoldLease, GoldTransaction } from '@/api/dataInterface';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
+import type { GoldAccountSummary, GoldLease, GoldTransaction } from '@myfinances/core/types';
 import { LeaseMonth, useGoldLeaseData } from './useGoldLeaseData';
 
 const GRAMS_PRECISION = 4;

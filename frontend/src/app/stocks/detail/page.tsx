@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useStocksPortfolioQuery } from '@/api/query/stocks';
+import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
 import CompanySearchBar from './[symbol]/CompanySearchBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search } from 'lucide-react';

@@ -4,8 +4,8 @@ import { Wallet, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { useUserProfileQuery } from '@/api/query';
-import { useUpdateUserProfileMutation } from '@/api/mutations';
+import { useUserProfileQuery } from '@myfinances/core/api';
+import { useUpdateUserProfileMutation } from '@myfinances/core/api';
 import { AddPaymentRecordDialog } from './AddPaymentRecordDialog';
 import { MonthlyPayment } from './profileTypes';
 

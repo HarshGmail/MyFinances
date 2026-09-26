@@ -1,5 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTimeframes } from '@/utils/chartHelpers';
+import { getTimeframes } from '@myfinances/core/calc/chartHelpers';
 
 const TIMEFRAMES = getTimeframes();
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useSearchStockByNameQuery } from '@/api/query/stocks';
+import { useSearchStockByNameQuery } from '@myfinances/core/api/query/stocks';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 

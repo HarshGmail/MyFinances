@@ -7,19 +7,19 @@ import {
   useUserProfileQuery,
   useEmailIntegrationStatusQuery,
   useSyncJobStatusQuery,
-} from '@/api/query';
+} from '@myfinances/core/api';
 import {
   useEmailSyncMutation,
   useEmailImportMutation,
   useCancelSyncMutation,
-} from '@/api/mutations';
+} from '@myfinances/core/api';
 import { apiRequest } from '@/api/configs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, AlertTriangle, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { EmailSyncPreview as EmailSyncPreviewType } from '@/api/dataInterface';
+import { EmailSyncPreview as EmailSyncPreviewType } from '@myfinances/core/types';
 import LinkedAccountsList from './LinkedAccountsList';
 import EmailSyncPreviewCard from './EmailSyncPreview';
 import CustomPasswordsCard from './CustomPasswordsCard';

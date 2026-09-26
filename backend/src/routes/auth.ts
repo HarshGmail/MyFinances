@@ -12,6 +12,10 @@ import {
   forgotPassword,
   resetPassword,
   demoLogin,
+  mobileLogin,
+  mobileSignup,
+  mobileDemoLogin,
+  mobileRefresh,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
 
@@ -21,6 +25,10 @@ router.post('/signup', signup);
 router.post('/login', login);
 router.post('/demo-login', demoLogin);
 router.post('/logout', logout);
+router.post('/mobile/signup', mobileSignup);
+router.post('/mobile/login', mobileLogin);
+router.post('/mobile/demo-login', mobileDemoLogin);
+router.post('/mobile/refresh', mobileRefresh);
 router.get('/profile', authenticateToken, userProfile);
 router.put('/profile', authenticateToken, updateUserProfile);
 router.post('/ingest-token/regenerate', authenticateToken, regenerateIngestToken);

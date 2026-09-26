@@ -3,7 +3,7 @@ import { Bitcoin, Coins, PieChart, TrendingUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CoinSearchResult } from '@/api/dataInterface';
+import { CoinSearchResult } from '@myfinances/core/types';
 import { PiPPreferences, OwnedCoin, OwnedMutualFund, GoldPortfolioData } from '../types';
 import { CryptoTab } from './CryptoTab';
 import { MutualFundsTab } from './MutualFundTab';

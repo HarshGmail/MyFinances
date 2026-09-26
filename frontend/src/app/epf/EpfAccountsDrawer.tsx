@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { EpfAccount } from '@/api/dataInterface';
+import { EpfAccount } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,

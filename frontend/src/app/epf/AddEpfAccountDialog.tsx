@@ -1,7 +1,7 @@
 import { CalendarIcon } from 'lucide-react';
 import { UseFormReturn } from 'react-hook-form';
 import { format } from 'date-fns';
-import { EpfAccountPayload } from '@/api/dataInterface';
+import { EpfAccountPayload } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {

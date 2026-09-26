@@ -1,13 +1,13 @@
 'use client';
 
-import { useCryptoTransactionsQuery } from '@/api/query';
+import { useCryptoTransactionsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
 import { useRouter } from 'next/navigation';
 import { Bitcoin, Edit3, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { useDeleteCryptoTransactionMutation } from '@/api/mutations';
+import { useDeleteCryptoTransactionMutation } from '@myfinances/core/api';
 
 interface CryptoTransaction {
   _id?: string;

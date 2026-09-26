@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { StockFinancials, StocksPortfolioItem } from '@/api/dataInterface';
+import { StockFinancials, StocksPortfolioItem } from '@myfinances/core/types';
 import MetricEducationDrawer from '@/app/stocks/detail/[symbol]/MetricEducationDrawer';
 import { ANALYTICS_METRIC_DEFINITIONS } from './analyticsMetricDefinitions';
 
