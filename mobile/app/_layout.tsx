@@ -11,6 +11,7 @@ import { QUERY_CACHE_MAX_AGE_MS, shouldPersistQuery } from '@myfinances/core/api
 import { asyncAppStorage } from '@/lib/storage';
 import { queryCacheKey, useSession } from '@/lib/session';
 import { useTokenRefresh } from '@/lib/useTokenRefresh';
+import { usePushRegistration } from '@/lib/pushNotifications';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -53,6 +54,7 @@ export default function RootLayout() {
   const cacheKey = queryCacheKey(useSession((state) => state.user));
   const restore = useSession((state) => state.restore);
   useTokenRefresh();
+  usePushRegistration();
 
   useEffect(() => {
     restore().finally(() => SplashScreen.hideAsync());

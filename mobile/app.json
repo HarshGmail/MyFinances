@@ -44,7 +44,8 @@
         {
           "faceIDPermission": "Unlock your vault with Face ID."
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
