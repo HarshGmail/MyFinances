@@ -10,7 +10,8 @@
     "./calc/*": "./src/calc/*.ts",
     "./types": "./src/types/index.ts",
     "./schemas/*": "./src/schemas/*.ts",
-    "./hooks/*": "./src/hooks/*.ts"
+    "./hooks/*": "./src/hooks/*.ts",
+    "./vault/*": "./src/vault/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -22,8 +23,11 @@
     "react": "*"
   },
   "dependencies": {
-    "lodash": "^4.17.21",
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "date-fns": "4.1.0",
+    "lodash": "^4.17.21",
     "zod": "^3.25.67"
   },
   "devDependencies": {

@@ -52,6 +52,17 @@ export default function MoreScreen() {
         ) : null}
       </Card>
 
+      <Pressable
+        onPress={() => router.push('/more/vault')}
+        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
+      >
+        <View className="gap-0.5">
+          <Text className="text-base font-medium text-foreground">Vault</Text>
+          <Text className="text-xs text-muted">PIN-locked, end-to-end encrypted</Text>
+        </View>
+        <ChevronRight color={colors.muted} size={18} />
+      </Pressable>
+
       <View className="overflow-hidden rounded-xl border border-border bg-card">
         {WEB_ONLY_LINKS.map((link, index) => (
           <Pressable

@@ -12,6 +12,7 @@ export default function MoreLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="vault" options={{ headerShown: false }} />
     </Stack>
   );
 }
