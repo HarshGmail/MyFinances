@@ -63,7 +63,7 @@ import {
   FIXED_EXPENSE_TAGS,
   EXPENSE_FREQUENCIES,
   MonthlyData,
-} from './types';
+} from '@myfinances/core/schemas/expenses';
 
 interface DashboardTabProps {
   expenses: Expense[] | undefined;

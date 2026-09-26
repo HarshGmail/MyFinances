@@ -39,3 +39,36 @@ export function heldCoinSymbols(holdings: Record<string, CryptoHolding>): string
     .filter(([, holding]) => holding.units > 0)
     .map(([symbol]) => symbol);
 }
+
+export interface CryptoPosition {
+  coinName: string;
+  currency: string;
+  balance: number;
+  currentPrice: number;
+  investedAmount: number;
+  currentValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+}
+
+export function valueCryptoHoldings(
+  holdings: Record<string, CryptoHolding>,
+  prices: Record<string, number | null>
+): CryptoPosition[] {
+  return heldCoinSymbols(holdings).map((symbol) => {
+    const { coinName, invested, units } = holdings[symbol];
+    const currentPrice = prices[symbol] || 0;
+    const currentValue = units * currentPrice;
+    const profitLoss = currentValue - invested;
+    return {
+      coinName,
+      currency: symbol,
+      balance: units,
+      currentPrice,
+      investedAmount: invested,
+      currentValue,
+      profitLoss,
+      profitLossPercentage: invested > 0 ? (profitLoss / invested) * 100 : 0,
+    };
+  });
+}

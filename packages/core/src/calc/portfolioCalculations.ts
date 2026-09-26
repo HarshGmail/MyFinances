@@ -6,6 +6,7 @@
 
 import { MutualFundTransaction, MutualFundInfo, EpfTimelineSummary } from '../types';
 import groupBy from 'lodash/groupBy';
+import { holdingXirrPercent } from './holdingXirr';
 
 // ── Mutual Funds ─────────────────────────────────────────────────────────────
 
@@ -105,4 +106,62 @@ export function calcEPFPortfolio(epfTimelineData: EpfTimelineSummary): EPFPortfo
   const profitLossPercentage = invested > 0 ? (profitLoss / invested) * 100 : 0;
 
   return { invested, currentValue, profitLoss, profitLossPercentage };
+}
+
+export interface MFFundRow extends MFFundData {
+  schemeNumber: number | null;
+  fundXirr: number | null;
+}
+
+export function buildMfFundRows(
+  transactions: MutualFundTransaction[],
+  mfInfoData: MutualFundInfo[],
+  navDataMap: MFNavDataMap,
+  asOf: Date = new Date()
+): MFFundRow[] {
+  const byFund = groupBy(transactions, 'fundName');
+  return calcMFPortfolio(transactions, mfInfoData, navDataMap).fundData.map((fund) => ({
+    ...fund,
+    schemeNumber: mfInfoData.find((info) => info.fundName === fund.fundName)?.schemeNumber ?? null,
+    fundXirr:
+      fund.currentValue === null
+        ? null
+        : holdingXirrPercent(byFund[fund.fundName] ?? [], fund.currentValue, asOf),
+  }));
+}
+
+export function latestNavMap(
+  schemeNumbers: (string | number)[],
+  navHistory: Record<string, { data?: { date: string; nav: string }[] } | undefined> | undefined
+): MFNavDataMap {
+  const map: MFNavDataMap = {};
+  schemeNumbers.forEach((schemeNumber) => {
+    const latest = navHistory?.[schemeNumber]?.data?.[0];
+    map[schemeNumber] = latest ? { nav: parseFloat(latest.nav), navDate: latest.date } : null;
+  });
+  return map;
+}
+
+export interface MFRowsSummary {
+  invested: number;
+  currentValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  xirr: number | null;
+}
+
+export function summariseMfRows(
+  rows: MFFundRow[],
+  transactions: MutualFundTransaction[]
+): MFRowsSummary {
+  const invested = rows.reduce((sum, row) => sum + row.totalInvested, 0);
+  const currentValue = rows.reduce((sum, row) => sum + (row.currentValue ?? 0), 0);
+  const profitLoss = currentValue - invested;
+  return {
+    invested,
+    currentValue,
+    profitLoss,
+    profitLossPercentage: invested > 0 ? (profitLoss / invested) * 100 : 0,
+    xirr: rows.length ? holdingXirrPercent(transactions, currentValue) : null,
+  };
 }

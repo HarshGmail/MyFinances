@@ -20,7 +20,7 @@ import { useGoldLeasesQuery } from '@myfinances/core/api';
 import { useAppStore } from '@/store/useAppStore';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
 import type { GoldAccountSummary, GoldLease, GoldTransaction } from '@myfinances/core/types';
-import { LeaseMonth, useGoldLeaseData } from './useGoldLeaseData';
+import { LeaseMonth, useGoldLeaseData } from '@myfinances/core/hooks/useGoldLeaseData';
 
 const GRAMS_PRECISION = 4;
 

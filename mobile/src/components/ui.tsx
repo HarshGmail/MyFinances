@@ -18,15 +18,17 @@ export function Screen({
   refreshing = false,
   onRefresh,
   right,
+  underHeader = false,
 }: {
   title?: string;
   children: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   right?: ReactNode;
+  underHeader?: boolean;
 }) {
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={underHeader ? [] : ['top']}>
       <ScrollView
         contentContainerClassName="gap-4 px-4 pb-10 pt-2"
         refreshControl={

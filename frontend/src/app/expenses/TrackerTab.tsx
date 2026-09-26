@@ -37,7 +37,7 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Pencil, Trash2, Activity } from 'lucide-react';
 import { format } from 'date-fns';
-import { trackerSchema, TrackerFormValues, EXPENSE_TAGS } from './types';
+import { trackerSchema, TrackerFormValues, EXPENSE_TAGS } from '@myfinances/core/schemas/expenses';
 
 interface TrackerTabProps {
   expenseTransactions: ExpenseTransaction[] | undefined;

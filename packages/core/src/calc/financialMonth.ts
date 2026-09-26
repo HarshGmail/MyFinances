@@ -1,3 +1,5 @@
+import { endOfDay, endOfWeek, startOfDay, startOfWeek } from 'date-fns';
+
 // A "financial month" ends on the user's salary credit date (last working day of
 // the calendar month) and starts at the previous month's salary credit. A date
 // D belongs to FM(M) iff lastWorkingDay(M-1) <= D < lastWorkingDay(M).
@@ -76,4 +78,40 @@ export function getRecentFinancialMonthKeys(count: number): string[] {
 export function financialMonthKeyToLabelDate(monthKey: string): Date {
   const { year, month0 } = parseMonthKey(monthKey);
   return new Date(year, month0, 1);
+}
+
+export interface SpendTotals {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  total: number;
+}
+
+const WEEK_STARTS_ON_MONDAY = 1;
+
+export function summariseSpend(
+  transactions: { date: string | Date; amount: number }[],
+  now: Date = new Date()
+): SpendTotals {
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+  const weekStart = startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON_MONDAY });
+  const weekEnd = endOfWeek(now, { weekStartsOn: WEEK_STARTS_ON_MONDAY });
+  const { start: monthStart, end: monthEnd } = getFinancialMonthBoundaries(
+    getFinancialMonthKey(now)
+  );
+  const sumBetween = (start: Date, end: Date) =>
+    transactions
+      .filter((tx) => {
+        const date = new Date(tx.date);
+        return date >= start && date <= end;
+      })
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+  return {
+    today: sumBetween(todayStart, todayEnd),
+    thisWeek: sumBetween(weekStart, weekEnd),
+    thisMonth: sumBetween(monthStart, monthEnd),
+    total: transactions.reduce((sum, tx) => sum + tx.amount, 0),
+  };
 }

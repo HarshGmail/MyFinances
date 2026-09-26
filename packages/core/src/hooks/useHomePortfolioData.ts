@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { differenceInMonths } from 'date-fns';
-import { useAppStore } from '@/store/useAppStore';
 import {
   useMutualFundTransactionsQuery,
   useSafeGoldRatesQuery,
@@ -13,20 +12,16 @@ import {
   useEpfTimelineQuery,
   useFixedDepositsQuery,
   useRecurringDepositsQuery,
-} from '@myfinances/core/api';
-import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
-import { useCapitalGainsQuery } from '@myfinances/core/api/query/capitalGains';
-import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
-import { cagr, firstTransactionDate, earliestDate } from '@myfinances/core/calc/cagr';
-import { calcMFPortfolio, calcEPFPortfolio } from '@myfinances/core/calc/portfolioCalculations';
-import { buildAIInsightPrompt } from './aiCopy';
-import {
-  goldCashFlow,
-  netGoldInvested,
-  totalGoldGrams,
-} from '@myfinances/core/calc/goldCategories';
-import { groupCryptoHoldings, heldCoinSymbols } from '@myfinances/core/calc/cryptoHoldings';
-import { summariseFixedDeposits, summariseRecurringDeposits } from '@myfinances/core/calc/deposits';
+} from '../api';
+import { useStocksPortfolioQuery } from '../api/query/stocks';
+import { useCapitalGainsQuery } from '../api/query/capitalGains';
+import xirr, { XirrTransaction as XirrCashFlow } from '../calc/xirr';
+import { cagr, firstTransactionDate, earliestDate } from '../calc/cagr';
+import { calcMFPortfolio, calcEPFPortfolio } from '../calc/portfolioCalculations';
+import { buildAIInsightPrompt } from '../calc/aiCopy';
+import { goldCashFlow, netGoldInvested, totalGoldGrams } from '../calc/goldCategories';
+import { groupCryptoHoldings, heldCoinSymbols, valueCryptoHoldings } from '../calc/cryptoHoldings';
+import { summariseFixedDeposits, summariseRecurringDeposits } from '../calc/deposits';
 
 interface CryptoPortfolioItem {
   coinName: string;
@@ -42,9 +37,7 @@ interface CryptoPortfolioItem {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const LATEST_GOLD_RATE_LOOKBACK_DAYS = 7;
 
-export function useHomePortfolioData() {
-  const user = useAppStore((state) => state.user);
-
+export function useHomePortfolioData(userName: string | null | undefined) {
   const capitalGainsQuery = useCapitalGainsQuery();
   const stocksPortfolioQuery = useStocksPortfolioQuery();
   const mfTransactionsQuery = useMutualFundTransactionsQuery();
@@ -142,25 +135,10 @@ export function useHomePortfolioData() {
   const coinPricesQuery = useCryptoCoinPricesQuery(validCoins);
   const { data: coinPrices } = coinPricesQuery;
 
-  const cryptoPortfolioData = useMemo<CryptoPortfolioItem[]>(() => {
-    if (!coinPrices?.data) return [];
-    return validCoins.map((coinSymbol) => {
-      const { coinName, invested: investedAmount, units } = cryptoInvestedMap[coinSymbol];
-      const currentPrice = coinPrices.data[coinSymbol] || 0;
-      const currentValue = units * currentPrice;
-      const profitLoss = currentValue - investedAmount;
-      return {
-        coinName,
-        currency: coinSymbol,
-        balance: units,
-        currentPrice,
-        investedAmount,
-        currentValue,
-        profitLoss,
-        profitLossPercentage: investedAmount > 0 ? (profitLoss / investedAmount) * 100 : 0,
-      };
-    });
-  }, [coinPrices, cryptoInvestedMap, validCoins]);
+  const cryptoPortfolioData = useMemo<CryptoPortfolioItem[]>(
+    () => (coinPrices?.data ? valueCryptoHoldings(cryptoInvestedMap, coinPrices.data) : []),
+    [coinPrices, cryptoInvestedMap]
+  );
 
   // ===== EPF =====
   const epfPortfolioData = useMemo(() => {
@@ -464,7 +442,7 @@ export function useHomePortfolioData() {
   const aiPrompt = useMemo(
     () =>
       buildAIInsightPrompt({
-        userName: user?.name ?? 'Investor',
+        userName: userName ?? 'Investor',
         asOf: new Date(),
         total: {
           invested: portfolioSummary.total.invested,
@@ -542,7 +520,7 @@ export function useHomePortfolioData() {
         },
       }),
     [
-      user?.name,
+      userName,
       portfolioSummary,
       stockPortfolioData,
       mfPortfolioData,
@@ -621,7 +599,7 @@ export function useHomePortfolioData() {
   const lastUpdatedAt = updateTimestamps.length ? Math.min(...updateTimestamps) : null;
 
   return {
-    userName: user?.name,
+    userName,
     cgData,
     stockPortfolioData,
     stockTransactions,

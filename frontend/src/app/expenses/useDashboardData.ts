@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { format, startOfMonth } from 'date-fns';
 import Highcharts from 'highcharts';
 import { Expense, UserProfile, MonthlyInvestmentSummaryItem } from '@myfinances/core/types';
-import { MonthlyData, FIXED_EXPENSE_TAGS } from './types';
+import { MonthlyData, FIXED_EXPENSE_TAGS } from '@myfinances/core/schemas/expenses';
 import {
   getFinancialMonthKey,
   getRecentFinancialMonthKeys,

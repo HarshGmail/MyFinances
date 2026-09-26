@@ -12,6 +12,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { useMemo, useRef } from 'react';
+import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
 import {
   formatCurrency,
   formatToPercentage,
@@ -19,7 +20,6 @@ import {
 } from '@myfinances/core/calc/numbers';
 import { useUrlState } from '@/utils/useUrlState';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
-import xirr, { XirrTransaction as XirrCashFlow } from '@myfinances/core/calc/xirr';
 import { Skeleton } from '@/components/ui/skeleton';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
@@ -71,23 +71,10 @@ export default function StocksPortfolioPage() {
   const xirrByStockName = useMemo(() => {
     const result: Record<string, number | null> = {};
     processedPortfolioData.forEach((row) => {
-      const stockTxs = stockTransactions.filter((tx) => tx.stockName === row.stockName);
-      if (!stockTxs.length || row.currentValuation <= 0) {
-        result[row.stockName] = null;
-        return;
-      }
-      const cashFlows: XirrCashFlow[] = [
-        ...stockTxs.map((tx) => ({
-          amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-          when: new Date(tx.date),
-        })),
-        { amount: row.currentValuation, when: new Date() },
-      ];
-      try {
-        result[row.stockName] = xirr(cashFlows) * 100;
-      } catch {
-        result[row.stockName] = null;
-      }
+      result[row.stockName] = holdingXirrPercent(
+        stockTransactions.filter((tx) => tx.stockName === row.stockName),
+        row.currentValuation
+      );
     });
     return result;
   }, [processedPortfolioData, stockTransactions]);
@@ -199,21 +186,10 @@ export default function StocksPortfolioPage() {
     };
   }, [chartData, isDark]);
 
-  const overallXirr = useMemo(() => {
-    if (!stockTransactions.length || portfolioTotals.totalCurrentValue === 0) return null;
-    const cashFlows: XirrCashFlow[] = [
-      ...stockTransactions.map((tx) => ({
-        amount: tx.type === 'credit' ? -tx.amount : tx.amount,
-        when: new Date(tx.date),
-      })),
-      { amount: portfolioTotals.totalCurrentValue, when: new Date() },
-    ];
-    try {
-      return xirr(cashFlows) * 100;
-    } catch {
-      return null;
-    }
-  }, [stockTransactions, portfolioTotals.totalCurrentValue]);
+  const overallXirr = useMemo(
+    () => holdingXirrPercent(stockTransactions, portfolioTotals.totalCurrentValue),
+    [stockTransactions, portfolioTotals.totalCurrentValue]
+  );
 
   // Per-stock unrealized STCG/LTCG split (what if sold today)
   const stockUnrealizedByName = useMemo(() => {

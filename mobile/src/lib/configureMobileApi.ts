@@ -16,7 +16,7 @@ export async function clearPersistedQueries(): Promise<void> {
   appStorage.remove(queryCacheKey(useSession.getState().user));
 }
 
-async function endSession(): Promise<void> {
+export async function signOutLocally(): Promise<void> {
   await clearPersistedQueries();
   await useSession.getState().signOut();
 }
@@ -27,7 +27,7 @@ configureApi({
   getToken: currentToken,
   onDemoBlocked: () => Alert.alert('Demo mode', 'Demo data is read-only'),
   onUnauthorized: () => {
-    endSession().finally(() => router.replace('/login'));
+    signOutLocally().finally(() => router.replace('/login'));
   },
-  onLoggedOut: endSession,
+  onLoggedOut: signOutLocally,
 });

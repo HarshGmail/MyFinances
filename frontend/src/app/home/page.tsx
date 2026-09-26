@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Copy, CopyCheck, Info } from 'lucide-react';
 import { formatCurrency, formatToPercentage } from '@myfinances/core/calc/numbers';
 import { getProfitLossColor } from '@myfinances/core/calc/text';
-import { useHomePortfolioData } from './useHomePortfolioData';
+import { useHomePortfolioData } from '@myfinances/core/hooks/useHomePortfolioData';
+import { useAppStore } from '@/store/useAppStore';
 import AssetPortfolioCard from './AssetPortfolioCard';
 import DepositCard from './DepositCard';
 import CapitalGainsCard from './CapitalGainsCard';
@@ -21,6 +22,7 @@ const Chart = dynamic(() => import('./Chart'), { ssr: false });
 export default function Home() {
   const [copied, setCopied] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const userDisplayName = useAppStore((state) => state.user?.name);
   const {
     userName,
     cgData,
@@ -50,7 +52,7 @@ export default function Home() {
     isRefreshing,
     lastUpdatedAt,
     aiPrompt,
-  } = useHomePortfolioData();
+  } = useHomePortfolioData(userDisplayName);
 
   const handleCopyPrompt = useCallback(async () => {
     try {
