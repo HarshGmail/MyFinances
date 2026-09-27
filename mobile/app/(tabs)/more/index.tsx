@@ -12,7 +12,6 @@ import { colors } from '@/lib/theme';
 const WEB_APP_URL = 'https://www.my-finances.site';
 
 const WEB_ONLY_LINKS = [
-  { label: 'Goals', path: '/goals' },
   { label: 'Integrations', path: '/integrations' },
   { label: 'Stock research', path: '/stocks/detail' },
 ];
@@ -78,6 +77,17 @@ export default function MoreScreen() {
         <View className="gap-0.5">
           <Text className="text-base font-medium text-foreground">Salary</Text>
           <Text className="text-xs text-muted">Salary history and payments</Text>
+        </View>
+        <ChevronRight color={colors.muted} size={18} />
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/more/goals')}
+        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
+      >
+        <View className="gap-0.5">
+          <Text className="text-base font-medium text-foreground">Goals</Text>
+          <Text className="text-xs text-muted">Targets and progress</Text>
         </View>
         <ChevronRight color={colors.muted} size={18} />
       </Pressable>

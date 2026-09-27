@@ -51,6 +51,17 @@ export default function ExpensesScreen() {
         ))}
       </View>
 
+      <Pressable
+        onPress={() => router.push('/expenses/cash-flow')}
+        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
+      >
+        <View className="gap-0.5">
+          <Text className="text-base font-medium text-foreground">Cash flow</Text>
+          <Text className="text-xs text-muted">Income, investments, expenses and savings rate</Text>
+        </View>
+        <Text className="text-sm text-muted">›</Text>
+      </Pressable>
+
       <AddButton label="Log expense" onPress={() => router.push('/expenses/add')} />
 
       <Card>

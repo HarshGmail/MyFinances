@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Text } from 'react-native';
 import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
 import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
@@ -8,10 +8,21 @@ import {
   formatSignedPercent,
 } from '@myfinances/core/calc/numbers';
 import { STOCK_REFRESH_MS_OPEN, getNseMarketStatus } from '@myfinances/core/calc/marketHours';
-import { EmptyState, LoadingState, Row, Screen } from '@/components/ui';
+import { Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components/ui';
+import { LineChart } from '@/components/LineChart';
+import { TimeframePicker } from '@/components/TimeframePicker';
+import { combinedStockValueSeries } from '@myfinances/core/calc/portfolioSeries';
+import { getPastDate, getTimeframes } from '@myfinances/core/calc/chartHelpers';
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
-import { changeClass } from '@/lib/theme';
+import { changeClass, colors } from '@/lib/theme';
 import { AssetCapitalGains } from '@/components/CapitalGains';
+
+const STOCK_TIMEFRAMES = getTimeframes('1y');
+const DEFAULT_TIMEFRAME = '3m';
+
+function chartDate(timestamp: number) {
+  return new Date(timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
 
 function formatXirr(value: number | null) {
   return value === null ? '—' : formatSignedPercent(value);
@@ -19,7 +30,8 @@ function formatXirr(value: number | null) {
 
 export default function StocksScreen() {
   const isMarketOpen = getNseMarketStatus() === 'open';
-  const { data, isLoading, isFetching, refetch } = useStocksPortfolioQuery(false, {
+  const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME);
+  const { data, isLoading, isFetching, refetch } = useStocksPortfolioQuery(true, {
     refetchInterval: isMarketOpen ? STOCK_REFRESH_MS_OPEN : undefined,
   });
 
@@ -49,6 +61,11 @@ export default function StocksScreen() {
     [data?.transactions, data?.summary.totalCurrentValue]
   );
 
+  const valueSeries = useMemo(() => {
+    const days = STOCK_TIMEFRAMES.find((option) => option.label === timeframe)?.days ?? 0;
+    return combinedStockValueSeries(holdings, data?.priceData ?? {}, getPastDate(days));
+  }, [holdings, data?.priceData, timeframe]);
+
   if (isLoading || !data) return <LoadingState />;
   const { summary } = data;
 
@@ -72,6 +89,23 @@ export default function StocksScreen() {
         />
         <Row label="XIRR" value={formatXirr(overallXirr)} />
       </SummaryCard>
+
+      {valueSeries.length > 1 && (
+        <Card>
+          <Text className="text-base font-semibold text-foreground">Portfolio value</Text>
+          <TimeframePicker
+            timeframes={STOCK_TIMEFRAMES}
+            selected={timeframe}
+            onSelect={setTimeframe}
+          />
+          <LineChart
+            series={[{ label: 'Value', color: colors.foreground, points: valueSeries }]}
+            formatY={formatCurrency}
+            formatX={chartDate}
+          />
+          <Label>Current holdings valued at each day&apos;s close.</Label>
+        </Card>
+      )}
 
       {holdings.length ? (
         holdings.map((stock) => (

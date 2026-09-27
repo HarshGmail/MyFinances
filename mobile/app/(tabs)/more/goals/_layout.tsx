@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { colors } from '@/lib/theme';
 
-export default function ExpensesLayout() {
+export default function GoalsLayout() {
   return (
     <Stack
       screenOptions={{
@@ -11,10 +11,8 @@ export default function ExpensesLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="add" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="cash-flow" />
-      <Stack.Screen name="recurring" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="index" options={{ title: 'Goals' }} />
+      <Stack.Screen name="edit" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

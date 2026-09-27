@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { useMemo, useRef } from 'react';
 import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
+import { combinedStockValueSeries } from '@myfinances/core/calc/portfolioSeries';
 import {
   formatCurrency,
   formatToPercentage,
@@ -83,28 +84,10 @@ export default function StocksPortfolioPage() {
   const chartData = useMemo(() => {
     if (!processedPortfolioData.length || !Object.keys(priceData).length) return null;
 
-    const combined = new Map<number, number>();
+    const points = combinedStockValueSeries(processedPortfolioData, priceData, timeframeStart);
+    if (points.length === 0) return null;
 
-    processedPortfolioData.forEach((stock) => {
-      const stockPriceData = priceData[stock.stockName];
-      if (!stockPriceData?.chart?.result?.[0]) return;
-
-      const timestamps: number[] = stockPriceData.chart.result[0].timestamp || [];
-      const closes = stockPriceData.chart.result[0].indicators?.quote?.[0]?.close || [];
-
-      timestamps.forEach((ts, idx) => {
-        const closePrice = closes[idx];
-        const timeMs = ts * 1000;
-        if (!closePrice || timeMs < timeframeStart) return;
-        combined.set(timeMs, (combined.get(timeMs) ?? 0) + closePrice * stock.numOfShares);
-      });
-    });
-
-    if (combined.size === 0) return null;
-
-    const seriesData = Array.from(combined.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([timeMs, value]) => [timeMs, value]);
+    const seriesData = points.map(({ x, y }) => [x, y]);
 
     return [
       {

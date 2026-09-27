@@ -2,7 +2,9 @@ import { Text, View } from 'react-native';
 import { useFixedDepositsQuery } from '@myfinances/core/api/query/fixed-deposits';
 import { useRecurringDepositsQuery } from '@myfinances/core/api/query/recurring-deposits';
 import {
+  fixedDepositMaturityAmount,
   fixedDepositProgress,
+  recurringDepositMaturityAmount,
   recurringDepositProgress,
   summariseFixedDeposits,
   summariseRecurringDeposits,
@@ -79,6 +81,7 @@ export default function DepositsScreen() {
                 <Row label="Principal" value={formatCurrency(fd.amountInvested)} />
                 <Row label="Rate" value={`${fd.rateOfInterest}%`} />
                 <Row label="Value today" value={formatCurrency(progress.currentValue)} />
+                <Row label="At maturity" value={formatCurrency(fixedDepositMaturityAmount(fd))} />
                 <Row label="Matures" value={formatDate(fd.dateOfMaturity)} />
                 <ProgressBar completed={progress.daysCompleted} total={progress.totalDays} />
               </Card>
@@ -107,6 +110,10 @@ export default function DepositsScreen() {
                 <Row label="Monthly" value={formatCurrency(rd.monthlyDeposit)} />
                 <Row label="Rate" value={`${rd.rateOfInterest}%`} />
                 <Row label="Value today" value={formatCurrency(progress.currentValue)} />
+                <Row
+                  label="At maturity"
+                  value={formatCurrency(recurringDepositMaturityAmount(rd))}
+                />
                 <Row label="Matures" value={formatDate(rd.dateOfMaturity)} />
                 <ProgressBar completed={progress.monthsCompleted} total={progress.totalMonths} />
               </Card>
