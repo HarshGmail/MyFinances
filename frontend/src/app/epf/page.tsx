@@ -16,7 +16,7 @@ import { useAddEpfAccountMutation } from '@myfinances/core/api';
 import { EpfAccountPayload } from '@myfinances/core/types';
 import { useAppStore } from '@/store/useAppStore';
 
-import { calculateEPFGrowth } from './useEpfCalculations';
+import { calculateEPFGrowth } from '@myfinances/core/calc/epfProjection';
 import { EpfPageSkeleton } from './EpfPageSkeleton';
 import { EpfAccountsDrawer } from './EpfAccountsDrawer';
 import { AddEpfAccountDialog } from './AddEpfAccountDialog';

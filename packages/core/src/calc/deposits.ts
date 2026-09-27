@@ -99,3 +99,15 @@ export function summariseRecurringDeposits(rds: RecurringDeposit[], now?: Date):
     }))
   );
 }
+
+export function fixedDepositMaturityAmount(fd: FixedDeposit): number {
+  const { totalDays } = fixedDepositProgress(fd);
+  return fd.amountInvested + simpleInterestAccrued(fd.amountInvested, fd.rateOfInterest, totalDays);
+}
+
+export function recurringDepositMaturityAmount(rd: RecurringDeposit): number {
+  const { totalMonths } = recurringDepositProgress(rd);
+  return (
+    rd.amountInvested + quarterlyCompoundInterest(rd.amountInvested, rd.rateOfInterest, totalMonths)
+  );
+}
