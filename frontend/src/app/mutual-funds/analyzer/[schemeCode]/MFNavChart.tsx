@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Highcharts from 'highcharts/highstock';
 import { MutualFundNavHistoryData } from '@myfinances/core/types';
-import { MF_INTERVALS, filterNavDataByInterval } from './mfVerdicts';
+import { MF_INTERVALS, filterNavDataByInterval } from '@myfinances/core/calc/mfMetrics';
 import { useAppStore } from '@/store/useAppStore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUrlState } from '@/utils/useUrlState';

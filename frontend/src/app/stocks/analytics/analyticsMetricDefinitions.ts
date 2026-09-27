@@ -1,4 +1,4 @@
-import { MetricDefinition } from '@/app/stocks/detail/[symbol]/metricDefinitions';
+import { MetricDefinition } from '@myfinances/core/calc/stockMetricDefinitions';
 
 export const ANALYTICS_METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
   'Trailing P/E': {

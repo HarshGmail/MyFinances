@@ -1,6 +1,5 @@
 import { Alert, Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
+import { router, type Href } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useUserProfileQuery } from '@myfinances/core/api/query/profile';
 import { useLogoutMutation } from '@myfinances/core/api/mutations/logout';
@@ -9,11 +8,15 @@ import { useSession } from '@/lib/session';
 import { signOutLocally } from '@/lib/configureMobileApi';
 import { colors } from '@/lib/theme';
 
-const WEB_APP_URL = 'https://www.my-finances.site';
-
-const WEB_ONLY_LINKS = [
-  { label: 'Integrations', path: '/integrations' },
-  { label: 'Stock research', path: '/stocks/detail' },
+const APP_LINKS: { label: string; description: string; href: Href }[] = [
+  { label: 'Vault', description: 'PIN-locked, end-to-end encrypted', href: '/more/vault' },
+  { label: 'Goals', description: 'Targets and progress', href: '/more/goals' },
+  { label: 'Salary', description: 'Salary history and payments', href: '/more/salary' },
+  {
+    label: 'Integrations',
+    description: 'UPI auto-track token and sender',
+    href: '/more/integrations',
+  },
 ];
 
 export default function MoreScreen() {
@@ -59,51 +62,18 @@ export default function MoreScreen() {
         </View>
       </Card>
 
-      <Pressable
-        onPress={() => router.push('/more/vault')}
-        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
-      >
-        <View className="gap-0.5">
-          <Text className="text-base font-medium text-foreground">Vault</Text>
-          <Text className="text-xs text-muted">PIN-locked, end-to-end encrypted</Text>
-        </View>
-        <ChevronRight color={colors.muted} size={18} />
-      </Pressable>
-
-      <Pressable
-        onPress={() => router.push('/more/salary')}
-        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
-      >
-        <View className="gap-0.5">
-          <Text className="text-base font-medium text-foreground">Salary</Text>
-          <Text className="text-xs text-muted">Salary history and payments</Text>
-        </View>
-        <ChevronRight color={colors.muted} size={18} />
-      </Pressable>
-
-      <Pressable
-        onPress={() => router.push('/more/goals')}
-        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
-      >
-        <View className="gap-0.5">
-          <Text className="text-base font-medium text-foreground">Goals</Text>
-          <Text className="text-xs text-muted">Targets and progress</Text>
-        </View>
-        <ChevronRight color={colors.muted} size={18} />
-      </Pressable>
-
       <View className="overflow-hidden rounded-xl border border-border bg-card">
-        {WEB_ONLY_LINKS.map((link, index) => (
+        {APP_LINKS.map((link, index) => (
           <Pressable
-            key={link.path}
-            onPress={() => WebBrowser.openBrowserAsync(`${WEB_APP_URL}${link.path}`)}
+            key={link.label}
+            onPress={() => router.push(link.href)}
             className={`flex-row items-center justify-between px-4 py-4 ${index > 0 ? 'border-t border-border' : ''}`}
           >
-            <Text className="text-base text-foreground">{link.label}</Text>
-            <View className="flex-row items-center gap-1">
-              <Text className="text-xs text-muted">on web</Text>
-              <ChevronRight color={colors.muted} size={18} />
+            <View className="gap-0.5">
+              <Text className="text-base font-medium text-foreground">{link.label}</Text>
+              <Text className="text-xs text-muted">{link.description}</Text>
             </View>
+            <ChevronRight color={colors.muted} size={18} />
           </Pressable>
         ))}
       </View>

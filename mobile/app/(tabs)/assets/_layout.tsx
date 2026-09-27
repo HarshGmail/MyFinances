@@ -19,6 +19,8 @@ export default function AssetsLayout() {
       <Stack.Screen name="epf" options={{ title: 'EPF' }} />
       <Stack.Screen name="deposits" options={{ title: 'Deposits' }} />
       <Stack.Screen name="transactions" options={{ title: 'Transactions' }} />
+      <Stack.Screen name="fund" options={{ title: 'Fund' }} />
+      <Stack.Screen name="stock" options={{ title: 'Stock' }} />
       <Stack.Screen name="forms" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
   );

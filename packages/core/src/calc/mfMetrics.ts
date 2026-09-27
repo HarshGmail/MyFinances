@@ -1,4 +1,4 @@
-import { MutualFundMeta, MutualFundNavHistoryData } from '@myfinances/core/types';
+import { MutualFundMeta, MutualFundNavHistoryData } from '../types';
 
 export type Verdict = { text: string; color: string };
 export type MetricCard = { label: string; value: string; verdict: Verdict | null };

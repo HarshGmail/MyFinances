@@ -3,7 +3,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { MF_METRIC_DEFINITIONS } from './mfMetricDefinitions';
 import { Lightbulb, Calculator } from 'lucide-react';
-import { MetricCalculation } from './mfVerdicts';
+import { MetricCalculation } from '@myfinances/core/calc/mfMetrics';
 
 interface Props {
   isOpen: boolean;

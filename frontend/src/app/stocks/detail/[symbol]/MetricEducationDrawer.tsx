@@ -1,9 +1,9 @@
 'use client';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { METRIC_DEFINITIONS, MetricDefinition } from './metricDefinitions';
+import { METRIC_DEFINITIONS, MetricDefinition } from '@myfinances/core/calc/stockMetricDefinitions';
 import { Lightbulb, Calculator } from 'lucide-react';
-import { MetricCalculation } from './verdicts';
+import { MetricCalculation } from '@myfinances/core/calc/stockVerdicts';
 
 interface Props {
   isOpen: boolean;

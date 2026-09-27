@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { useStocksPortfolioQuery } from '@myfinances/core/api/query/stocks';
 import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
 import {
@@ -16,6 +16,7 @@ import { getPastDate, getTimeframes } from '@myfinances/core/calc/chartHelpers';
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
 import { changeClass, colors } from '@/lib/theme';
 import { AssetCapitalGains } from '@/components/CapitalGains';
+import { router } from 'expo-router';
 
 const STOCK_TIMEFRAMES = getTimeframes('1y');
 const DEFAULT_TIMEFRAME = '3m';
@@ -109,28 +110,34 @@ export default function StocksScreen() {
 
       {holdings.length ? (
         holdings.map((stock) => (
-          <HoldingCard
+          <Pressable
             key={stock.stockName}
-            title={stock.stockName}
-            currentValue={stock.isDataAvailable ? stock.currentValuation : null}
-            profitLoss={stock.profitLoss}
-            profitLossPercentage={stock.profitLossPercentage}
-            metrics={[
-              { label: 'Shares', value: String(stock.numOfShares) },
-              { label: 'Avg price', value: formatCurrency(stock.avgPrice) },
-              { label: 'Price', value: formatCurrency(stock.currentPrice) },
-              { label: 'Invested', value: formatCurrency(stock.investedAmount) },
-              {
-                label: 'Day',
-                value: (
-                  <SignedText value={stock.oneDayChange}>
-                    {formatSignedCurrency(stock.oneDayChange)}
-                  </SignedText>
-                ),
-              },
-              { label: 'XIRR', value: formatXirr(xirrByStock.get(stock.stockName) ?? null) },
-            ]}
-          />
+            onPress={() =>
+              router.push({ pathname: '/assets/stock', params: { symbol: stock.stockName } })
+            }
+          >
+            <HoldingCard
+              title={stock.stockName}
+              currentValue={stock.isDataAvailable ? stock.currentValuation : null}
+              profitLoss={stock.profitLoss}
+              profitLossPercentage={stock.profitLossPercentage}
+              metrics={[
+                { label: 'Shares', value: String(stock.numOfShares) },
+                { label: 'Avg price', value: formatCurrency(stock.avgPrice) },
+                { label: 'Price', value: formatCurrency(stock.currentPrice) },
+                { label: 'Invested', value: formatCurrency(stock.investedAmount) },
+                {
+                  label: 'Day',
+                  value: (
+                    <SignedText value={stock.oneDayChange}>
+                      {formatSignedCurrency(stock.oneDayChange)}
+                    </SignedText>
+                  ),
+                },
+                { label: 'XIRR', value: formatXirr(xirrByStock.get(stock.stockName) ?? null) },
+              ]}
+            />
+          </Pressable>
         ))
       ) : (
         <EmptyState message="No stock holdings yet." />

@@ -1,6 +1,6 @@
 'use client';
 
-import { getMFVerdict, MFMetrics } from './mfVerdicts';
+import { getMFVerdict, MFMetrics } from '@myfinances/core/calc/mfMetrics';
 import MFMetricEducationDrawer from './MFMetricEducationDrawer';
 import { useUrlNullableState } from '@/utils/useUrlState';
 
