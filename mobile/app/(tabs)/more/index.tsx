@@ -50,6 +50,14 @@ export default function MoreScreen() {
         {profileQuery.data?.panNumber ? (
           <Row label="PAN" value={profileQuery.data.panNumber} />
         ) : null}
+        <View className="flex-row gap-4 pt-2">
+          <Pressable onPress={() => router.push('/more/edit-profile')} className="flex-1">
+            <Text className="text-sm font-semibold text-foreground">Edit profile</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/more/change-password')} className="flex-1">
+            <Text className="text-sm font-semibold text-foreground">Change password</Text>
+          </Pressable>
+        </View>
       </Card>
 
       <Pressable
@@ -59,6 +67,17 @@ export default function MoreScreen() {
         <View className="gap-0.5">
           <Text className="text-base font-medium text-foreground">Vault</Text>
           <Text className="text-xs text-muted">PIN-locked, end-to-end encrypted</Text>
+        </View>
+        <ChevronRight color={colors.muted} size={18} />
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/more/salary')}
+        className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-4"
+      >
+        <View className="gap-0.5">
+          <Text className="text-base font-medium text-foreground">Salary</Text>
+          <Text className="text-xs text-muted">Salary history and payments</Text>
         </View>
         <ChevronRight color={colors.muted} size={18} />
       </Pressable>

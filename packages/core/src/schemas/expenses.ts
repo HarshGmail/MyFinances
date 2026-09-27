@@ -77,3 +77,5 @@ function toIsoDay(date: Date): string {
 export function trackerEntryPayload(values: TrackerEntryValues): TrackerFormValues {
   return { ...values, date: toIsoDay(values.date) };
 }
+
+export type ExpenseFrequency = (typeof EXPENSE_FREQUENCIES)[number]['value'];

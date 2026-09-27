@@ -11,7 +11,7 @@ import {
 } from '@myfinances/core/schemas/transactions';
 import { BUY_SELL_OPTIONS, DateField, NumberField, SegmentedField } from '@/components/form';
 import { FormScreen, errorMessage } from '@/components/FormScreen';
-import { EmptyState, Label, LoadingState } from '@/components/ui';
+import { AddButton, EmptyState, Label, LoadingState } from '@/components/ui';
 
 export default function MutualFundTransactionForm() {
   const { fund } = useLocalSearchParams<{ fund?: string }>();
@@ -84,8 +84,12 @@ export default function MutualFundTransactionForm() {
               })}
             </View>
           ) : (
-            <EmptyState message="Add a fund on the web first, then log its transactions here." />
+            <EmptyState message="No funds yet. Add one first." />
           )}
+          <AddButton
+            label="Add a new fund"
+            onPress={() => router.push('/assets/forms/mutual-fund-info')}
+          />
         </View>
         <SegmentedField control={control} name="type" label="Type" options={BUY_SELL_OPTIONS} />
         <DateField control={control} name="date" label="Date" />

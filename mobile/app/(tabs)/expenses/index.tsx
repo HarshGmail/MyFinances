@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useExpenseTransactionsQuery } from '@myfinances/core/api/query/expenseTransactions';
 import { useExpensesQuery } from '@myfinances/core/api/query/expenses';
 import { useDeleteExpenseTransactionMutation } from '@myfinances/core/api/mutations/expenseTransactions';
@@ -55,7 +55,7 @@ export default function ExpensesScreen() {
 
       <Card>
         <Text className="text-base font-semibold text-foreground">Recent</Text>
-        <Label>Long press to delete</Label>
+        <Label>Tap to edit · long press to delete</Label>
         {transactions.length ? (
           transactions
             .slice(0, RECENT_COUNT)
@@ -67,6 +67,7 @@ export default function ExpensesScreen() {
                 date={tx.date}
                 amount={tx.amount}
                 isCredit
+                onEdit={() => router.push({ pathname: '/expenses/add', params: { id: tx._id } })}
                 onDelete={() => deleteMutation.mutateAsync(tx._id)}
               />
             ))
@@ -75,18 +76,30 @@ export default function ExpensesScreen() {
         )}
       </Card>
 
-      {(recurringQuery.data ?? []).length > 0 && (
-        <Card>
-          <Text className="text-base font-semibold text-foreground">Recurring</Text>
-          {recurringQuery.data!.map((expense) => (
-            <Row
+      <Card>
+        <Text className="text-base font-semibold text-foreground">Recurring</Text>
+        <AddButton
+          label="Add recurring expense"
+          onPress={() => router.push('/expenses/recurring')}
+        />
+        {(recurringQuery.data ?? []).length ? (
+          recurringQuery.data!.map((expense) => (
+            <Pressable
               key={expense._id}
-              label={`${expense.expenseName} · ${expense.expenseFrequency}`}
-              value={formatCurrency(expense.expenseAmount)}
-            />
-          ))}
-        </Card>
-      )}
+              onPress={() =>
+                router.push({ pathname: '/expenses/recurring', params: { id: expense._id } })
+              }
+            >
+              <Row
+                label={`${expense.expenseName} · ${expense.expenseFrequency}`}
+                value={formatCurrency(expense.expenseAmount)}
+              />
+            </Pressable>
+          ))
+        ) : (
+          <EmptyState message="No recurring expenses yet." />
+        )}
+      </Card>
     </Screen>
   );
 }

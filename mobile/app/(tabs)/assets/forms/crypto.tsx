@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCryptoTransactionsQuery } from '@myfinances/core/api/query/crypto';
+import {
+  useCryptoTransactionsQuery,
+  useSearchCryptoQuery,
+} from '@myfinances/core/api/query/crypto';
 import {
   useAddCryptoTransactionMutation,
   useUpdateCryptoTransactionMutation,
@@ -11,13 +14,8 @@ import {
   cryptoTransactionSchema,
   CryptoTransactionValues,
 } from '@myfinances/core/schemas/transactions';
-import {
-  BUY_SELL_OPTIONS,
-  DateField,
-  NumberField,
-  SegmentedField,
-  TextField,
-} from '@/components/form';
+import { BUY_SELL_OPTIONS, DateField, NumberField, SegmentedField } from '@/components/form';
+import { SearchPicker, useDebouncedValue } from '@/components/SearchPicker';
 import { FormScreen, errorMessage } from '@/components/FormScreen';
 import { LoadingState } from '@/components/ui';
 
@@ -49,12 +47,32 @@ function CryptoForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const addMutation = useAddCryptoTransactionMutation();
   const updateMutation = useUpdateCryptoTransactionMutation();
-  const { control, handleSubmit } = useForm<CryptoTransactionValues>({
+  const { control, handleSubmit, setValue, watch, formState } = useForm<CryptoTransactionValues>({
     resolver: zodResolver(cryptoTransactionSchema),
     defaultValues: initial
       ? { ...initial, date: new Date(initial.date) }
       : { type: 'credit', date: new Date(), coinName: '', coinSymbol: '' },
   });
+
+  const selectedName = watch('coinName');
+  const [coinQuery, setCoinQuery] = useState(initial?.coinName ?? '');
+  const debouncedQuery = useDebouncedValue(coinQuery);
+  const coinSearch = useSearchCryptoQuery(debouncedQuery);
+  const coinOptions = useMemo(
+    () =>
+      [...(coinSearch.data ?? [])]
+        .sort((a, b) => a.rank - b.rank)
+        .map((coin) => ({ key: coin.id, title: coin.name, subtitle: coin.symbol.toUpperCase() })),
+    [coinSearch.data]
+  );
+
+  const pickCoin = (coinId: string) => {
+    const coin = coinSearch.data?.find((candidate) => candidate.id === coinId);
+    if (!coin) return;
+    setValue('coinName', coin.name, { shouldValidate: true });
+    setValue('coinSymbol', coin.symbol.toUpperCase(), { shouldValidate: true });
+    setCoinQuery(coin.name);
+  };
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
@@ -83,14 +101,22 @@ function CryptoForm({
         error={serverError}
       >
         <SegmentedField control={control} name="type" label="Type" options={BUY_SELL_OPTIONS} />
-        <TextField control={control} name="coinName" label="Coin name" placeholder="e.g. Bitcoin" />
-        <TextField
-          control={control}
-          name="coinSymbol"
-          label="Symbol"
-          placeholder="e.g. BTC"
-          autoCapitalize="characters"
-          autoCorrect={false}
+        <SearchPicker
+          label="Coin"
+          placeholder="Search e.g. Bitcoin"
+          query={coinQuery}
+          onQueryChange={(next) => {
+            setCoinQuery(next);
+            if (next !== selectedName) {
+              setValue('coinName', '');
+              setValue('coinSymbol', '');
+            }
+          }}
+          options={coinOptions}
+          isSearching={coinSearch.isFetching}
+          selectedTitle={selectedName}
+          onSelect={pickCoin}
+          error={formState.errors.coinName ? 'Pick a coin from the list' : undefined}
         />
         <DateField control={control} name="date" label="Date" />
         <NumberField control={control} name="quantity" label="Quantity" />

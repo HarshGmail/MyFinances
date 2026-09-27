@@ -21,6 +21,7 @@ import { Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
 import { BreadthBar, ChangeBars } from '@/components/ChangeBars';
 import { changeClass } from '@/lib/theme';
+import { AssetCapitalGains } from '@/components/CapitalGains';
 
 const NAV_DECIMALS = 4;
 
@@ -173,6 +174,7 @@ export default function MutualFundsScreen() {
       ) : (
         <EmptyState message="No mutual fund holdings yet." />
       )}
+      <AssetCapitalGains asset="mutualFunds" />
     </Screen>
   );
 }

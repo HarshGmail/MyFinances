@@ -15,6 +15,7 @@ import {
 import { Card, Label, LoadingState, Row, Screen } from '@/components/ui';
 import { SummaryCard } from '@/components/HoldingCard';
 import { changeClass } from '@/lib/theme';
+import { AssetCapitalGains } from '@/components/CapitalGains';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const RATE_LOOKBACK_DAYS = 7;
@@ -137,6 +138,7 @@ export default function GoldScreen() {
           </View>
         </Card>
       )}
+      <AssetCapitalGains asset="gold" />
     </Screen>
   );
 }

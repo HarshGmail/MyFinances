@@ -79,3 +79,14 @@ export function goldTransactionPayload(values: GoldTransactionValues) {
     platform: values.platform || undefined,
   };
 }
+
+export const mutualFundInfoSchema = z.object({
+  fundName: z.string().min(1, 'Pick a fund from the search'),
+  schemeNumber: z.number({ invalid_type_error: 'Pick a fund from the search' }),
+  sipAmount: z.number().min(1, 'SIP amount must be at least 1'),
+  goal: z.string().optional(),
+  platform: z.string().optional(),
+  date: pastOrToday,
+});
+
+export type MutualFundInfoValues = z.infer<typeof mutualFundInfoSchema>;

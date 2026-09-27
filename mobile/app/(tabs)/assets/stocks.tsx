@@ -11,6 +11,7 @@ import { STOCK_REFRESH_MS_OPEN, getNseMarketStatus } from '@myfinances/core/calc
 import { EmptyState, LoadingState, Row, Screen } from '@/components/ui';
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
 import { changeClass } from '@/lib/theme';
+import { AssetCapitalGains } from '@/components/CapitalGains';
 
 function formatXirr(value: number | null) {
   return value === null ? '—' : formatSignedPercent(value);
@@ -100,6 +101,7 @@ export default function StocksScreen() {
       ) : (
         <EmptyState message="No stock holdings yet." />
       )}
+      <AssetCapitalGains asset="stocks" />
     </Screen>
   );
 }
