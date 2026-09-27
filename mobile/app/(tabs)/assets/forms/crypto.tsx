@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   useCryptoTransactionsQuery,
@@ -47,14 +47,14 @@ function CryptoForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const addMutation = useAddCryptoTransactionMutation();
   const updateMutation = useUpdateCryptoTransactionMutation();
-  const { control, handleSubmit, setValue, watch, formState } = useForm<CryptoTransactionValues>({
+  const { control, handleSubmit, setValue, formState } = useForm<CryptoTransactionValues>({
     resolver: zodResolver(cryptoTransactionSchema),
     defaultValues: initial
       ? { ...initial, date: new Date(initial.date) }
       : { type: 'credit', date: new Date(), coinName: '', coinSymbol: '' },
   });
 
-  const selectedName = watch('coinName');
+  const selectedName = useWatch({ control, name: 'coinName' });
   const [coinQuery, setCoinQuery] = useState(initial?.coinName ?? '');
   const debouncedQuery = useDebouncedValue(coinQuery);
   const coinSearch = useSearchCryptoQuery(debouncedQuery);

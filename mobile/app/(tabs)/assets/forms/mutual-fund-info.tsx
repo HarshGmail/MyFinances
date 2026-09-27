@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Stack, router } from 'expo-router';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSearchMutualFundsQuery } from '@myfinances/core/api/query/mutual-funds-info';
 import { useAddMutualFundInfoMutation } from '@myfinances/core/api/mutations/mutual-funds-info';
@@ -15,11 +15,11 @@ export default function AddMutualFundScreen() {
   const debouncedQuery = useDebouncedValue(query);
   const search = useSearchMutualFundsQuery(debouncedQuery);
   const addMutation = useAddMutualFundInfoMutation();
-  const { control, handleSubmit, setValue, watch, formState } = useForm<MutualFundInfoValues>({
+  const { control, handleSubmit, setValue, formState } = useForm<MutualFundInfoValues>({
     resolver: zodResolver(mutualFundInfoSchema),
     defaultValues: { fundName: '', date: new Date(), platform: '', goal: '' },
   });
-  const selectedName = watch('fundName');
+  const selectedName = useWatch({ control, name: 'fundName' });
 
   const options = useMemo(
     () =>
