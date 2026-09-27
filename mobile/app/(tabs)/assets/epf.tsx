@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useEpfQuery, useEpfTimelineQuery } from '@myfinances/core/api/query/epf';
 import { useInflationQuery } from '@myfinances/core/api/query/inflation';
 import { useUserProfileQuery } from '@myfinances/core/api/query/profile';
@@ -108,11 +108,17 @@ export default function EpfScreen() {
         <Card>
           <Text className="text-base font-semibold text-foreground">Accounts</Text>
           {accountsQuery.data!.map((account) => (
-            <Row
+            <Pressable
               key={account._id}
-              label={account.organizationName}
-              value={`${formatCurrency(account.epfAmount)}/mo`}
-            />
+              onPress={() =>
+                router.push({ pathname: '/assets/forms/epf-account', params: { id: account._id } })
+              }
+            >
+              <Row
+                label={account.organizationName}
+                value={`${formatCurrency(account.epfAmount)}/mo`}
+              />
+            </Pressable>
           ))}
         </Card>
       )}

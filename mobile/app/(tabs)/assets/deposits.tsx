@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useFixedDepositsQuery } from '@myfinances/core/api/query/fixed-deposits';
 import { useRecurringDepositsQuery } from '@myfinances/core/api/query/recurring-deposits';
 import {
@@ -76,15 +76,24 @@ export default function DepositsScreen() {
           {fds.map((fd) => {
             const progress = fixedDepositProgress(fd);
             return (
-              <Card key={fd._id}>
-                <Text className="text-sm font-semibold text-foreground">{fd.fixedDepositName}</Text>
-                <Row label="Principal" value={formatCurrency(fd.amountInvested)} />
-                <Row label="Rate" value={`${fd.rateOfInterest}%`} />
-                <Row label="Value today" value={formatCurrency(progress.currentValue)} />
-                <Row label="At maturity" value={formatCurrency(fixedDepositMaturityAmount(fd))} />
-                <Row label="Matures" value={formatDate(fd.dateOfMaturity)} />
-                <ProgressBar completed={progress.daysCompleted} total={progress.totalDays} />
-              </Card>
+              <Pressable
+                key={fd._id}
+                onPress={() =>
+                  router.push({ pathname: '/assets/forms/fixed-deposit', params: { id: fd._id } })
+                }
+              >
+                <Card>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {fd.fixedDepositName}
+                  </Text>
+                  <Row label="Principal" value={formatCurrency(fd.amountInvested)} />
+                  <Row label="Rate" value={`${fd.rateOfInterest}%`} />
+                  <Row label="Value today" value={formatCurrency(progress.currentValue)} />
+                  <Row label="At maturity" value={formatCurrency(fixedDepositMaturityAmount(fd))} />
+                  <Row label="Matures" value={formatDate(fd.dateOfMaturity)} />
+                  <ProgressBar completed={progress.daysCompleted} total={progress.totalDays} />
+                </Card>
+              </Pressable>
             );
           })}
         </>
@@ -103,20 +112,30 @@ export default function DepositsScreen() {
           {rds.map((rd) => {
             const progress = recurringDepositProgress(rd);
             return (
-              <Card key={rd._id}>
-                <Text className="text-sm font-semibold text-foreground">
-                  {rd.recurringDepositName}
-                </Text>
-                <Row label="Monthly" value={formatCurrency(rd.monthlyDeposit)} />
-                <Row label="Rate" value={`${rd.rateOfInterest}%`} />
-                <Row label="Value today" value={formatCurrency(progress.currentValue)} />
-                <Row
-                  label="At maturity"
-                  value={formatCurrency(recurringDepositMaturityAmount(rd))}
-                />
-                <Row label="Matures" value={formatDate(rd.dateOfMaturity)} />
-                <ProgressBar completed={progress.monthsCompleted} total={progress.totalMonths} />
-              </Card>
+              <Pressable
+                key={rd._id}
+                onPress={() =>
+                  router.push({
+                    pathname: '/assets/forms/recurring-deposit',
+                    params: { id: rd._id },
+                  })
+                }
+              >
+                <Card>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {rd.recurringDepositName}
+                  </Text>
+                  <Row label="Monthly" value={formatCurrency(rd.monthlyDeposit)} />
+                  <Row label="Rate" value={`${rd.rateOfInterest}%`} />
+                  <Row label="Value today" value={formatCurrency(progress.currentValue)} />
+                  <Row
+                    label="At maturity"
+                    value={formatCurrency(recurringDepositMaturityAmount(rd))}
+                  />
+                  <Row label="Matures" value={formatDate(rd.dateOfMaturity)} />
+                  <ProgressBar completed={progress.monthsCompleted} total={progress.totalMonths} />
+                </Card>
+              </Pressable>
             );
           })}
         </>

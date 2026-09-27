@@ -103,8 +103,8 @@ export function DateField<T extends FieldValues>({
   control,
   name,
   label,
-  maximumDate = new Date(),
-}: BaseProps<T> & { maximumDate?: Date }) {
+  allowFuture = false,
+}: BaseProps<T> & { allowFuture?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Controller
@@ -128,7 +128,7 @@ export function DateField<T extends FieldValues>({
               <DateTimePicker
                 value={value ?? new Date()}
                 mode="date"
-                maximumDate={maximumDate}
+                maximumDate={allowFuture ? undefined : new Date()}
                 display={Platform.OS === 'ios' ? 'inline' : 'default'}
                 themeVariant="dark"
                 onChange={(event, selected) => {

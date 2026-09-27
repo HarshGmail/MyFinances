@@ -4,6 +4,8 @@ import {
   getEpfAccounts,
   getEpfTimeline,
   deleteAllUserEpfAccounts,
+  updateEpfAccount,
+  deleteEpfAccount,
   parseEpfPassbooks,
   bulkUpdateEpfAccounts,
 } from '../controllers';
@@ -16,6 +18,8 @@ router.post('/addInfo', addEpfAccount);
 router.get('/timeline', getEpfTimeline);
 router.get('/getInfo', getEpfAccounts);
 router.delete('/all', deleteAllUserEpfAccounts);
+router.put('/account/:id', updateEpfAccount);
+router.delete('/account/:id', deleteEpfAccount);
 // Allow large base64-encoded PDF payloads on these routes
 router.post('/parse-passbook', express.json({ limit: '20mb' }), parseEpfPassbooks);
 router.post('/bulk-update', bulkUpdateEpfAccounts);

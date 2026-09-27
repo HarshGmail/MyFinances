@@ -48,6 +48,11 @@ export const fixedDepositSchema = z.object({
   dateOfMaturity: z.string().min(1, 'Maturity date is required'),
 });
 
+const depositDates = {
+  dateOfCreation: z.date({ required_error: 'Start date is required' }),
+  dateOfMaturity: z.date({ required_error: 'Maturity date is required' }),
+};
+
 export const recurringDepositSchema = fixedDepositSchema.omit({ fixedDepositName: true }).extend({
   recurringDepositName: z.string().min(1, 'RD name is required'),
   monthlyDeposit: z.number().min(1, 'Monthly deposit amount is required'),
@@ -90,3 +95,20 @@ export const mutualFundInfoSchema = z.object({
 });
 
 export type MutualFundInfoValues = z.infer<typeof mutualFundInfoSchema>;
+
+export const fixedDepositEntrySchema = fixedDepositSchema
+  .extend(depositDates)
+  .refine((value) => value.dateOfMaturity > value.dateOfCreation, {
+    message: 'Maturity must be after the start date',
+    path: ['dateOfMaturity'],
+  });
+
+export const recurringDepositEntrySchema = recurringDepositSchema
+  .extend(depositDates)
+  .refine((value) => value.dateOfMaturity > value.dateOfCreation, {
+    message: 'Maturity must be after the start date',
+    path: ['dateOfMaturity'],
+  });
+
+export type FixedDepositEntryValues = z.infer<typeof fixedDepositEntrySchema>;
+export type RecurringDepositEntryValues = z.infer<typeof recurringDepositEntrySchema>;

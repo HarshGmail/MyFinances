@@ -4,6 +4,7 @@ import database from '../database';
 import { epfSchema } from '../schemas/epf';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
+import { deleteOwnedDocument, updateOwnedDocument } from '../utils/ownedDocuments';
 import { extractTextFromPdf, PdfPasswordError } from '../services/pdfParser';
 import { parseEpfPassbook, groupIntoSegments, EpfSegment } from '../services/epfPassbookParser';
 import {
@@ -483,3 +484,13 @@ export async function deleteAllUserEpfAccounts(req: Request, res: Response) {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+const epfAccountOptions = { collection: 'epfAccounts', label: 'EPF account' };
+
+export const updateEpfAccount = updateOwnedDocument(
+  epfAccountOptions,
+  epfSchema.omit({ userId: true, _id: true, createdAt: true, updatedAt: true }).partial(),
+  (parsed) => ({ ...parsed, updatedAt: new Date() })
+);
+
+export const deleteEpfAccount = deleteOwnedDocument(epfAccountOptions);

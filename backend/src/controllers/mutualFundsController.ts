@@ -4,6 +4,7 @@ import database from '../database';
 import { mutualFundSchema } from '../schemas/mutual-funds';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
+import { updateOwnedDocument } from '../utils/ownedDocuments';
 import { fundNameSimilarity, lookupMFAPIScheme } from '../utils/fundNameMatch';
 
 export async function addMutualFundTransaction(req: Request, res: Response) {
@@ -154,3 +155,8 @@ export async function deleteAllUserMutualFundTransactions(req: Request, res: Res
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+export const updateMutualFundTransaction = updateOwnedDocument(
+  { collection: 'mutualFunds', label: 'Mutual fund transaction' },
+  mutualFundSchema.omit({ userId: true, _id: true, fundName: true }).partial()
+);

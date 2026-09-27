@@ -3,6 +3,7 @@ import {
   addMutualFundTransaction,
   getMutualFundTransactions,
   deleteMutualFundTransaction,
+  updateMutualFundTransaction,
   deleteAllUserMutualFundTransactions,
 } from '../controllers';
 import { authenticateToken } from '../middleware';
@@ -19,6 +20,7 @@ router.get('/transactions', getMutualFundTransactions);
 
 // GET /mutual-funds/search - Search mutual funds by name
 router.get('/search', searchMutualFundsByName);
+router.put('/transaction/:id', updateMutualFundTransaction);
 router.delete('/transaction/:id', deleteMutualFundTransaction);
 router.delete('/all', deleteAllUserMutualFundTransactions);
 

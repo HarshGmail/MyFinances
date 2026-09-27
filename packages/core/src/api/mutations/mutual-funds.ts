@@ -51,3 +51,17 @@ export function useAddMutualFundTransactionMutation() {
     isError: mutation.isError,
   };
 }
+
+export function useUpdateMutualFundTransactionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<Omit<MutualFundTransactionPayload, 'fundName'>>;
+    }) => apiRequest({ endpoint: `/mutual-funds/transaction/${id}`, method: 'PUT', body: data }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mutual-fund-transactions'] }),
+  });
+}
