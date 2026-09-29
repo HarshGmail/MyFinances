@@ -1,3 +1,4 @@
+import '@/lib/installCryptoRandom';
 import '../global.css';
 import '@/lib/configureMobileApi';
 import { useEffect, useState } from 'react';

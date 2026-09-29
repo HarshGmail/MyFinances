@@ -11,6 +11,9 @@ const yahooFinance = new YahooFinance();
 
 const QUOTE_FETCH_CONCURRENCY = 5;
 const QUOTE_BATCH_DELAY_MS = 300;
+const MS_PER_SECOND = 1000;
+
+type ChartInterval = NonNullable<Parameters<typeof yahooFinance.chart>[1]['interval']>;
 
 export class StocksService {
   static async fetchNSEQuotes(symbols: string[]): Promise<Record<string, StockData | null>> {
@@ -106,7 +109,7 @@ export class StocksService {
       `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${yfSymbol}?merge=false&padTimeSeries=true&period1=${startTime}&period2=${now}&type=${defaultStockInfoOptions.join('%2C')}&lang=en-US&region=US`,
       `https://query2.finance.yahoo.com/v8/finance/chart/${yfSymbol}?period1=${startTime}&period2=${now}&interval=${interval}&includePrePost=true&events=div%7Csplit%7Cearn&lang=en-US&region=US&source=cosaic`,
     ];
-    const [trends, chartData] = await Promise.all(
+    const [trends, rawChartData] = await Promise.all(
       endpoints.map((url) =>
         axios
           .get(url)
@@ -117,6 +120,8 @@ export class StocksService {
           })
       )
     );
+    const chartData =
+      rawChartData ?? (await this.fetchChartViaLibrary(yfSymbol, startTime, interval));
 
     // const financials = await this.fetchQuoteSummaryViaBrowser(yfSymbol);
 
@@ -126,6 +131,21 @@ export class StocksService {
       chartData,
     };
   }
+  private static async fetchChartViaLibrary(yfSymbol: string, startTime: number, interval: string) {
+    try {
+      const result = await yahooFinance.chart(yfSymbol, {
+        period1: new Date(startTime * MS_PER_SECOND),
+        interval: interval as ChartInterval,
+        includePrePost: true,
+        return: 'object',
+      });
+      return { chart: { result: [result], error: null } };
+    } catch (err) {
+      logger.error({ err, symbol: yfSymbol }, 'yahoo-finance2 chart fallback failed');
+      return null;
+    }
+  }
+
   static async fetchFinancials(symbol: string) {
     const yfSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
     const modules = [
