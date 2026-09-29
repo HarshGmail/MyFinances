@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useStockFinancialsQuery, useStockFullProfile } from '@myfinances/core/api/query/stocks';
+import {
+  useStockFinancialsQuery,
+  useStockFullProfile,
+  useStocksPortfolioQuery,
+} from '@myfinances/core/api/query/stocks';
 import {
   INTERVALS,
   buildMetricCards,
@@ -115,6 +119,8 @@ export default function StockDetailScreen() {
     PHONE_INTERVALS.find((option) => option.label === intervalLabel) ?? PHONE_INTERVALS[0];
   const financialsQuery = useStockFinancialsQuery(symbol ?? '');
   const profileQuery = useStockFullProfile(symbol ?? '', interval.range, interval.interval);
+  const portfolioQuery = useStocksPortfolioQuery();
+  const holding = portfolioQuery.data?.portfolio.find((stock) => stock.stockName === symbol);
 
   const series = useMemo(
     () =>
@@ -124,15 +130,17 @@ export default function StockDetailScreen() {
       ),
     [profileQuery.data, intervalLabel]
   );
-  const cards = useMemo(
-    () => (financialsQuery.data ? buildMetricCards(financialsQuery.data) : []),
-    [financialsQuery.data]
-  );
+  const cards = useMemo(() => {
+    const financials = financialsQuery.data;
+    const hasFundamentals =
+      financials && Object.values(financials).some((module) => module !== null);
+    return hasFundamentals ? buildMetricCards(financials) : [];
+  }, [financialsQuery.data]);
 
   if (financialsQuery.isLoading) return <LoadingState />;
   const price = financialsQuery.data?.price;
-  const change = price?.regularMarketChange ?? 0;
-  const changePct = price?.regularMarketChangePercent ?? 0;
+  const currentPrice = price?.regularMarketPrice ?? holding?.currentPrice ?? null;
+  const changePct = price?.regularMarketChangePercent ?? holding?.oneDayChangePercentage ?? 0;
 
   return (
     <Screen
@@ -144,7 +152,7 @@ export default function StockDetailScreen() {
       }}
     >
       <Stack.Screen options={{ title: symbol ?? 'Stock' }} />
-      {!financialsQuery.data ? (
+      {currentPrice === null && !cards.length ? (
         <EmptyState message="No data for this symbol." />
       ) : (
         <>
@@ -154,9 +162,9 @@ export default function StockDetailScreen() {
             </Text>
             <View className="flex-row items-baseline gap-2">
               <Text className="text-2xl font-bold text-foreground">
-                {formatCurrency(price?.regularMarketPrice ?? 0)}
+                {currentPrice === null ? '—' : formatCurrency(currentPrice)}
               </Text>
-              <Text className={`text-sm ${changeClass(change)}`}>
+              <Text className={`text-sm ${changeClass(changePct)}`}>
                 {formatSignedPercent(changePct)}
               </Text>
             </View>
@@ -181,7 +189,11 @@ export default function StockDetailScreen() {
 
           <Card>
             <Text className="text-base font-semibold text-foreground">Fundamentals</Text>
-            <Label>Tap a metric to see what it means.</Label>
+            <Label>
+              {cards.length
+                ? 'Tap a metric to see what it means.'
+                : 'Fundamentals are unavailable right now. Pull down to retry.'}
+            </Label>
             {cards.map((card) => (
               <Pressable
                 key={card.label}

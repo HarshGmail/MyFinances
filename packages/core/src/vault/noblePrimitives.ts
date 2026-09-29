@@ -6,6 +6,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import type { VaultPrimitives } from './crypto';
 
 const COMPRESSION_PREFIX_BYTES = 1;
+const P256_KEYGEN_SEED_BYTES = p256.lengths.seed ?? 48;
 
 export function createNoblePrimitives(
   randomBytes: (length: number) => Uint8Array,
@@ -20,7 +21,7 @@ export function createNoblePrimitives(
     hkdfSha256: (secret, salt, info, length) => hkdf(sha256, secret, salt, info, length),
     aesGcmEncrypt: (key, iv, plaintext) => gcm(key, iv).encrypt(plaintext),
     aesGcmDecrypt: (key, iv, ciphertext) => gcm(key, iv).decrypt(ciphertext),
-    p256RandomPrivateKey: () => p256.utils.randomSecretKey(),
+    p256RandomPrivateKey: () => p256.utils.randomSecretKey(randomBytes(P256_KEYGEN_SEED_BYTES)),
     p256PublicKey: (privateKey) => p256.getPublicKey(privateKey, false),
     p256SharedSecretX: (privateKey, publicKey) =>
       p256.getSharedSecret(privateKey, publicKey).slice(COMPRESSION_PREFIX_BYTES),
