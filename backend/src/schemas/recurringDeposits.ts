@@ -7,6 +7,7 @@ export const recurringDepositSchema = z.object({
   dateOfCreation: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
   dateOfMaturity: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
   amountInvested: z.number().nonnegative(),
+  monthlyDeposit: z.number().nonnegative().optional(),
   platform: z.string().optional(),
   recurringDepositName: z.string(),
   rateOfInterest: z.number(),

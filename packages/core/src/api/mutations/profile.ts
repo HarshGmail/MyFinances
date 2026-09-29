@@ -27,7 +27,7 @@ export function useUpdateUserProfileMutation() {
   const mutation = useMutation({
     mutationFn: ({ data }: { data: UpdateUserProfile }) => updateUserProfile(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-goals'] });
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
   return {

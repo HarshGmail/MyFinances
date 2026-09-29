@@ -60,3 +60,25 @@ export function useBulkUpdateEpfAccountsMutation() {
     },
   });
 }
+
+function invalidateEpf(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['epf-account'] });
+  queryClient.invalidateQueries({ queryKey: ['epf-timeline'] });
+}
+
+export function useUpdateEpfAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<EpfAccountPayload> }) =>
+      apiRequest({ endpoint: `/epf/account/${id}`, method: 'PUT', body: data }),
+    onSuccess: () => invalidateEpf(queryClient),
+  });
+}
+
+export function useDeleteEpfAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest({ endpoint: `/epf/account/${id}`, method: 'DELETE' }),
+    onSuccess: () => invalidateEpf(queryClient),
+  });
+}

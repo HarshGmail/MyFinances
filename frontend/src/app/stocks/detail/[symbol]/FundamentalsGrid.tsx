@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StockFinancials } from '@myfinances/core/types';
-import { buildMetricCards, getMetricCalculation } from './verdicts';
+import { buildMetricCards, getMetricCalculation } from '@myfinances/core/calc/stockVerdicts';
 import MetricEducationDrawer from './MetricEducationDrawer';
 import { HelpCircle } from 'lucide-react';
 import { useUrlNullableState } from '@/utils/useUrlState';

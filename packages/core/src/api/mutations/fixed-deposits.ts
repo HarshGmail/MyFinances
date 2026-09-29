@@ -31,3 +31,20 @@ export function useFixedDepositMutation() {
     isError: mutation.isError,
   };
 }
+
+export function useUpdateFixedDepositMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<FixedDepositPayload> }) =>
+      apiRequest({ endpoint: `/fixed-deposit/${id}`, method: 'PUT', body: data }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fixed-deposits-fetch'] }),
+  });
+}
+
+export function useDeleteFixedDepositMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest({ endpoint: `/fixed-deposit/${id}`, method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fixed-deposits-fetch'] }),
+  });
+}

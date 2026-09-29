@@ -26,3 +26,18 @@ export const signupSchema = loginSchema
 
 export type LoginValues = z.infer<typeof loginSchema>;
 export type SignupValues = z.infer<typeof signupSchema>;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, { message: 'Enter your current password' }),
+    newPassword: z
+      .string()
+      .min(MIN_PASSWORD_LENGTH, { message: 'Password must be at least 6 characters' }),
+    confirmPassword: z.string().min(1, { message: 'Confirm your new password' }),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;

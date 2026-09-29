@@ -9,6 +9,7 @@ export const mutualFundSchema = z.object({
   date: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
   numOfUnits: z.number().positive(),
   amount: z.number().nonnegative(),
+  fundPrice: z.number().nonnegative().optional(),
   platform: z.string().optional(),
   fundName: z.string(),
 });

@@ -59,8 +59,10 @@ packages/core/src/
 ├── calc/                 Pure calculations: xirr, cagr, portfolioCalculations (MF rows, EPF),
 │                         deposits (FD/RD interest), holdingXirr, goldCategories (+ computeGoldStats),
 │                         cryptoHoldings (+ valueCryptoHoldings), dailyMoves, mfDailyMoves,
-│                         marketHours, navDates, numbers, financialMonth (+ summariseSpend), aiCopy
-├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData
+│                         marketHours, navDates, numbers, financialMonth (+ summariseSpend), aiCopy,
+│                         cashFlow (expenses dashboard), epfProjection, goals, portfolioSeries,
+│                         mfMetrics (fund analyzer), stockVerdicts + stockMetricDefinitions
+├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData, useGoalHoldingValues
 ├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses
 └── vault/                crypto.ts (vault format over injected primitives), noblePrimitives.ts,
                           vaultTypes.ts (field defs, no icons), inviteCode.ts
@@ -75,11 +77,12 @@ Frontend keeps thin shims where it adds web-only pieces: `api/configs/configureW
 Expo Router, NativeWind (Tailwind 3), TanStack Query persisted to MMKV, token in `expo-secure-store`.
 
 - **Auth:** bearer JWT from `/api/auth/mobile/login|signup|demo-login` (body, no cookie). `useTokenRefresh` calls `/api/auth/mobile/refresh` on launch and foreground; the server re-signs past half of `SESSION_DURATION_SECONDS`. `configureMobileApi.ts` wires `configureApi` with the token and a 401 → `/login` handler.
-- **Screens:** `app/(tabs)/` — `today`, `home`, `assets/` (stocks, mutual-funds, gold, crypto, epf, deposits, transactions, `forms/*`), `expenses/` (list, `add`), `more/` (profile, `vault/`).
+- **Screens:** `app/(tabs)/` — `today`, `home` (incl. capital gains), `assets/` (stocks + `stock` detail, mutual-funds + `fund` detail, gold, crypto, epf with retirement projection, deposits, transactions, `forms/*` add/edit/delete for every asset), `expenses/` (list, `add` log/edit, `recurring`, `cash-flow`), `more/` (profile, `edit-profile`, `change-password`, `salary`, `goals/`, `integrations`, `vault/`).
 - **Vault:** `src/features/vault/` — `vaultCrypto.ts` (native PBKDF2 via react-native-quick-crypto + noble), `VaultSession.tsx`, `useWalletActions.ts`, `biometricPin.ts`. Locks on background and after 5 min idle, zeroes key bytes, blocks screenshots.
 - **Push:** `src/lib/pushNotifications.ts` registers an Expo push token at `POST /api/push/expo-token`; backend `sendPush` fans out to Expo tokens and Web Push.
 - **Builds:** EAS profiles in `eas.json` — `development` (dev client), `preview` (Android APK / iOS ad hoc), `production` (TestFlight). Native modules (quick-crypto, MMKV) mean **Expo Go cannot run it**; use a development build.
-- **Web-only for now:** goals, integrations, email import, EPF passbook upload, stock research — linked from More.
+- **Web-only by design:** Gmail/email PDF import and custom PDF passwords, EPF passbook upload, Claude MCP setup, delete-all data management, stock analytics scorecard and the indicator-heavy research chart. Integrations links to the web for these.
+- **Charts:** `src/components/LineChart.tsx` draws with react-native-svg (no chart library); `TimeframePicker` pairs with it.
 
 ## Frontend Structure
 
@@ -253,8 +256,8 @@ backend/src/
 | `/api/mutual-funds`         | MF transactions                                                                           |
 | `/api/funds`                | MF info (scheme numbers) + batch NAV history                                              |
 | `/api/epf`                  | EPF accounts + timeline                                                                   |
-| `/api/fixed-deposit`        | FD management                                                                             |
-| `/api/recurring-deposit`    | RD management                                                                             |
+| `/api/fixed-deposit`        | FD management (add, list, `PUT`/`DELETE /:id`)                                            |
+| `/api/recurring-deposit`    | RD management (add, list, `PUT`/`DELETE /:id`)                                            |
 | `/api/expenses`             | Recurring expense categories                                                              |
 | `/api/expense-transactions` | Daily expense log                                                                         |
 | `/api/goals`                | Investment goals                                                                          |
@@ -570,3 +573,5 @@ Defined in `packages/core/src/schemas/expenses.ts`: `['Rent', 'Insurance', 'Bill
 44. **Mobile auth is bearer-only and never sets a cookie** — `/api/auth/mobile/login|signup|demo-login` share the credential logic of their web twins through `startSession(res, user, 'cookie' | 'body')` in `authController.ts`, so validation cannot drift, but only the web routes set the cookie and only the mobile routes put `token` in the body. `authenticateToken` already reads `Authorization: Bearer` first. Bearer tokens get no sliding refresh from the middleware; the app calls `/mobile/refresh`, which uses the same `reissueTokenIfStale` as the cookie path.
 
 45. **Expo Go cannot run the mobile app** — react-native-quick-crypto (native PBKDF2; 310k iterations in pure JS would take seconds) and MMKV are native modules. Use `eas build --profile development` once, then `npx expo start --dev-client`. `expo-doctor` must stay at 21/21; `react-native-svg` is pinned and deduped via a root `overrides` entry because lucide-react-native pulls its own.
+
+46. **Per-record edit/delete go through `utils/ownedDocuments.ts`** — `updateOwnedDocument(options, schema)` and `deleteOwnedDocument(options)` validate the id, scope the write to `{ _id, userId }` so nobody can touch another user's record (a miss is a 404, never a silent success), and parse the body with the collection's schema made `.partial()`. FD, RD, EPF accounts and MF transactions use it; reuse it for any new per-record endpoint instead of copying the boilerplate. Note zod strips unknown keys, so a field the client sends but the schema lacks is silently dropped on insert and update — `monthlyDeposit` (RD) and `fundPrice` (MF) were lost this way until added to the schemas.

@@ -919,3 +919,64 @@ export interface WrappedWalletKey {
   epk: JsonWebKey;
   wrapped: string;
 }
+
+export interface CapitalGainsFYSummary {
+  equityStcg: number;
+  equityLtcg: number;
+  goldStcg: number;
+  goldLtcg: number;
+  cryptoGains: number;
+  equityStcgTax: number;
+  equityLtcgTax: number;
+  goldLtcgTax: number;
+  cryptoTax: number;
+  totalEstimatedTax: number;
+}
+
+export interface CapitalGainsAssetFY {
+  stcgGains: number;
+  ltcgGains: number;
+  stcgTax: number;
+  ltcgTax: number;
+  flatGains?: number;
+  flatTax?: number;
+  lots: unknown[];
+}
+
+interface CapitalGainsLotBase {
+  units: number;
+  costPerUnit: number;
+  purchaseDate: string;
+  holdingDays: number;
+}
+
+export interface CapitalGainsResponse {
+  byAsset: {
+    stocks: {
+      realizedByFY: Record<string, CapitalGainsAssetFY>;
+      currentLots: (CapitalGainsLotBase & { stockName: string })[];
+    };
+    gold: {
+      realizedByFY: Record<string, CapitalGainsAssetFY>;
+      currentLots: {
+        grams: number;
+        costPerGram: number;
+        purchaseDate: string;
+        holdingDays: number;
+      }[];
+    };
+    crypto: {
+      realizedByFY: Record<string, CapitalGainsAssetFY>;
+      currentLots: (CapitalGainsLotBase & { coinName: string })[];
+    };
+    mutualFunds: {
+      realizedByFY: Record<string, CapitalGainsAssetFY>;
+      currentLots: (CapitalGainsLotBase & { fundName: string })[];
+    };
+  };
+  summary: {
+    currentFY: string;
+    byFY: Record<string, CapitalGainsFYSummary>;
+    notes: string[];
+  };
+}

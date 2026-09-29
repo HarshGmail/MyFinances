@@ -15,10 +15,17 @@ import {
 import { Card, Label, LoadingState, Row, Screen } from '@/components/ui';
 import { SummaryCard } from '@/components/HoldingCard';
 import { changeClass } from '@/lib/theme';
+import { AssetCapitalGains } from '@/components/CapitalGains';
+import { LineChart } from '@/components/LineChart';
+import { TimeframePicker } from '@/components/TimeframePicker';
+import { getPastDate, getTimeframes } from '@myfinances/core/calc/chartHelpers';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const RATE_LOOKBACK_DAYS = 7;
+const RATE_LOOKBACK_DAYS = 365;
+const GOLD_TIMEFRAMES = getTimeframes('1y');
+const DEFAULT_TIMEFRAME = '3m';
 const GRAM_DECIMALS = 4;
+const GOLD_COLOR = '#eab308';
 
 function grams(value: number) {
   return `${value.toFixed(GRAM_DECIMALS)} g`;
@@ -38,7 +45,7 @@ export default function GoldScreen() {
   const transactionsQuery = useGoldTransactionsQuery();
   const leasesQuery = useGoldLeasesQuery();
 
-  const rates = ratesQuery.data?.data ?? [];
+  const rates = useMemo(() => ratesQuery.data?.data ?? [], [ratesQuery.data]);
   const currentRate = rates.length ? parseFloat(rates[rates.length - 1].rate) : 0;
   const previousRate = rates.length > 1 ? parseFloat(rates[rates.length - 2].rate) : currentRate;
 
@@ -49,6 +56,14 @@ export default function GoldScreen() {
         : null,
     [transactionsQuery.data, currentRate]
   );
+  const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME);
+  const rateSeries = useMemo(() => {
+    const days = GOLD_TIMEFRAMES.find((option) => option.label === timeframe)?.days ?? 0;
+    const since = getPastDate(days);
+    return rates
+      .map((row) => ({ x: Date.parse(row.date), y: parseFloat(row.rate) }))
+      .filter((point) => point.x >= since);
+  }, [rates, timeframe]);
   const lease = useGoldLeaseData(transactionsQuery.data, leasesQuery.data?.leases ?? []);
 
   if (transactionsQuery.isLoading || ratesQuery.isLoading) return <LoadingState />;
@@ -96,6 +111,24 @@ export default function GoldScreen() {
         </Card>
       )}
 
+      {rateSeries.length > 1 && (
+        <Card>
+          <Text className="text-base font-semibold text-foreground">Gold rate (₹/g)</Text>
+          <TimeframePicker
+            timeframes={GOLD_TIMEFRAMES}
+            selected={timeframe}
+            onSelect={setTimeframe}
+          />
+          <LineChart
+            series={[{ label: 'Rate', color: GOLD_COLOR, points: rateSeries }]}
+            formatY={formatCurrency}
+            formatX={(timestamp) =>
+              new Date(timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+            }
+          />
+        </Card>
+      )}
+
       {lease.activeLeases.length > 0 && (
         <Card>
           <Text className="text-base font-semibold text-foreground">Gold leasing</Text>
@@ -137,6 +170,7 @@ export default function GoldScreen() {
           </View>
         </Card>
       )}
+      <AssetCapitalGains asset="gold" />
     </Screen>
   );
 }

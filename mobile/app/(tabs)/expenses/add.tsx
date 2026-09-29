@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAddExpenseTransactionMutation } from '@myfinances/core/api/mutations/expenseTransactions';
+import {
+  useAddExpenseTransactionMutation,
+  useUpdateExpenseTransactionMutation,
+} from '@myfinances/core/api/mutations/expenseTransactions';
+import { useExpenseTransactionsQuery } from '@myfinances/core/api/query/expenseTransactions';
 import {
   EXPENSE_TAGS,
   trackerEntryPayload,
@@ -12,20 +16,53 @@ import {
 } from '@myfinances/core/schemas/expenses';
 import { DateField, NumberField, TextField } from '@/components/form';
 import { FormScreen, errorMessage } from '@/components/FormScreen';
-import { Label } from '@/components/ui';
+import { Label, LoadingState } from '@/components/ui';
 
 export default function AddExpenseScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const transactionsQuery = useExpenseTransactionsQuery();
+  const existing = id ? transactionsQuery.data?.find((tx) => tx._id === id) : undefined;
+
+  if (id && !existing) return <LoadingState />;
+
+  return <ExpenseForm id={id} initial={existing} />;
+}
+
+function ExpenseForm({
+  id,
+  initial,
+}: {
+  id?: string;
+  initial?: {
+    date: string;
+    name: string;
+    amount: number;
+    category: string;
+    notes?: string;
+  };
+}) {
   const [serverError, setServerError] = useState<string | null>(null);
   const addMutation = useAddExpenseTransactionMutation();
+  const updateMutation = useUpdateExpenseTransactionMutation();
   const { control, handleSubmit } = useForm<TrackerEntryValues>({
     resolver: zodResolver(trackerEntrySchema),
-    defaultValues: { date: new Date(), name: '', category: '', notes: '' },
+    defaultValues: initial
+      ? {
+          date: new Date(initial.date),
+          name: initial.name,
+          amount: initial.amount,
+          category: initial.category,
+          notes: initial.notes ?? '',
+        }
+      : { date: new Date(), name: '', category: '', notes: '' },
   });
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      await addMutation.mutateAsync(trackerEntryPayload(values));
+      const payload = trackerEntryPayload(values);
+      if (id) await updateMutation.mutateAsync({ id, data: payload });
+      else await addMutation.mutateAsync(payload);
       router.back();
     } catch (error) {
       setServerError(errorMessage(error));
@@ -34,11 +71,11 @@ export default function AddExpenseScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Log expense' }} />
+      <Stack.Screen options={{ title: id ? 'Edit expense' : 'Log expense' }} />
       <FormScreen
-        submitLabel="Log expense"
+        submitLabel={id ? 'Save changes' : 'Log expense'}
         onSubmit={submit}
-        submitting={addMutation.isPending}
+        submitting={addMutation.isPending || updateMutation.isPending}
         error={serverError}
       >
         <TextField control={control} name="name" label="What" placeholder="e.g. Groceries" />

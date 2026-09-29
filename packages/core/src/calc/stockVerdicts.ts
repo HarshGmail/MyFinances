@@ -1,4 +1,4 @@
-import { StockFinancials } from '@myfinances/core/types';
+import { StockFinancials } from '../types';
 
 export type Verdict = { text: string; color: string };
 

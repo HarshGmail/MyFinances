@@ -1,6 +1,6 @@
 import { TrendingUp, DollarSign, Target, Clock, PiggyBank, Calculator } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EpfSummary } from './useEpfCalculations';
+import { EpfSummary } from '@myfinances/core/calc/epfProjection';
 
 interface EpfSummaryCardsProps {
   summary: EpfSummary;

@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useStockFullProfile, useStockTransactionsQuery } from '@myfinances/core/api/query/stocks';
 import { useAppStore } from '@/store/useAppStore';
 import { useUrlBoolean } from '@/utils/useUrlState';
-import { INTERVALS, Interval } from './verdicts';
+import { INTERVALS, Interval } from '@myfinances/core/calc/stockVerdicts';
 import { useStockDetailInterval, useStockDetailOverlays } from './stockDetailStore';
 import { buildChartOptions } from './chartOptions';
 import ChartLegendDrawer from './ChartLegendDrawer';

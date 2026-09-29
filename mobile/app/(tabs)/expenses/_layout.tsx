@@ -13,6 +13,8 @@ export default function ExpensesLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="add" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="cash-flow" />
+      <Stack.Screen name="recurring" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

@@ -4,7 +4,7 @@ import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Info, SlidersHorizontal } from 'lucide-react';
-import { INTERVALS } from './verdicts';
+import { INTERVALS } from '@myfinances/core/calc/stockVerdicts';
 import { OverlayConfig, countActiveOverlays, StockIntervalLabel } from './stockDetailStore';
 
 interface Props {

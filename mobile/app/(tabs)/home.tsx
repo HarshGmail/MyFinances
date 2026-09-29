@@ -6,6 +6,7 @@ import { useHomePortfolioData } from '@myfinances/core/hooks/useHomePortfolioDat
 import { formatCurrency, formatSignedPercent } from '@myfinances/core/calc/numbers';
 import { Card, Label, LoadingState, Row, Screen } from '@/components/ui';
 import { useSession } from '@/lib/session';
+import { CapitalGainsOverview } from '@/components/CapitalGains';
 import { changeClass } from '@/lib/theme';
 
 interface AssetSummary {
@@ -123,6 +124,7 @@ export default function HomeScreen() {
       <AssetRow label="EPF" summary={portfolioSummary.epf} href="/assets/epf" />
       <AssetRow label="Fixed Deposits" summary={portfolioSummary.fd} href="/assets/deposits" />
       <AssetRow label="Recurring Deposits" summary={portfolioSummary.rd} href="/assets/deposits" />
+      <CapitalGainsOverview />
     </Screen>
   );
 }

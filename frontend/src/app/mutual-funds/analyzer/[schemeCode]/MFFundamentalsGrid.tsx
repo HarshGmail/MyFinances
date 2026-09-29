@@ -2,7 +2,11 @@
 
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MFMetrics, buildMFMetricCards, getMFMetricCalculation } from './mfVerdicts';
+import {
+  MFMetrics,
+  buildMFMetricCards,
+  getMFMetricCalculation,
+} from '@myfinances/core/calc/mfMetrics';
 import MFMetricEducationDrawer from './MFMetricEducationDrawer';
 import CustomCAGRCalculator from './CustomCAGRCalculator';
 import { MutualFundNavHistoryData } from '@myfinances/core/types';

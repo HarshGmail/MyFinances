@@ -4,6 +4,7 @@ import database from '../database';
 import { recurringDepositSchema } from '../schemas/recurringDeposits';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
+import { deleteOwnedDocument, updateOwnedDocument } from '../utils/ownedDocuments';
 
 export async function addRecurringDeposit(req: Request, res: Response) {
   try {
@@ -65,3 +66,12 @@ export async function deleteAllUserRecurringDeposits(req: Request, res: Response
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+const recurringDepositOptions = { collection: 'recurringDeposits', label: 'Recurring deposit' };
+
+export const updateRecurringDeposit = updateOwnedDocument(
+  recurringDepositOptions,
+  recurringDepositSchema.omit({ userId: true, _id: true }).partial()
+);
+
+export const deleteRecurringDeposit = deleteOwnedDocument(recurringDepositOptions);

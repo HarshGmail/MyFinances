@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info, HelpCircle } from 'lucide-react';
 import { StockFinancials } from '@myfinances/core/types';
 import MetricEducationDrawer from './MetricEducationDrawer';
-import { getMetricCalculation } from './verdicts';
+import { getMetricCalculation } from '@myfinances/core/calc/stockVerdicts';
 import { useUrlNullableState } from '@/utils/useUrlState';
 
 interface Props {

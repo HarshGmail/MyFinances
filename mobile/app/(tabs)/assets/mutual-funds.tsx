@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   useMfapiNavHistoryBatchQuery,
   useMutualFundInfoFetchQuery,
@@ -21,6 +21,8 @@ import { Card, EmptyState, Label, LoadingState, Row, Screen } from '@/components
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
 import { BreadthBar, ChangeBars } from '@/components/ChangeBars';
 import { changeClass } from '@/lib/theme';
+import { AssetCapitalGains } from '@/components/CapitalGains';
+import { router } from 'expo-router';
 
 const NAV_DECIMALS = 4;
 
@@ -144,35 +146,49 @@ export default function MutualFundsScreen() {
         rows.map((row) => {
           const move = dailyByFund.get(row.fundName);
           return (
-            <HoldingCard
+            <Pressable
               key={row.fundName}
-              title={row.fundName}
-              currentValue={row.currentValue}
-              profitLoss={row.profitLoss}
-              profitLossPercentage={row.profitLossPercentage}
-              metrics={[
-                { label: 'Units', value: row.totalUnits.toFixed(3) },
-                { label: 'NAV', value: row.currentNav === null ? '—' : formatNav(row.currentNav) },
-                { label: 'Invested', value: formatCurrency(row.totalInvested) },
-                {
-                  label: 'Day',
-                  value: move?.isStale ? (
-                    'NAV pending'
-                  ) : (
-                    <SignedText value={move?.valueChange ?? 0}>
-                      {formatSignedCurrency(move?.valueChange ?? 0)}
-                    </SignedText>
-                  ),
-                },
-                { label: '1M', value: formatOptionalPercent(move?.monthChange?.changePct) },
-                { label: 'XIRR', value: formatOptionalPercent(row.fundXirr) },
-              ]}
-            />
+              onPress={() =>
+                row.schemeNumber &&
+                router.push({
+                  pathname: '/assets/fund',
+                  params: { scheme: String(row.schemeNumber), name: row.fundName },
+                })
+              }
+            >
+              <HoldingCard
+                title={row.fundName}
+                currentValue={row.currentValue}
+                profitLoss={row.profitLoss}
+                profitLossPercentage={row.profitLossPercentage}
+                metrics={[
+                  { label: 'Units', value: row.totalUnits.toFixed(3) },
+                  {
+                    label: 'NAV',
+                    value: row.currentNav === null ? '—' : formatNav(row.currentNav),
+                  },
+                  { label: 'Invested', value: formatCurrency(row.totalInvested) },
+                  {
+                    label: 'Day',
+                    value: move?.isStale ? (
+                      'NAV pending'
+                    ) : (
+                      <SignedText value={move?.valueChange ?? 0}>
+                        {formatSignedCurrency(move?.valueChange ?? 0)}
+                      </SignedText>
+                    ),
+                  },
+                  { label: '1M', value: formatOptionalPercent(move?.monthChange?.changePct) },
+                  { label: 'XIRR', value: formatOptionalPercent(row.fundXirr) },
+                ]}
+              />
+            </Pressable>
           );
         })
       ) : (
         <EmptyState message="No mutual fund holdings yet." />
       )}
+      <AssetCapitalGains asset="mutualFunds" />
     </Screen>
   );
 }

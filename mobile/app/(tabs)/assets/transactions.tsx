@@ -72,6 +72,7 @@ export default function TransactionsScreen() {
           date: tx.date,
           amount: tx.amount,
           isCredit: tx.type === 'credit',
+          editHref: { pathname: '/assets/forms/mutual-fund', params: { id: tx.id } },
           remove: () => deleteFund.mutateAsync(tx.id),
         }));
       case 'gold':

@@ -1,5 +1,5 @@
 import { differenceInYears } from 'date-fns';
-import { EpfAccount } from '@myfinances/core/types';
+import { EpfAccount } from '../types';
 
 export interface EpfYearlyDataPoint {
   year: number;
@@ -110,4 +110,10 @@ export function calculateEPFGrowth(
       inflationAnnualPct,
     },
   };
+}
+
+const DEFAULT_INFLATION_PCT = 5;
+
+export function resolveInflationPct(average: number | undefined): number {
+  return average !== undefined && Number.isFinite(average) ? average : DEFAULT_INFLATION_PCT;
 }

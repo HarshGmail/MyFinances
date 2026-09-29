@@ -1,7 +1,7 @@
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EpfYearlyDataPoint } from './useEpfCalculations';
+import { EpfYearlyDataPoint } from '@myfinances/core/calc/epfProjection';
 
 const BLUE = '#3B82F6';
 const ORANGE = '#F97316';

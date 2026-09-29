@@ -9,7 +9,7 @@ import MFNavChart from './MFNavChart';
 import MFSnapshotVerdict from './MFSnapshotVerdict';
 import MFFundamentalsGrid from './MFFundamentalsGrid';
 import { Skeleton } from '@/components/ui/skeleton';
-import { computeMFMetrics } from './mfVerdicts';
+import { computeMFMetrics } from '@myfinances/core/calc/mfMetrics';
 
 export default function MFDetailPage() {
   const params = useParams();

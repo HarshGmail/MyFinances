@@ -4,6 +4,7 @@ import database from '../database';
 import { fixedDepositSchema } from '../schemas/fixedDeposits';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import logger from '../utils/logger';
+import { deleteOwnedDocument, updateOwnedDocument } from '../utils/ownedDocuments';
 
 export async function addFixedDeposit(req: Request, res: Response) {
   try {
@@ -65,3 +66,12 @@ export async function deleteAllUserFixedDeposits(req: Request, res: Response) {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
+
+const fixedDepositOptions = { collection: 'fixedDeposits', label: 'Fixed deposit' };
+
+export const updateFixedDeposit = updateOwnedDocument(
+  fixedDepositOptions,
+  fixedDepositSchema.omit({ userId: true, _id: true }).partial()
+);
+
+export const deleteFixedDeposit = deleteOwnedDocument(fixedDepositOptions);

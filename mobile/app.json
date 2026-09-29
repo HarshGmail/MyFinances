@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MyFinances",
-    "slug": "myfinances",
+    "slug": "harshvardhan",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -51,7 +51,17 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://api.my-finances.site"
+      "apiBaseUrl": "https://api.my-finances.site",
+      "eas": {
+        "projectId": "4ab96527-80dc-4150-b737-9efc8ecc7c64"
+      }
+    },
+    "owner": "harshdevcreations",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4ab96527-80dc-4150-b737-9efc8ecc7c64"
     }
   }
 }

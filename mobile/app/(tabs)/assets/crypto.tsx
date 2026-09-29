@@ -12,6 +12,7 @@ import { holdingXirrPercent } from '@myfinances/core/calc/holdingXirr';
 import { formatCurrency, formatSignedPercent } from '@myfinances/core/calc/numbers';
 import { EmptyState, LoadingState, Row, Screen } from '@/components/ui';
 import { HoldingCard, SignedText, SummaryCard } from '@/components/HoldingCard';
+import { AssetCapitalGains } from '@/components/CapitalGains';
 
 const COIN_DECIMALS = 6;
 
@@ -94,6 +95,7 @@ export default function CryptoScreen() {
       ) : (
         <EmptyState message="No crypto holdings yet." />
       )}
+      <AssetCapitalGains asset="crypto" />
     </Screen>
   );
 }

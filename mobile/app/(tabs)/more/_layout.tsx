@@ -13,6 +13,11 @@ export default function MoreLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="vault" options={{ headerShown: false }} />
+      <Stack.Screen name="goals" options={{ headerShown: false }} />
+      <Stack.Screen name="integrations" options={{ title: 'Integrations' }} />
+      <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="change-password" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="salary" options={{ title: 'Salary' }} />
     </Stack>
   );
 }
