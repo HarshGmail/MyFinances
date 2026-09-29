@@ -173,7 +173,7 @@ export default function McpIntegration({ ingestToken }: { ingestToken: string | 
               ['get_epf_accounts', 'Read EPF accounts'],
               ['get_fixed_deposits', 'Read fixed deposits'],
               ['get_recurring_deposits', 'Read recurring deposits'],
-              ['get_goals', 'Read investment goals'],
+              ['goals_list', 'Read investment goals'],
             ].map(([tool, desc]) => (
               <div key={tool} className="flex flex-col p-2 rounded-lg bg-muted/50">
                 <code className="text-xs font-mono text-primary">{tool}</code>

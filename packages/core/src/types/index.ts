@@ -1,5 +1,3 @@
-export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
-
 export interface AdjClose {
   adjclose: number[];
 }
@@ -687,17 +685,31 @@ export interface User {
   isDemo?: boolean;
 }
 
+export type GoalAssetType = 'stock' | 'mutualFund' | 'crypto' | 'gold' | 'epf' | 'fd' | 'rd';
+
+export interface GoalAllocation {
+  assetType: GoalAssetType;
+  assetKey: string;
+  percent: number;
+}
+
 export interface UserGoal {
-  _id?: string;
+  _id: string;
   userId: string;
   goalName: string;
-  stockSymbols?: string[];
-  mutualFundIds?: string[];
-  cryptoCurrency?: string[];
-  goldAlloted?: number;
   description?: string;
-  targetAmount?: number;
+  targetAmount: number;
+  targetDate: string;
+  inflationAdjusted?: boolean;
+  expectedReturnPct?: number;
+  plannedMonthly?: number;
+  manualAmount?: number;
+  allocations: GoalAllocation[];
+  createdAt: string;
+  updatedAt: string;
 }
+
+export type GoalPayload = Omit<UserGoal, '_id' | 'userId' | 'createdAt' | 'updatedAt'>;
 
 export interface UserProfile {
   userName: string;

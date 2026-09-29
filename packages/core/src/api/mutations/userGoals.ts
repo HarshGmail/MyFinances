@@ -1,13 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../client';
-import { UserGoal } from '../../types';
+import { GoalPayload } from '../../types';
 
-export type AddGoalPayload = Omit<UserGoal, '_id' | 'userId'> & { targetAmount?: number };
-export type UpdateGoalPayload = Partial<Omit<UserGoal, '_id' | 'userId'>> & {
-  targetAmount?: number;
-};
-
-async function addGoal(data: AddGoalPayload) {
+async function addGoal(data: GoalPayload) {
   return apiRequest({
     endpoint: '/goals/add',
     method: 'POST',
@@ -15,7 +10,7 @@ async function addGoal(data: AddGoalPayload) {
   });
 }
 
-async function updateGoal(id: string, data: UpdateGoalPayload) {
+async function updateGoal(id: string, data: GoalPayload) {
   return apiRequest({
     endpoint: `/goals/update/${id}`,
     method: 'PUT',
@@ -49,7 +44,7 @@ export function useAddGoalMutation() {
 export function useUpdateGoalMutation() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateGoalPayload }) => updateGoal(id, data),
+    mutationFn: ({ id, data }: { id: string; data: GoalPayload }) => updateGoal(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-goals'] });
     },

@@ -85,7 +85,7 @@ export async function addStockTransaction(req: Request, res: Response) {
 // ─── Goals ───────────────────────────────────────────────────────────────────
 
 export async function getGoals(req: Request, res: Response) {
-  await wrapTool(req, res, 'get_goals', {});
+  await wrapTool(req, res, 'goals_list', {});
 }
 
 // ─── OpenAI tool definitions (for GPT Actions schema) ────────────────────────
@@ -185,8 +185,9 @@ export function getToolDefinitions(_req: Request, res: Response) {
       {
         type: 'function',
         function: {
-          name: 'get_goals',
-          description: "Get the user's investment goals with target amounts and current progress.",
+          name: 'goals_list',
+          description:
+            "Get the user's investment goals with target amount, target date, planned monthly contribution and asset allocations (percent of each linked holding). Progress is computed in the app, not returned.",
           parameters: { type: 'object', properties: {} },
         },
       },

@@ -62,8 +62,8 @@ packages/core/src/
 │                         marketHours, navDates, numbers, financialMonth (+ summariseSpend), aiCopy,
 │                         cashFlow (expenses dashboard), epfProjection, goals, portfolioSeries,
 │                         mfMetrics (fund analyzer), stockVerdicts + stockMetricDefinitions
-├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData, useGoalHoldingValues
-├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses
+├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData, useGoalsData
+├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses, goals
 └── vault/                crypto.ts (vault format over injected primitives), noblePrimitives.ts,
                           vaultTypes.ts (field defs, no icons), inviteCode.ts
 ```
@@ -150,7 +150,7 @@ frontend/src/
 │   │   └── useEpfCalculations.ts      EPF growth projection math (inflated/real)
 │   ├── fd/                   Fixed deposits
 │   ├── rd/                   Recurring deposits
-│   ├── goals/                Investment goals
+│   ├── goals/                Goals: list + [id] detail (projection chart, breakdown), GoalDialog + AllocationEditor
 │   ├── profile/              User profile + salary history (Phone + PAN Number fields; PAN has show/hide toggle)
 │   ├── integrations/         4 tabs: UPI Auto-Track, Claude MCP, Email Import, Notifications
 │   ├── vault/                PIN-locked, end-to-end encrypted secrets store
@@ -575,3 +575,5 @@ Defined in `packages/core/src/schemas/expenses.ts`: `['Rent', 'Insurance', 'Bill
 45. **Expo Go cannot run the mobile app** — react-native-quick-crypto (native PBKDF2; 310k iterations in pure JS would take seconds) and MMKV are native modules. Use `eas build --profile development` once, then `npx expo start --dev-client`. `expo-doctor` must stay at 21/21; `react-native-svg` is pinned and deduped via a root `overrides` entry because lucide-react-native pulls its own.
 
 46. **Per-record edit/delete go through `utils/ownedDocuments.ts`** — `updateOwnedDocument(options, schema)` and `deleteOwnedDocument(options)` validate the id, scope the write to `{ _id, userId }` so nobody can touch another user's record (a miss is a 404, never a silent success), and parse the body with the collection's schema made `.partial()`. FD, RD, EPF accounts and MF transactions use it; reuse it for any new per-record endpoint instead of copying the boilerplate. Note zod strips unknown keys, so a field the client sends but the schema lacks is silently dropped on insert and update — `monthlyDeposit` (RD) and `fundPrice` (MF) were lost this way until added to the schemas.
+
+47. **Goals fund themselves by percentage of real holdings, capped at 100% per holding** — a goal's `allocations[]` is `{ assetType, assetKey, percent }` where the key is `stockName` / `fundName` / `coinName` for market assets, `'gold'` and `'epf'` for the single pooled holdings, and the document `_id` for FDs and RDs. `userGoalsController` rejects any add or update that would push one holding past 100% across the user's goals (400 with `conflicts[]`), and update is a full replace that `$unset`s absent optionals. All maths lives in `packages/core/src/calc/goals.ts` and `useGoalsData`: current value is each holding × percent, history is the holding's cash flows × percent, the expected return is value-weighted from each holding's deposit rate, own XIRR (only after a year, clamped) or a class default, and required monthly is the annuity formula at that return. Name keys mean a renamed fund orphans its allocation; the UI shows those as "not found".
