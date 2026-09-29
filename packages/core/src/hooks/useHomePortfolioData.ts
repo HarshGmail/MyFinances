@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { differenceInMonths } from 'date-fns';
 import {
   useMutualFundTransactionsQuery,
   useSafeGoldRatesQuery,
@@ -17,7 +16,11 @@ import { useStocksPortfolioQuery } from '../api/query/stocks';
 import { useCapitalGainsQuery } from '../api/query/capitalGains';
 import xirr, { XirrTransaction as XirrCashFlow } from '../calc/xirr';
 import { cagr, firstTransactionDate, earliestDate } from '../calc/cagr';
-import { calcMFPortfolio, calcEPFPortfolio } from '../calc/portfolioCalculations';
+import {
+  calcMFPortfolio,
+  calcEPFPortfolio,
+  epfContributionFlows,
+} from '../calc/portfolioCalculations';
 import { buildAIInsightPrompt } from '../calc/aiCopy';
 import { goldCashFlow, netGoldInvested, totalGoldGrams } from '../calc/goldCategories';
 import { groupCryptoHoldings, heldCoinSymbols, valueCryptoHoldings } from '../calc/cryptoHoldings';
@@ -309,18 +312,9 @@ export function useHomePortfolioData(userName: string | null | undefined) {
     cryptoTransactions?.forEach((tx) =>
       flows.push({ amount: tx.type === 'credit' ? -tx.amount : tx.amount, when: new Date(tx.date) })
     );
-    epfData?.forEach((epf, index) => {
-      const epfStart = new Date(epf.startDate);
-      const nextDate =
-        index < epfData.length - 1 ? new Date(epfData[index + 1].startDate) : new Date();
-      const monthsDiff = differenceInMonths(nextDate, epfStart);
-      for (let i = 0; i < monthsDiff; i++) {
-        const d = new Date(epfStart);
-        d.setMonth(d.getMonth() + i);
-        d.setDate(epf.creditDay);
-        if (d <= new Date()) flows.push({ amount: -epf.epfAmount, when: d });
-      }
-    });
+    epfContributionFlows(epfData ?? []).forEach(({ amount, when }) =>
+      flows.push({ amount: -amount, when })
+    );
     fdData?.forEach((fd) =>
       flows.push({ amount: -fd.amountInvested, when: new Date(fd.dateOfCreation) })
     );

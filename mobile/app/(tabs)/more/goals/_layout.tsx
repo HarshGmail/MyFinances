@@ -12,6 +12,7 @@ export default function GoalsLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Goals' }} />
+      <Stack.Screen name="[id]" options={{ title: 'Goal' }} />
       <Stack.Screen name="edit" options={{ presentation: 'modal' }} />
     </Stack>
   );

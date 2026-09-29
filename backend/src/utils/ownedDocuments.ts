@@ -10,7 +10,7 @@ interface OwnedDocumentOptions {
   label: string;
 }
 
-function resolveOwnedFilter(req: Request, res: Response, label: string) {
+export function resolveOwnedFilter(req: Request, res: Response, label: string) {
   const user = getUserFromRequest(req);
   if (!user?.userId) {
     res.status(401).json({ success: false, message: 'Authentication required' });

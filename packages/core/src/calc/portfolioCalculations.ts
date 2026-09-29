@@ -4,8 +4,9 @@
  * Both the home dashboard and individual portfolio pages should use these.
  */
 
-import { MutualFundTransaction, MutualFundInfo, EpfTimelineSummary } from '../types';
+import { MutualFundTransaction, MutualFundInfo, EpfTimelineSummary, EpfAccount } from '../types';
 import groupBy from 'lodash/groupBy';
+import { differenceInMonths } from 'date-fns';
 import { holdingXirrPercent } from './holdingXirr';
 
 // ── Mutual Funds ─────────────────────────────────────────────────────────────
@@ -106,6 +107,25 @@ export function calcEPFPortfolio(epfTimelineData: EpfTimelineSummary): EPFPortfo
   const profitLossPercentage = invested > 0 ? (profitLoss / invested) * 100 : 0;
 
   return { invested, currentValue, profitLoss, profitLossPercentage };
+}
+
+export function epfContributionFlows(
+  accounts: EpfAccount[],
+  now: Date = new Date()
+): { amount: number; when: Date }[] {
+  const flows: { amount: number; when: Date }[] = [];
+  accounts.forEach((account, index) => {
+    const accountStart = new Date(account.startDate);
+    const nextStart = index < accounts.length - 1 ? new Date(accounts[index + 1].startDate) : now;
+    const months = differenceInMonths(nextStart, accountStart);
+    for (let month = 0; month < months; month++) {
+      const creditDate = new Date(accountStart);
+      creditDate.setMonth(creditDate.getMonth() + month);
+      creditDate.setDate(account.creditDay);
+      if (creditDate <= now) flows.push({ amount: account.epfAmount, when: creditDate });
+    }
+  });
+  return flows;
 }
 
 export interface MFFundRow extends MFFundData {

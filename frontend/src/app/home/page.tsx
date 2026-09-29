@@ -13,6 +13,7 @@ import { useAppStore } from '@/store/useAppStore';
 import AssetPortfolioCard from './AssetPortfolioCard';
 import DepositCard from './DepositCard';
 import CapitalGainsCard from './CapitalGainsCard';
+import GoalsCard from './GoalsCard';
 import DashboardSkeleton from './DashboardSkeleton';
 import HomeInfoSheet from './HomeInfoSheet';
 import RefreshIndicator from './RefreshIndicator';
@@ -244,6 +245,8 @@ export default function Home() {
           emptyMessage="No recurring deposits found"
         />
       </div>
+
+      <GoalsCard />
 
       {/* Capital gains */}
       {cgData && <CapitalGainsCard cgData={cgData} />}

@@ -8,7 +8,7 @@ export function registerGoalTools(server: McpServer, client: BackendClient): voi
     'goals_list',
     {
       description:
-        'Fetch all investment goals with their target amounts, current progress, and linked assets (stocks, mutual funds, etc.). If this tool fails or times out, retry it once.',
+        'Fetch all investment goals with target amount, target date, planned monthly contribution and asset allocations (the percent of each linked holding — stock, mutual fund, crypto, gold, EPF, FD or RD — earmarked for the goal). Current progress is not returned; it is computed in the app from live holding values. If this tool fails or times out, retry it once.',
       inputSchema: z.object({}),
     },
     async () => {

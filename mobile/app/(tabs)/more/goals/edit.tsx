@@ -1,100 +1,112 @@
-import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, Switch, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useUserGoalsQuery } from '@myfinances/core/api/query/userGoals';
+import type { UserGoal } from '@myfinances/core/types';
 import {
   useAddGoalMutation,
-  useUpdateGoalMutation,
   useDeleteGoalMutation,
-  AddGoalPayload,
+  useUpdateGoalMutation,
 } from '@myfinances/core/api/mutations/userGoals';
-import { useGoalHoldingValues } from '@myfinances/core/hooks/useGoalHoldingValues';
-import { NumberField, TextField } from '@/components/form';
+import { GoalsData, useGoalsData } from '@myfinances/core/hooks/useGoalsData';
+import { GoalFormValues, goalFormSchema, goalFormToPayload } from '@myfinances/core/schemas/goals';
+import {
+  blendedExpectedReturn,
+  computeGoalValue,
+  scaledCashFlows,
+  trailingMonthlyContribution,
+} from '@myfinances/core/calc/goals';
+import { DateField, NumberField, TextField } from '@/components/form';
 import { FormScreen, errorMessage } from '@/components/FormScreen';
-import { Label, LoadingState } from '@/components/ui';
+import { EmptyState, Label, LoadingState } from '@/components/ui';
+import { colors } from '@/lib/theme';
+import { GoalAllocationEditor, hasOverAllocation } from '@/features/goals/GoalAllocationEditor';
+import { formatRupees } from '@/features/goals/goalDisplay';
 
-const goalSchema = z.object({
-  goalName: z.string().min(1, 'Name is required'),
-  targetAmount: z.number().min(1, 'Target must be greater than 0'),
-  description: z.string().optional(),
-  goldAlloted: z.number().min(0).optional(),
-});
+const OVER_ALLOCATED_MESSAGE = 'Some holdings are allocated beyond what is free. Lower them first.';
 
-type GoalFormValues = z.infer<typeof goalSchema>;
+function goalToFormValues(goal: UserGoal): GoalFormValues {
+  return {
+    goalName: goal.goalName,
+    description: goal.description ?? '',
+    targetAmount: goal.targetAmount,
+    targetDate: new Date(goal.targetDate),
+    inflationAdjusted: goal.inflationAdjusted ?? false,
+    expectedReturnPct: goal.expectedReturnPct,
+    plannedMonthly: goal.plannedMonthly,
+    manualAmount: goal.manualAmount,
+    allocations: goal.allocations.map((allocation) => ({ ...allocation })),
+  };
+}
+
+const EMPTY_FORM_VALUES: Partial<GoalFormValues> = {
+  goalName: '',
+  description: '',
+  targetAmount: undefined,
+  targetDate: undefined,
+  inflationAdjusted: false,
+  expectedReturnPct: undefined,
+  plannedMonthly: undefined,
+  manualAmount: undefined,
+  allocations: [],
+};
 
 export default function GoalEditScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const goalsQuery = useUserGoalsQuery();
-  const existing = id ? goalsQuery.data?.find((g) => g._id === id) : undefined;
+  const goalsData = useGoalsData();
+  const existing = id ? goalsData.goals.find((goal) => goal._id === id) : undefined;
 
-  if (id && !existing) return <LoadingState />;
+  if (id && goalsData.isLoading) return <LoadingState />;
+  if (id && !existing) return <EmptyState message="This goal no longer exists." />;
 
-  return <GoalForm id={id} initial={existing} />;
+  return <GoalForm key={existing?._id ?? 'new'} id={id} initial={existing} goalsData={goalsData} />;
 }
 
 function GoalForm({
   id,
   initial,
+  goalsData,
 }: {
   id?: string;
-  initial?: {
-    goalName: string;
-    targetAmount?: number;
-    description?: string;
-    goldAlloted?: number;
-    stockSymbols?: string[];
-    mutualFundIds?: string[];
-    cryptoCurrency?: string[];
-  };
+  initial?: UserGoal;
+  goalsData: GoalsData;
 }) {
   const [serverError, setServerError] = useState<string | null>(null);
-  const [stockSymbols, setStockSymbols] = useState<string[]>(initial?.stockSymbols ?? []);
-  const [mutualFundIds, setMutualFundIds] = useState<string[]>(initial?.mutualFundIds ?? []);
-  const [cryptoCurrency, setCryptoCurrency] = useState<string[]>(initial?.cryptoCurrency ?? []);
-
   const addMutation = useAddGoalMutation();
   const updateMutation = useUpdateGoalMutation();
   const deleteMutation = useDeleteGoalMutation();
+  const { holdings, holdingsByKey, inflationPct, allocatedByHolding, isHoldingsLoading } =
+    goalsData;
 
-  const { stockNames, coinNames, mfInfo } = useGoalHoldingValues();
-
-  const { control, handleSubmit } = useForm<GoalFormValues>({
-    resolver: zodResolver(goalSchema),
-    defaultValues: initial
-      ? {
-          goalName: initial.goalName,
-          targetAmount: initial.targetAmount,
-          description: initial.description ?? '',
-          goldAlloted: initial.goldAlloted,
-        }
-      : {
-          goalName: '',
-          targetAmount: undefined,
-          description: '',
-          goldAlloted: undefined,
-        },
+  const { control, handleSubmit, formState } = useForm<GoalFormValues>({
+    resolver: zodResolver(goalFormSchema),
+    defaultValues: initial ? goalToFormValues(initial) : EMPTY_FORM_VALUES,
   });
 
-  const toggle = (list: string[], value: string): string[] => {
-    return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
-  };
+  const allocations = useWatch({ control, name: 'allocations' });
+  const manualAmount = useWatch({ control, name: 'manualAmount' });
+  const allocated = allocatedByHolding(id);
+
+  const defaults = useMemo(() => {
+    const value = computeGoalValue(
+      { allocations: allocations.filter((line) => Number.isFinite(line.percent)), manualAmount },
+      holdingsByKey
+    );
+    return {
+      returnPct: blendedExpectedReturn(value).pct,
+      trailingMonthly: trailingMonthlyContribution(scaledCashFlows(value.lines)),
+    };
+  }, [allocations, manualAmount, holdingsByKey]);
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
+    if (hasOverAllocation(values.allocations, allocated)) {
+      setServerError(OVER_ALLOCATED_MESSAGE);
+      return;
+    }
     try {
-      const payload: AddGoalPayload = {
-        goalName: values.goalName,
-        targetAmount: values.targetAmount,
-        description: values.description || undefined,
-        goldAlloted: values.goldAlloted || undefined,
-        stockSymbols,
-        mutualFundIds,
-        cryptoCurrency,
-      };
-
+      const payload = goalFormToPayload(values);
       if (id) await updateMutation.mutateAsync({ id, data: payload });
       else await addMutation.mutateAsync(payload);
       router.back();
@@ -112,7 +124,7 @@ function GoalForm({
         onPress: async () => {
           try {
             await deleteMutation.mutateAsync(id!);
-            router.back();
+            router.dismissTo('/more/goals');
           } catch (error) {
             setServerError(errorMessage(error));
           }
@@ -120,10 +132,6 @@ function GoalForm({
       },
     ]);
   };
-
-  const fundOptions = mfInfo
-    .filter((f) => f.fundName)
-    .map((f) => ({ id: f._id, label: f.fundName! }));
 
   return (
     <>
@@ -134,106 +142,76 @@ function GoalForm({
         submitting={addMutation.isPending || updateMutation.isPending || deleteMutation.isPending}
         error={serverError}
       >
-        <TextField control={control} name="goalName" label="Goal" />
+        <TextField
+          control={control}
+          name="goalName"
+          label="Goal"
+          placeholder="e.g. House down payment"
+        />
         <NumberField control={control} name="targetAmount" label="Target amount (₹)" />
+        <DateField control={control} name="targetDate" label="Target date" allowFuture />
+
+        <Controller
+          control={control}
+          name="inflationAdjusted"
+          render={({ field }) => (
+            <View className="gap-1 rounded-lg border border-border bg-card px-3 py-3">
+              <View className="flex-row items-center justify-between gap-3">
+                <Text className="flex-1 text-sm text-foreground">Adjust target for inflation</Text>
+                <Switch
+                  value={Boolean(field.value)}
+                  onValueChange={field.onChange}
+                  trackColor={{ false: colors.accent, true: colors.gain }}
+                  thumbColor={colors.foreground}
+                  ios_backgroundColor={colors.accent}
+                />
+              </View>
+              <Label>
+                {`Treats the target as today's money and grows it by ${inflationPct.toFixed(1)}% a year until the target date.`}
+              </Label>
+            </View>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="allocations"
+          render={({ field }) => (
+            <GoalAllocationEditor
+              value={field.value}
+              onChange={field.onChange}
+              holdings={holdings}
+              holdingsByKey={holdingsByKey}
+              allocated={allocated}
+              errors={
+                Array.isArray(formState.errors.allocations)
+                  ? formState.errors.allocations
+                  : undefined
+              }
+              isLoading={isHoldingsLoading}
+            />
+          )}
+        />
+
+        <NumberField
+          control={control}
+          name="manualAmount"
+          label="Other savings (₹, optional)"
+          placeholder="Cash or accounts not tracked here"
+        />
+        <NumberField
+          control={control}
+          name="expectedReturnPct"
+          label="Expected return (% p.a., optional)"
+          placeholder={`Blended default ${defaults.returnPct.toFixed(1)}%`}
+        />
+        <NumberField
+          control={control}
+          name="plannedMonthly"
+          label="Planned monthly investment (₹, optional)"
+          placeholder={`Auto from last 12 months: ${formatRupees(defaults.trailingMonthly)}`}
+        />
         <TextField control={control} name="description" label="Description (optional)" />
-        <NumberField control={control} name="goldAlloted" label="Gold allotted (grams, optional)" />
-
-        <View className="gap-1.5">
-          <Label>Stocks</Label>
-          {stockNames.length > 0 ? (
-            <View className="flex-row flex-wrap gap-2">
-              {stockNames.map((name) => {
-                const selected = stockSymbols.includes(name);
-                return (
-                  <Pressable
-                    key={name}
-                    onPress={() => setStockSymbols(toggle(stockSymbols, name))}
-                    className={`h-9 justify-center rounded-full border px-3 ${selected ? 'border-foreground bg-foreground' : 'border-border'}`}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                  >
-                    <Text
-                      className={
-                        selected
-                          ? 'text-sm font-semibold text-background'
-                          : 'text-sm text-foreground'
-                      }
-                    >
-                      {name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <Text className="text-xs text-muted">None held</Text>
-          )}
-        </View>
-
-        <View className="gap-1.5">
-          <Label>Mutual funds</Label>
-          {fundOptions.length > 0 ? (
-            <View className="flex-row flex-wrap gap-2">
-              {fundOptions.map(({ id: fundId, label }) => {
-                const selected = mutualFundIds.includes(fundId);
-                return (
-                  <Pressable
-                    key={fundId}
-                    onPress={() => setMutualFundIds(toggle(mutualFundIds, fundId))}
-                    className={`h-9 justify-center rounded-full border px-3 ${selected ? 'border-foreground bg-foreground' : 'border-border'}`}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                  >
-                    <Text
-                      className={
-                        selected
-                          ? 'text-sm font-semibold text-background'
-                          : 'text-sm text-foreground'
-                      }
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <Text className="text-xs text-muted">None held</Text>
-          )}
-        </View>
-
-        <View className="gap-1.5">
-          <Label>Crypto</Label>
-          {coinNames.length > 0 ? (
-            <View className="flex-row flex-wrap gap-2">
-              {coinNames.map((name) => {
-                const selected = cryptoCurrency.includes(name);
-                return (
-                  <Pressable
-                    key={name}
-                    onPress={() => setCryptoCurrency(toggle(cryptoCurrency, name))}
-                    className={`h-9 justify-center rounded-full border px-3 ${selected ? 'border-foreground bg-foreground' : 'border-border'}`}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                  >
-                    <Text
-                      className={
-                        selected
-                          ? 'text-sm font-semibold text-background'
-                          : 'text-sm text-foreground'
-                      }
-                    >
-                      {name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <Text className="text-xs text-muted">None held</Text>
-          )}
-        </View>
 
         {id && (
           <Pressable
