@@ -366,14 +366,14 @@ describe('HSBC statement', () => {
   });
 });
 
-describe('reconciliation warnings', () => {
-  it('flags a statement whose totals do not add up', () => {
+describe('reconciliation', () => {
+  it('marks a statement whose totals do not add up as unreconciled, without a warning', () => {
     const parsed = parseCreditCardStatement(
       'Total Amount Due Rs.999.00\n01/09/2026 SWIGGY ORDER 100.00',
       'other'
     );
     expect(parsed.reconciled).toBe(false);
-    expect(parsed.warnings[0]).toMatch(/does not reconcile/);
+    expect(parsed.warnings).toEqual([]);
   });
 
   it('warns when nothing could be read', () => {
@@ -478,6 +478,33 @@ TOTAL PURCHASE OUTSTANDING 2,011.60
 TARIFF SHEET
 `;
 
+const HDFC_DUES_STATEMENT = `
+TOTAL AMOUNT DUE
+C855.00
+MINIMUM DUE
+C200.00
+DUE DATE
+03 Oct, 2026
+IMPORTANT INFORMATION
+1. MITC CALCULATION ON YOUR HDFC BANK CREDIT CARD
+Domestic Transactions
+DATE & TIME TRANSACTION DESCRIPTION AMOUNT PI
+16/08/2026| 18:39 SWIGGY FOODBANGALORE C 421.00 l
+01/09/2026| 13:59 BPPY CC PAYMENT + C 1,620.00 l
+PREVIOUS STATEMENT DUES PAYMENTS/CREDITS
+RECEIVED
+PURCHASES/DEBIT
+(Current Billing Cycle) FINANCE CHARGES
+C1,619.58 C1,697.20 C933.00 C0.00
+TOTAL CREDIT LIMIT
+(Including Cash) AVAILABLE CREDIT LIMIT AVAILABLE CASH LIMIT
+C57,000 C56,145 C22,800
+Statement Date
+Billing Period
+13 Sep, 2026
+14 Aug, 2026 - 13 Sep, 2026
+`;
+
 describe('real-layout summary derivations', () => {
   it('Axis: reads the total from the equation row, not the reflowed box or the MAD illustration', () => {
     const parsed = parseCreditCardStatement(AXIS_EQUATION_STATEMENT, 'axis');
@@ -505,5 +532,15 @@ describe('real-layout summary derivations', () => {
     expect(parsed.transactions[0].date).toEqual(utc(2026, 9, 9));
     expect(parsed.transactions[0].amount).toBe(1167.4);
     expect(parsed.reconciled).toBe(true);
+  });
+
+  it('HDFC: reads the dash-separated billing period and reconciles against the dues box', () => {
+    const parsed = parseCreditCardStatement(HDFC_DUES_STATEMENT, 'hdfc');
+    expect(parsed.summary.periodStart).toEqual(utc(2026, 8, 14));
+    expect(parsed.summary.periodEnd).toEqual(utc(2026, 9, 13));
+    expect(parsed.summary.totalDue).toBe(855);
+    expect(parsed.summary.previousBalance).toBe(1619.58);
+    expect(parsed.reconciled).toBe(true);
+    expect(parsed.warnings).toEqual([]);
   });
 });

@@ -168,142 +168,144 @@ function CardForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="issuer"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Issuer</FormLabel>
-                <Select
-                  value={field.value}
-                  onValueChange={(issuer) =>
-                    changeIssuer(issuer as CreditCardIssuer, field.onChange)
-                  }
-                >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="issuer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Issuer</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(issuer) =>
+                      changeIssuer(issuer as CreditCardIssuer, field.onChange)
+                    }
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select bank" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CARD_ISSUERS.map((issuer) => (
+                        <SelectItem key={issuer.value} value={issuer.value}>
+                          {issuer.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="label"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Card name</FormLabel>
                   <FormControl>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select bank" />
-                    </SelectTrigger>
+                    <Input placeholder="e.g. SBI Cashback" {...field} />
                   </FormControl>
-                  <SelectContent>
-                    {CARD_ISSUERS.map((issuer) => (
-                      <SelectItem key={issuer.value} value={issuer.value}>
-                        {issuer.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="label"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Card name</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. SBI Cashback" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="lastDigits"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last digits</FormLabel>
+                  <FormControl>
+                    <Input
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="1234"
+                      autoComplete="off"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nameOnCard"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name on card (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={profile?.userName ?? ''}
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormDescription>Used to try name-based PDF passwords.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
-            name="lastDigits"
+            name="senderEmails"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Last digits</FormLabel>
-                <FormControl>
-                  <Input
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="1234"
-                    autoComplete="off"
-                    {...field}
-                  />
-                </FormControl>
+                <FormLabel>Statement sender emails</FormLabel>
+                <SenderEmailPicker
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  suggestions={suggestionsQuery.data ?? []}
+                  isLoadingSuggestions={suggestionsQuery.isLoading}
+                />
                 <FormMessage />
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
-            name="nameOnCard"
+            name="pdfPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name on card (optional)</FormLabel>
+                <FormLabel>PDF password (optional)</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder={profile?.userName ?? ''}
+                  <PasswordInput
+                    autoComplete="new-password"
+                    placeholder={card?.hasPassword ? 'Unchanged' : ''}
                     {...field}
                     value={field.value ?? ''}
                   />
                 </FormControl>
-                <FormDescription>Used to try name-based PDF passwords.</FormDescription>
+                <FormDescription>
+                  Leave blank and we&apos;ll try common formats (name + date of birth, last digits)
+                  and save the one that opens the PDF.
+                </FormDescription>
+                {card?.hasPassword && <SavedPasswordControls card={card} />}
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {card?.passwordHint && (
+            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+              Your bank&apos;s email says: {card.passwordHint}
+            </div>
+          )}
+
+          {profile && !profile.dob && <MissingDobNote />}
         </div>
 
-        <FormField
-          control={form.control}
-          name="senderEmails"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Statement sender emails</FormLabel>
-              <SenderEmailPicker
-                value={field.value ?? []}
-                onChange={field.onChange}
-                suggestions={suggestionsQuery.data ?? []}
-                isLoadingSuggestions={suggestionsQuery.isLoading}
-              />
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="pdfPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>PDF password (optional)</FormLabel>
-              <FormControl>
-                <PasswordInput
-                  autoComplete="new-password"
-                  placeholder={card?.hasPassword ? 'Unchanged' : ''}
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormDescription>
-                Leave blank and we&apos;ll try common formats (name + date of birth, last digits)
-                and save the one that opens the PDF.
-              </FormDescription>
-              {card?.hasPassword && <SavedPasswordControls card={card} />}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {card?.passwordHint && (
-          <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-            Your bank&apos;s email says: {card.passwordHint}
-          </div>
-        )}
-
-        {profile && !profile.dob && <MissingDobNote />}
-
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4">
           <Button type="button" variant="outline" onClick={onDone} disabled={isPending}>
             Cancel
           </Button>
@@ -319,8 +321,8 @@ function CardForm({
 export function CardFormDialog({ open, onOpenChange, card }: CardFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>{card ? 'Edit card' : 'Add credit card'}</DialogTitle>
           <DialogDescription>
             We look for statement emails from these senders in your linked Gmail and read the PDF.

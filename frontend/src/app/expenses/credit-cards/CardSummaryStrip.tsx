@@ -69,10 +69,10 @@ function StatementDetails({
   const due = daysUntilDue === null ? null : dueBadge(daysUntilDue);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div>
-        <p className="text-xs text-muted-foreground">Total due</p>
-        <p className="text-2xl font-bold">{formatCurrency(statement.totalDue)}</p>
+        <p className="text-[11px] text-muted-foreground">Total due</p>
+        <p className="text-xl font-bold leading-tight">{formatCurrency(statement.totalDue)}</p>
       </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
         <StatLine
@@ -107,21 +107,24 @@ function CardTile({ summary }: { summary: CardDueSummary }) {
 
   return (
     <Card className="min-w-0">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{issuerLabel(card.issuer)}</p>
-            <p className="font-semibold truncate">
+            <p className="text-[11px] text-muted-foreground">{issuerLabel(card.issuer)}</p>
+            <p className="text-sm font-semibold truncate">
               {card.label}{' '}
               <span className="text-muted-foreground font-normal">••{card.lastDigits}</span>
             </p>
           </div>
-          <Badge variant="outline" className={`shrink-0 font-normal ${password.className}`}>
+          <Badge
+            variant="outline"
+            className={`shrink-0 font-normal text-[10px] px-1.5 py-0 ${password.className}`}
+          >
             {password.label}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         {statement ? (
           <StatementDetails
             statement={statement}
@@ -129,10 +132,9 @@ function CardTile({ summary }: { summary: CardDueSummary }) {
             daysUntilDue={daysUntilDue}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <CreditCardIcon className="h-8 w-8 mb-2 opacity-30" />
-            <p className="text-sm">No statement yet</p>
-            <p className="text-xs mt-1">Sync statements to pull the latest one</p>
+          <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+            <CreditCardIcon className="h-6 w-6 mb-1.5 opacity-30" />
+            <p className="text-xs">No statement yet</p>
           </div>
         )}
       </CardContent>
@@ -142,7 +144,7 @@ function CardTile({ summary }: { summary: CardDueSummary }) {
 
 export function CardSummaryStrip({ summaries }: { summaries: CardDueSummary[] }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {summaries.map((summary) => (
         <CardTile key={summary.card._id} summary={summary} />
       ))}

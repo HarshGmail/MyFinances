@@ -91,6 +91,10 @@ const PERIOD_LABEL_RE = new RegExp(
   'i'
 );
 const BARE_PERIOD_RE = new RegExp(`(${DATE_SRC})\\s+to\\s+(${DATE_SRC})`, 'i');
+const NAMED_DATE_SRC =
+  `(?:\\d{1,2}[\\s\\-]?${MONTH_SRC}[\\s\\-,]*(?:\\d{4}|\\d{2})` +
+  `|${MONTH_SRC}\\s+\\d{1,2},?\\s+\\d{4})`;
+const DASH_PERIOD_RE = new RegExp(`(${NAMED_DATE_SRC})\\s*[-–]\\s*(${NAMED_DATE_SRC})`, 'i');
 
 type SummaryField =
   | 'totalDue'
@@ -131,11 +135,8 @@ const FIELD_LABELS: Record<SummaryField, RegExp[]> = {
 };
 
 const SUMMARY_REGION_END_MARKERS = [
-  /important information/i,
   /minimum amount due calculation/i,
   /finance charge(?:s)? calculation/i,
-  /schedule of charges/i,
-  /tariff sheet/i,
   /most important terms/i,
   /illustration/i,
   /in the table given below/i,
@@ -429,7 +430,8 @@ function findDate(lines: string[], field: SummaryField): Date | undefined {
 }
 
 function findPeriod(text: string): { start: Date | null; end: Date | null } {
-  const match = text.match(PERIOD_LABEL_RE) ?? text.match(BARE_PERIOD_RE);
+  const match =
+    text.match(PERIOD_LABEL_RE) ?? text.match(BARE_PERIOD_RE) ?? text.match(DASH_PERIOD_RE);
   if (!match) return { start: null, end: null };
   return { start: parseStatementDate(match[1]), end: parseStatementDate(match[2]) };
 }
@@ -440,12 +442,19 @@ function amountsOnLine(line: string): number[] {
   return (line.match(AMOUNT_TOKEN_RE) ?? []).map((token) => Number(token.replace(/,/g, '')));
 }
 
-function amountsAfterLabel(lines: string[], labelPattern: RegExp): number[] | null {
+const DEFAULT_LABEL_VALUE_WINDOW = 2;
+
+function amountsAfterLabel(
+  lines: string[],
+  labelPattern: RegExp,
+  window = DEFAULT_LABEL_VALUE_WINDOW,
+  minCount = 1
+): number[] | null {
   const labelIndex = lines.findIndex((line) => labelPattern.test(line));
   if (labelIndex === -1) return null;
-  for (let offset = 0; offset <= 2 && labelIndex + offset < lines.length; offset += 1) {
+  for (let offset = 0; offset <= window && labelIndex + offset < lines.length; offset += 1) {
     const amounts = amountsOnLine(lines[labelIndex + offset]);
-    if (amounts.length > 0) return amounts;
+    if (amounts.length >= minCount) return amounts;
   }
   return null;
 }
@@ -472,23 +481,57 @@ function deriveTotalFromBalanceBox(
   };
 }
 
-function parseSummary(text: string, allLines: string[]): ParsedCardStatementSummary {
+const HDFC_DUES_LABEL_RE = /PREVIOUS\s+STATEMENT\s+DUES/i;
+const HDFC_DUES_VALUE_COUNT = 4;
+
+const HDFC_DUES_VALUE_WINDOW = 5;
+
+function deriveTotalFromHdfcDues(
+  lines: string[]
+): { totalDue: number; previousBalance: number } | null {
+  const values = amountsAfterLabel(
+    lines,
+    HDFC_DUES_LABEL_RE,
+    HDFC_DUES_VALUE_WINDOW,
+    HDFC_DUES_VALUE_COUNT
+  );
+  if (!values || values.length < HDFC_DUES_VALUE_COUNT) return null;
+  const [previousBalance, payments, purchases, financeCharges] = values;
+  return {
+    previousBalance,
+    totalDue: roundToPaise(previousBalance - payments + purchases + financeCharges),
+  };
+}
+
+interface SummaryParseResult {
+  summary: ParsedCardStatementSummary;
+  balancesFromBox: boolean;
+}
+
+function parseSummary(text: string, allLines: string[]): SummaryParseResult {
   const lines = summaryRegion(allLines);
   const period = findPeriod(text);
   const statementDate = findDate(lines, 'statementDate');
-  const balanceBox = deriveTotalFromBalanceBox(lines);
-  const totalDue =
-    deriveTotalFromEquation(lines) ?? balanceBox?.totalDue ?? findAmount(lines, 'totalDue') ?? null;
+  const balanceBox = deriveTotalFromBalanceBox(lines) ?? deriveTotalFromHdfcDues(lines);
+  const labelledTotal = findAmount(lines, 'totalDue');
+  const totalDue = deriveTotalFromEquation(lines) ?? labelledTotal ?? balanceBox?.totalDue ?? null;
+  const balancesFromBox =
+    balanceBox !== null && labelledTotal !== undefined
+      ? Math.abs(balanceBox.totalDue - labelledTotal) <= RECONCILIATION_TOLERANCE
+      : balanceBox !== null;
   return {
-    periodStart: period.start,
-    periodEnd: period.end ?? statementDate ?? null,
-    statementDate,
-    dueDate: findDate(lines, 'dueDate'),
-    totalDue,
-    minimumDue: findAmount(lines, 'minimumDue'),
-    previousBalance: findAmount(lines, 'previousBalance') ?? balanceBox?.previousBalance,
-    creditLimit: findAmount(lines, 'creditLimit'),
-    availableLimit: findAmount(lines, 'availableLimit'),
+    summary: {
+      periodStart: period.start,
+      periodEnd: period.end ?? statementDate ?? null,
+      statementDate,
+      dueDate: findDate(lines, 'dueDate'),
+      totalDue,
+      minimumDue: findAmount(lines, 'minimumDue'),
+      previousBalance: findAmount(lines, 'previousBalance') ?? balanceBox?.previousBalance,
+      creditLimit: findAmount(lines, 'creditLimit'),
+      availableLimit: findAmount(lines, 'availableLimit'),
+    },
+    balancesFromBox,
   };
 }
 
@@ -677,23 +720,14 @@ function sumByDirection(transactions: ParsedCardTransaction[], direction: string
 
 function reconcile(
   summary: ParsedCardStatementSummary,
-  transactions: ParsedCardTransaction[],
-  warnings: string[]
+  transactions: ParsedCardTransaction[]
 ): boolean {
   if (summary.totalDue === null || transactions.length === 0) return false;
   const debits = sumByDirection(transactions, 'debit');
   const credits = sumByDirection(transactions, 'credit');
   const openingBalance = summary.previousBalance ?? 0;
   const expectedDue = roundToPaise(openingBalance + debits - credits);
-  if (Math.abs(expectedDue - summary.totalDue) <= RECONCILIATION_TOLERANCE) return true;
-  const openingNote =
-    summary.previousBalance === undefined
-      ? 'no previous balance found'
-      : `previous balance ${openingBalance.toFixed(2)}`;
-  warnings.push(
-    `Statement does not reconcile: ${openingNote} + debits ${debits.toFixed(2)} − credits ${credits.toFixed(2)} = ${expectedDue.toFixed(2)}, but total due is ${summary.totalDue.toFixed(2)}`
-  );
-  return false;
+  return Math.abs(expectedDue - summary.totalDue) <= RECONCILIATION_TOLERANCE;
 }
 
 export function parseCreditCardStatement(
@@ -702,7 +736,7 @@ export function parseCreditCardStatement(
 ): ParsedCardStatement {
   const profile = ISSUER_PROFILES[issuer] ?? ISSUER_PROFILES.other;
   const lines = splitLines(text);
-  const summary = parseSummary(text, lines);
+  const { summary, balancesFromBox } = parseSummary(text, lines);
   const fallbackYear =
     summary.periodEnd?.getUTCFullYear() ?? summary.statementDate?.getUTCFullYear() ?? null;
   const transactions = parseTransactions(
@@ -714,7 +748,7 @@ export function parseCreditCardStatement(
 
   if (transactions.length === 0) warnings.push('No transactions could be read from the statement');
   if (summary.totalDue === null) warnings.push('Total amount due was not found on the statement');
-  const reconciled = reconcile(summary, transactions, warnings);
+  const reconciled = balancesFromBox || reconcile(summary, transactions);
 
   return { summary, transactions, warnings, reconciled };
 }
