@@ -61,9 +61,10 @@ packages/core/src/
 │                         cryptoHoldings (+ valueCryptoHoldings), dailyMoves, mfDailyMoves,
 │                         marketHours, navDates, numbers, financialMonth (+ summariseSpend), aiCopy,
 │                         cashFlow (expenses dashboard), epfProjection, goals, portfolioSeries,
-│                         mfMetrics (fund analyzer), stockVerdicts + stockMetricDefinitions
+│                         mfMetrics (fund analyzer), stockVerdicts + stockMetricDefinitions,
+│                         creditCards (EMI plans, GST linking, card spend summaries)
 ├── hooks/                useHomePortfolioData, useTodayMovesData, useGoldLeaseData, useGoalsData
-├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses, goals
+├── schemas/              auth, transactions (stock/crypto/gold/MF/FD/RD/EPF), expenses, goals, creditCards
 └── vault/                crypto.ts (vault format over injected primitives), noblePrimitives.ts,
                           vaultTypes.ts (field defs, no icons), inviteCode.ts
 ```
@@ -135,6 +136,8 @@ frontend/src/
 │   │   ├── page.tsx          Entry point — fetches all data, routes to tabs
 │   │   ├── DashboardTab.tsx  Financial dashboard (display only, receives props)
 │   │   ├── TrackerTab.tsx    Daily expense logger
+│   │   ├── credit-cards/     Credit Cards tab (?tab=cards): per-card due tiles, spend/category/cost-of-credit
+│   │   │                     charts, EMI plans, filterable transactions, Manage cards + CardFormDialog
 │   │   ├── useDashboardData.ts  All dashboard calculations (useMemo)
 │   │   └── useTrackerData.ts    Tracker chart options; totals via core summariseSpend
 │   │                            (schemas + EXPENSE_TAGS now in packages/core/src/schemas/expenses.ts)
@@ -260,6 +263,7 @@ backend/src/
 | `/api/recurring-deposit`    | RD management (add, list, `PUT`/`DELETE /:id`)                                            |
 | `/api/expenses`             | Recurring expense categories                                                              |
 | `/api/expense-transactions` | Daily expense log                                                                         |
+| `/api/credit-cards`         | Card profiles, statement sync (Gmail PDFs), parsed statements + transactions              |
 | `/api/goals`                | Investment goals                                                                          |
 | `/api/targets`              | Asset allocation targets                                                                  |
 | `/api/inflation`            | Inflation rate data                                                                       |
@@ -577,3 +581,5 @@ Defined in `packages/core/src/schemas/expenses.ts`: `['Rent', 'Insurance', 'Bill
 46. **Per-record edit/delete go through `utils/ownedDocuments.ts`** — `updateOwnedDocument(options, schema)` and `deleteOwnedDocument(options)` validate the id, scope the write to `{ _id, userId }` so nobody can touch another user's record (a miss is a 404, never a silent success), and parse the body with the collection's schema made `.partial()`. FD, RD, EPF accounts and MF transactions use it; reuse it for any new per-record endpoint instead of copying the boilerplate. Note zod strips unknown keys, so a field the client sends but the schema lacks is silently dropped on insert and update — `monthlyDeposit` (RD) and `fundPrice` (MF) were lost this way until added to the schemas.
 
 47. **Goals fund themselves by percentage of real holdings, capped at 100% per holding** — a goal's `allocations[]` is `{ assetType, assetKey, percent }` where the key is `stockName` / `fundName` / `coinName` for market assets, `'gold'` and `'epf'` for the single pooled holdings, and the document `_id` for FDs and RDs. `userGoalsController` rejects any add or update that would push one holding past 100% across the user's goals (400 with `conflicts[]`), and update is a full replace that `$unset`s absent optionals. All maths lives in `packages/core/src/calc/goals.ts` and `useGoalsData`: current value is each holding × percent, history is the holding's cash flows × percent, the expected return is value-weighted from each holding's deposit rate, own XIRR (only after a year, clamped) or a class default, and required monthly is the annuity formula at that return. Name keys mean a renamed fund orphans its allocation; the UI shows those as "not found".
+
+48. **Credit card statements are a separate, manual-first sync** — the user registers each card in Expenses › Credit Cards (`creditCards`: issuer, last 4–6 digits, sender emails, optional PDF password; no vault involvement). `POST /api/credit-cards/sync` runs its own `syncJobs` job (`kind: 'credit-cards'`, polled through the shared `/email-integration/sync-status/:jobId`) and each card syncs from its own `lastSyncAt`. Passwords are tried in order: saved, `buildCardPasswordCandidates` (issuer rule first, then name/surname + DOB and last-digit variants), custom PDF passwords, empty. The first non-saved one that works is stored encrypted as `passwordSource: 'derived'`, so guessing happens once. Locked PDFs never echo password values; they quote the email's own password sentence (`extractPasswordHint`) and keep `lastSyncAt` unchanged so the next sync retries. A PDF that opens but lacks the card's masked last digits belongs to another card from the same sender and is skipped. Statements upsert on `{ userId, cardId, periodEnd }` and their transactions are replaced wholesale, so re-syncing never duplicates. `reconciled` is false when previous balance + debits − credits ≠ total due (±₹1): the parser missed lines, and the UI flags it. Spend counts `purchase` rows only — EMI principal repays an earlier purchase and would double count; EMI interest, GST, fees and finance charges are "cost of credit". `groupEmiPlans` attaches a `tax` row to EMI interest on the same statement when it is ≈18% of it. Parsers are regex-only and tuned on synthetic text: use `backend/scripts/dumpCardStatement.ts <pdf> <issuer> [password…]` on a real statement to tune `ISSUER_PROFILES`. Backend tests: `cd backend && npm test` (vitest).

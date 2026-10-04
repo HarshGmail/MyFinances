@@ -72,7 +72,7 @@ const COIN_NAMES: Record<string, string> = {
 /**
  * Strip HTML tags and decode common HTML entities.
  */
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     .replace(/<[^>]+>/g, ' ') // remove all tags
     .replace(/&amp;/g, '&')

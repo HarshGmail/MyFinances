@@ -16,7 +16,20 @@ export class PdfPasswordError extends Error {
   }
 }
 
+export interface UnlockedPdfText {
+  text: string;
+  password: string;
+}
+
 export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): Promise<string> {
+  const { text } = await extractTextFromPdfWithPassword(buffer, passwords);
+  return text;
+}
+
+export async function extractTextFromPdfWithPassword(
+  buffer: Buffer,
+  passwords: string[]
+): Promise<UnlockedPdfText> {
   const passwordsToTry = passwords.length > 0 ? passwords : [''];
 
   for (const password of passwordsToTry) {
@@ -30,7 +43,7 @@ export async function extractTextFromPdf(buffer: Buffer, passwords: string[]): P
 
       parser = new PDFParse(loadParams);
       const result = await parser.getText();
-      return result.text as string;
+      return { text: result.text as string, password };
     } catch (err: unknown) {
       // Wrong password — try the next one
       if (err instanceof PasswordException) {

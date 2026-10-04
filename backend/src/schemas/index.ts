@@ -13,3 +13,4 @@ export * from './user';
 export * from './userGoals';
 export * from './vault';
 export * from './wallet';
+export * from './creditCard';

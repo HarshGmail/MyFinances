@@ -32,6 +32,7 @@ import {
   vaultRouter,
   walletsRouter,
   pushRouter,
+  creditCardsRouter,
 } from './routes';
 import { requestLogger, blockDemoMutations, errorHandler } from './middleware';
 import logger from './utils/logger';
@@ -94,6 +95,7 @@ app.use('/api/email-integration', emailIntegrationsRouter);
 app.use('/api/vault', vaultRouter);
 app.use('/api/wallets', walletsRouter);
 app.use('/api/push', pushRouter);
+app.use('/api/credit-cards', creditCardsRouter);
 app.use('/api', verifyRoutes);
 
 app.get('/api/health', (req, res) => {
@@ -121,6 +123,9 @@ const USER_SCOPED_COLLECTIONS = [
   'expenseTransactions',
   'assetTargets',
   'userGoals',
+  'creditCards',
+  'creditCardStatements',
+  'creditCardTransactions',
 ];
 
 const ENCRYPTION_KEY_PATTERN = /^[0-9a-f]{64}$/i;
@@ -165,6 +170,16 @@ async function startServer() {
         database.getDb().collection(name).createIndex({ userId: 1 })
       )
     );
+
+    await database
+      .getDb()
+      .collection('creditCardStatements')
+      .createIndex({ userId: 1, cardId: 1, periodEnd: 1 }, { unique: true });
+
+    await database
+      .getDb()
+      .collection('creditCardTransactions')
+      .createIndex({ userId: 1, cardId: 1, date: -1 });
 
     await database.getDb().collection('priceCache').createIndex({ key: 1 });
 
