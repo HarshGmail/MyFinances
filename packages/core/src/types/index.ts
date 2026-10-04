@@ -992,3 +992,100 @@ export interface CapitalGainsResponse {
     notes: string[];
   };
 }
+
+export type CreditCardIssuer = 'sbi' | 'hdfc' | 'icici' | 'axis' | 'hsbc' | 'yes' | 'other';
+
+export type CardPasswordSource = 'user' | 'derived';
+
+export interface CreditCard {
+  _id: string;
+  issuer: CreditCardIssuer;
+  label: string;
+  lastDigits: string;
+  nameOnCard?: string;
+  senderEmails: string[];
+  hasPassword: boolean;
+  passwordSource: CardPasswordSource | null;
+  passwordHint?: string;
+  lastSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditCardPayload {
+  issuer: CreditCardIssuer;
+  label: string;
+  lastDigits: string;
+  nameOnCard?: string;
+  senderEmails: string[];
+  pdfPassword?: string;
+}
+
+export interface CreditCardStatement {
+  _id: string;
+  cardId: string;
+  periodStart: string | null;
+  periodEnd: string;
+  statementDate?: string;
+  dueDate?: string;
+  totalDue: number;
+  minimumDue?: number;
+  previousBalance?: number;
+  creditLimit?: number;
+  availableLimit?: number;
+  reconciled: boolean;
+  parsedAt: string;
+}
+
+export type CardTransactionKind =
+  | 'purchase'
+  | 'payment'
+  | 'refund'
+  | 'cashback'
+  | 'emi_principal'
+  | 'emi_interest'
+  | 'tax'
+  | 'fee'
+  | 'interest'
+  | 'other';
+
+export type CardTransactionDirection = 'debit' | 'credit';
+
+export interface EmiInstallment {
+  number: number;
+  of: number;
+}
+
+export interface CreditCardTransaction {
+  _id: string;
+  cardId: string;
+  statementId: string;
+  date: string;
+  description: string;
+  amount: number;
+  direction: CardTransactionDirection;
+  kind: CardTransactionKind;
+  category: string;
+  emiInstallment?: EmiInstallment;
+}
+
+export interface CardSenderSuggestion {
+  email: string;
+  issuer: CreditCardIssuer | null;
+  count: number;
+  latestSubject?: string;
+  isKnown: boolean;
+}
+
+export interface CardSyncResult {
+  statementsImported: number;
+  transactionsImported: number;
+  passwordsDiscovered: number;
+  errors: string[];
+}
+
+export interface CardSyncJobStatus {
+  status: 'processing' | 'done' | 'failed' | 'cancelled';
+  result: CardSyncResult | null;
+  error: string | null;
+}

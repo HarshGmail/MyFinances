@@ -19,3 +19,4 @@ export * from './deleteAll';
 export * from './emailIntegration';
 export * from './vault';
 export * from './wallets';
+export * from './creditCards';

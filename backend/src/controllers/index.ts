@@ -14,3 +14,4 @@ export * from './expenseTransactionController';
 export * from './vaultController';
 export * from './walletController';
 export * from './pushController';
+export * from './creditCardsController';

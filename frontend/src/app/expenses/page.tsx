@@ -18,11 +18,33 @@ import { useDashboardData } from './useDashboardData';
 import { useTrackerData } from './useTrackerData';
 import { DashboardTab } from './DashboardTab';
 import { TrackerTab } from './TrackerTab';
+import { CreditCardsTab } from './credit-cards/CreditCardsTab';
 import { useUrlState } from '@/utils/useUrlState';
 
-type Tab = 'dashboard' | 'tracker';
+type Tab = 'dashboard' | 'tracker' | 'cards';
 
-const TABS = ['dashboard', 'tracker'] as const satisfies readonly Tab[];
+const TABS = ['dashboard', 'tracker', 'cards'] as const satisfies readonly Tab[];
+
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: 'Dashboard',
+  tracker: 'Tracker',
+  cards: 'Credit Cards',
+};
+
+const TAB_HEADERS: Record<Tab, { title: string; subtitle: string }> = {
+  dashboard: {
+    title: 'Financial Dashboard',
+    subtitle: 'Track your income, investments, and spending patterns',
+  },
+  tracker: {
+    title: 'Expense Tracker',
+    subtitle: 'Log and analyze your day-to-day expenses',
+  },
+  cards: {
+    title: 'Credit Cards',
+    subtitle: 'Statements synced from your inbox — spends, EMIs, interest and GST',
+  },
+};
 
 export default function ExpensesPage() {
   const { theme } = useAppStore();
@@ -84,14 +106,8 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">
-            {activeTab === 'dashboard' ? 'Financial Dashboard' : 'Expense Tracker'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {activeTab === 'dashboard'
-              ? 'Track your income, investments, and spending patterns'
-              : 'Log and analyze your day-to-day expenses'}
-          </p>
+          <h1 className="text-3xl font-bold">{TAB_HEADERS[activeTab].title}</h1>
+          <p className="text-muted-foreground mt-1">{TAB_HEADERS[activeTab].subtitle}</p>
         </div>
         {activeTab === 'tracker' && (
           <Button onClick={() => setTrackerDrawerOpen(true)}>
@@ -102,19 +118,19 @@ export default function ExpensesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
-        {(['dashboard', 'tracker'] as Tab[]).map((tab) => (
+      <div className="flex gap-1 border-b overflow-x-auto">
+        {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={[
-              'px-4 py-2 text-sm font-medium border-b-2 capitalize transition-colors',
+              'px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
               activeTab === tab
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >
-            {tab}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -144,6 +160,8 @@ export default function ExpensesPage() {
           monthlyOptions={tracker.monthlyOptions}
         />
       )}
+
+      {activeTab === 'cards' && <CreditCardsTab />}
     </div>
   );
 }

@@ -1,0 +1,151 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { AlertTriangle, CreditCard as CreditCardIcon } from 'lucide-react';
+import type { CardDueSummary } from '@myfinances/core/calc/creditCards';
+import { formatCurrency } from '@myfinances/core/calc/numbers';
+import { issuerLabel } from '@myfinances/core/schemas/creditCards';
+import type { CreditCardStatement } from '@myfinances/core/types';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import {
+  MISMATCH_BADGE_CLASS,
+  dueBadge,
+  formatCardDate,
+  passwordBadge,
+  utilisationIndicatorClass,
+} from './cardDisplay';
+
+const PERCENT = 100;
+
+function statementPeriodLabel(statement: CreditCardStatement): string {
+  const end = formatCardDate(statement.periodEnd);
+  return statement.periodStart
+    ? `${formatCardDate(statement.periodStart)} – ${end}`
+    : `Up to ${end}`;
+}
+
+function StatLine({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium truncate">{value}</dd>
+    </div>
+  );
+}
+
+function UtilisationBar({
+  statement,
+  utilisation,
+}: {
+  statement: CreditCardStatement;
+  utilisation: number;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>Utilisation {(utilisation * PERCENT).toFixed(0)}%</span>
+        <span>Limit {formatCurrency(statement.creditLimit ?? 0)}</span>
+      </div>
+      <Progress
+        value={utilisation * PERCENT}
+        className="bg-muted"
+        indicatorClassName={utilisationIndicatorClass(utilisation)}
+      />
+    </div>
+  );
+}
+
+function StatementDetails({
+  statement,
+  utilisation,
+  daysUntilDue,
+}: {
+  statement: CreditCardStatement;
+  utilisation: number | null;
+  daysUntilDue: number | null;
+}) {
+  const due = daysUntilDue === null ? null : dueBadge(daysUntilDue);
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs text-muted-foreground">Total due</p>
+        <p className="text-2xl font-bold">{formatCurrency(statement.totalDue)}</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <StatLine
+          label="Minimum due"
+          value={statement.minimumDue !== undefined ? formatCurrency(statement.minimumDue) : '—'}
+        />
+        <StatLine
+          label="Due date"
+          value={statement.dueDate ? formatCardDate(statement.dueDate) : '—'}
+        />
+      </dl>
+      {due && (
+        <Badge variant="outline" className={due.className}>
+          {due.label}
+        </Badge>
+      )}
+      {utilisation !== null && <UtilisationBar statement={statement} utilisation={utilisation} />}
+      <p className="text-xs text-muted-foreground">Statement {statementPeriodLabel(statement)}</p>
+      {!statement.reconciled && (
+        <Badge variant="outline" className={`gap-1 font-normal ${MISMATCH_BADGE_CLASS}`}>
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          Totals don&apos;t reconcile — some lines may be missing
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function CardTile({ summary }: { summary: CardDueSummary }) {
+  const { card, statement, utilisation, daysUntilDue } = summary;
+  const password = passwordBadge(card);
+
+  return (
+    <Card className="min-w-0">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">{issuerLabel(card.issuer)}</p>
+            <p className="font-semibold truncate">
+              {card.label}{' '}
+              <span className="text-muted-foreground font-normal">••{card.lastDigits}</span>
+            </p>
+          </div>
+          <Badge variant="outline" className={`shrink-0 font-normal ${password.className}`}>
+            {password.label}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {statement ? (
+          <StatementDetails
+            statement={statement}
+            utilisation={utilisation}
+            daysUntilDue={daysUntilDue}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+            <CreditCardIcon className="h-8 w-8 mb-2 opacity-30" />
+            <p className="text-sm">No statement yet</p>
+            <p className="text-xs mt-1">Sync statements to pull the latest one</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function CardSummaryStrip({ summaries }: { summaries: CardDueSummary[] }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      {summaries.map((summary) => (
+        <CardTile key={summary.card._id} summary={summary} />
+      ))}
+    </div>
+  );
+}

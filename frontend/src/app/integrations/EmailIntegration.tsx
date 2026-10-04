@@ -313,6 +313,19 @@ export default function EmailIntegration({
                 <p className="font-medium text-foreground">CoinDCX (trade confirmation email)</p>
                 <p>Crypto trades from &ldquo;CoinDCX Trade Executed&rdquo; emails.</p>
               </div>
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">
+                  Credit card statements (monthly email)
+                </p>
+                <p>
+                  Spends, EMIs, interest, fees and GST from your card statement PDFs. Add your cards
+                  and sync them from{' '}
+                  <a href="/expenses?tab=cards" className="text-primary underline">
+                    Expenses › Credit Cards
+                  </a>
+                  .
+                </p>
+              </div>
               <p className="text-xs border-t pt-3">
                 Make sure your PAN number and phone number are set in{' '}
                 <a href="/profile" className="text-primary underline">
