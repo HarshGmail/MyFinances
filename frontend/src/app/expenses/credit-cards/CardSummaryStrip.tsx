@@ -101,7 +101,7 @@ function StatementDetails({
   );
 }
 
-function CardTile({ summary }: { summary: CardDueSummary }) {
+function CardTile({ summary, cycleSpend }: { summary: CardDueSummary; cycleSpend: number }) {
   const { card, statement, utilisation, daysUntilDue } = summary;
   const password = passwordBadge(card);
 
@@ -124,7 +124,7 @@ function CardTile({ summary }: { summary: CardDueSummary }) {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-4">
+      <CardContent className="px-4 pb-4 space-y-2.5">
         {statement ? (
           <StatementDetails
             statement={statement}
@@ -137,16 +137,34 @@ function CardTile({ summary }: { summary: CardDueSummary }) {
             <p className="text-xs">No statement yet</p>
           </div>
         )}
+        {cycleSpend > 0 && (
+          <div className="flex items-baseline justify-between border-t pt-2">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              This cycle
+            </span>
+            <span className="text-sm font-semibold">{formatCurrency(cycleSpend)}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-export function CardSummaryStrip({ summaries }: { summaries: CardDueSummary[] }) {
+export function CardSummaryStrip({
+  summaries,
+  cycleSpendByCard,
+}: {
+  summaries: CardDueSummary[];
+  cycleSpendByCard: Record<string, number>;
+}) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {summaries.map((summary) => (
-        <CardTile key={summary.card._id} summary={summary} />
+        <CardTile
+          key={summary.card._id}
+          summary={summary}
+          cycleSpend={cycleSpendByCard[summary.card._id] ?? 0}
+        />
       ))}
     </div>
   );

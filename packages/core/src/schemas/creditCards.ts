@@ -23,6 +23,14 @@ export const KNOWN_CARD_SENDERS: readonly { email: string; issuer: CreditCardIss
   { email: 'liccardsstatements@axis.bank.in', issuer: 'axis' },
 ];
 
+export const KNOWN_CARD_ALERT_SENDERS: readonly { email: string; issuer: CreditCardIssuer }[] = [
+  { email: 'onlinesbicard@sbicard.com', issuer: 'sbi' },
+  { email: 'alerts@hdfcbank.bank.in', issuer: 'hdfc' },
+  { email: 'alerts@yes.bank.in', issuer: 'yes' },
+  { email: 'alerts@axis.bank.in', issuer: 'axis' },
+  { email: 'hsbc@mail.hsbc.co.in', issuer: 'hsbc' },
+];
+
 export const CARD_TRANSACTION_KINDS: readonly { value: CardTransactionKind; label: string }[] = [
   { value: 'purchase', label: 'Purchase' },
   { value: 'payment', label: 'Payment' },
@@ -53,6 +61,12 @@ export function cardTransactionKindLabel(kind: CardTransactionKind): string {
 
 export function knownSendersForIssuer(issuer: CreditCardIssuer): string[] {
   return KNOWN_CARD_SENDERS.filter((sender) => sender.issuer === issuer).map(
+    (sender) => sender.email
+  );
+}
+
+export function knownAlertSendersForIssuer(issuer: CreditCardIssuer): string[] {
+  return KNOWN_CARD_ALERT_SENDERS.filter((sender) => sender.issuer === issuer).map(
     (sender) => sender.email
   );
 }

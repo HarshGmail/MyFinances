@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   addCreditCard,
   deleteCreditCard,
+  getCardAlerts,
   getCardSenderSuggestions,
   getCardStatements,
   getCardTransactions,
@@ -19,6 +20,7 @@ router.get('/', getCreditCards);
 router.post('/', addCreditCard);
 router.get('/statements', getCardStatements);
 router.get('/transactions', getCardTransactions);
+router.get('/alerts', getCardAlerts);
 router.get('/sender-suggestions', getCardSenderSuggestions);
 router.post('/sync', syncCreditCards);
 router.put('/:id', updateCreditCard);

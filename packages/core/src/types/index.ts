@@ -1069,17 +1069,31 @@ export interface CreditCardTransaction {
   emiInstallment?: EmiInstallment;
 }
 
+export interface CardTransactionAlert {
+  _id: string;
+  cardId: string;
+  date: string;
+  description: string;
+  amount: number;
+  direction: CardTransactionDirection;
+  category: string;
+  gmailMessageId: string;
+  supersededByStatement: boolean;
+}
+
 export interface CardSenderSuggestion {
   email: string;
   issuer: CreditCardIssuer | null;
   count: number;
   latestSubject?: string;
   isKnown: boolean;
+  isAlertSender: boolean;
 }
 
 export interface CardSyncResult {
   statementsImported: number;
   transactionsImported: number;
+  alertsImported: number;
   passwordsDiscovered: number;
   errors: string[];
 }

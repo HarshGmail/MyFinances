@@ -6,6 +6,7 @@ const CREDIT_CARD_QUERY_KEYS = [
   'credit-cards',
   'credit-card-statements',
   'credit-card-transactions',
+  'credit-card-alerts',
 ] as const;
 
 export function invalidateCreditCardQueries(queryClient: QueryClient) {

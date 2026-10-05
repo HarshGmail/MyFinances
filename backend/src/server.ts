@@ -126,6 +126,7 @@ const USER_SCOPED_COLLECTIONS = [
   'creditCards',
   'creditCardStatements',
   'creditCardTransactions',
+  'creditCardAlerts',
 ];
 
 const ENCRYPTION_KEY_PATTERN = /^[0-9a-f]{64}$/i;
@@ -180,6 +181,11 @@ async function startServer() {
       .getDb()
       .collection('creditCardTransactions')
       .createIndex({ userId: 1, cardId: 1, date: -1 });
+
+    await database
+      .getDb()
+      .collection('creditCardAlerts')
+      .createIndex({ userId: 1, cardId: 1, gmailMessageId: 1 }, { unique: true });
 
     await database.getDb().collection('priceCache').createIndex({ key: 1 });
 

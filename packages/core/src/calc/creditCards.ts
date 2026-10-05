@@ -1,6 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { COST_OF_CREDIT_KINDS } from '../schemas/creditCards';
 import type {
+  CardTransactionAlert,
   CardTransactionKind,
   CreditCard,
   CreditCardStatement,
@@ -11,6 +12,8 @@ import { summariseSpend, type SpendTotals } from './financialMonth';
 export const GST_RATE = 0.18;
 const GST_MATCH_TOLERANCE_RUPEES = 1;
 const MONTH_KEY_FORMAT = 'yyyy-MM';
+
+const roundToPaise = (value: number) => Math.round(value * 100) / 100;
 
 const EMI_KINDS: readonly CardTransactionKind[] = ['emi_principal', 'emi_interest'];
 const INSTALLMENT_MARKER = /\b\d{1,2}\s*(?:\/|of)\s*\d{1,2}\b/gi;
@@ -230,4 +233,43 @@ export function latestStatementByCard(
 
     return { card, statement, utilisation, daysUntilDue };
   });
+}
+
+export function liveAlerts(alerts: CardTransactionAlert[]): CardTransactionAlert[] {
+  return alerts.filter((alert) => !alert.supersededByStatement);
+}
+
+export function currentCycleSpendByCard(alerts: CardTransactionAlert[]): Record<string, number> {
+  const byCard: Record<string, number> = {};
+  for (const alert of liveAlerts(alerts)) {
+    if (alert.direction !== 'debit') continue;
+    byCard[alert.cardId] = (byCard[alert.cardId] ?? 0) + alert.amount;
+  }
+  return byCard;
+}
+
+export interface LiveAlertSummary {
+  total: number;
+  count: number;
+  byCategory: Record<string, number>;
+  spend: SpendTotals;
+}
+
+export function summariseLiveAlerts(
+  alerts: CardTransactionAlert[],
+  now: Date = new Date()
+): LiveAlertSummary {
+  const live = liveAlerts(alerts).filter((alert) => alert.direction === 'debit');
+  const byCategory: Record<string, number> = {};
+  let total = 0;
+  for (const alert of live) {
+    byCategory[alert.category] = (byCategory[alert.category] ?? 0) + alert.amount;
+    total += alert.amount;
+  }
+  return {
+    total: roundToPaise(total),
+    count: live.length,
+    byCategory,
+    spend: summariseSpend(live, now),
+  };
 }

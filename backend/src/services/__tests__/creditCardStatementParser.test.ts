@@ -505,7 +505,42 @@ Billing Period
 14 Aug, 2026 - 13 Sep, 2026
 `;
 
+const SBI_STACKED_STATEMENT = `
+**Minimum Amount Due
+Credit Card Number
+*Total Amount Due
+Statement Date Cash Limit Credit Limit
+Available Credit Limit Available Cash Limit Payment Due Date
+Previous Balance Total Outstanding
+ACCOUNT SUMMARY
+for Statement Period: 03 Sep 26 to 02 Oct 26
+HARSH VARDHAN
+XXXX XXXX XXXX XX37
+9,627.00
+4,876.00
+2,00,000.00 40,000.00
+1,90,373.00 40,000.00
+02 Oct 2026
+22 Oct 2026
+Date Amount Transaction Details
+03 Sep 26 PAYMENT RECEIVED 30,957.00 C
+24 Sep 26 UPI-MERCHANT ONE 1,679.00 D
+02 Oct 26 FP EMI 03/12(EXCL TAX 12.34) 1,236.68 M
+02 Oct 26 INTEREST ON EMI 81.62 D
+`;
+
 describe('real-layout summary derivations', () => {
+  it('SBI: reads the stacked summary values and matches a two-digit masked card number', () => {
+    const parsed = parseCreditCardStatement(SBI_STACKED_STATEMENT, 'sbi');
+    expect(parsed.summary.totalDue).toBe(9627);
+    expect(parsed.summary.minimumDue).toBe(4876);
+    expect(parsed.summary.dueDate).toEqual(utc(2026, 10, 22));
+    expect(parsed.summary.periodStart).toEqual(utc(2026, 9, 3));
+    expect(parsed.summary.periodEnd).toEqual(utc(2026, 10, 2));
+    expect(statementMentionsCard(SBI_STACKED_STATEMENT, '6437')).toBe(true);
+    expect(parsed.transactions.length).toBe(4);
+  });
+
   it('Axis: reads the total from the equation row, not the reflowed box or the MAD illustration', () => {
     const parsed = parseCreditCardStatement(AXIS_EQUATION_STATEMENT, 'axis');
     expect(parsed.summary.totalDue).toBe(6231.84);

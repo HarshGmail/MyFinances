@@ -1,12 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import {
+  currentCycleSpendByCard,
   groupEmiPlans,
   latestStatementByCard,
   linkGstToEmiInterest,
+  liveAlerts,
   normaliseEmiDescription,
   summariseCardSpend,
+  summariseLiveAlerts,
 } from '../creditCards';
-import { CreditCard, CreditCardStatement, CreditCardTransaction } from '../../types';
+import {
+  CardTransactionAlert,
+  CreditCard,
+  CreditCardStatement,
+  CreditCardTransaction,
+} from '../../types';
+
+let alertSeq = 0;
+function alert(partial: Partial<CardTransactionAlert>): CardTransactionAlert {
+  alertSeq += 1;
+  return {
+    _id: `a${alertSeq}`,
+    cardId: 'c1',
+    date: '2026-10-02',
+    description: 'MERCHANT',
+    amount: 100,
+    direction: 'debit',
+    category: 'Others',
+    gmailMessageId: `g${alertSeq}`,
+    supersededByStatement: false,
+    ...partial,
+  };
+}
 
 let nextId = 0;
 function tx(partial: Partial<CreditCardTransaction>): CreditCardTransaction {
@@ -138,5 +163,38 @@ describe('credit card spend summary', () => {
     expect(first.utilisation).toBe(0.25);
     expect(first.daysUntilDue).toBe(6);
     expect(second.statement).toBeNull();
+  });
+});
+
+describe('live transaction alerts', () => {
+  it('excludes superseded alerts from the live set', () => {
+    const alerts = [
+      alert({ amount: 100 }),
+      alert({ amount: 200, supersededByStatement: true }),
+      alert({ amount: 50 }),
+    ];
+    expect(liveAlerts(alerts)).toHaveLength(2);
+  });
+
+  it('sums current-cycle debit spend per card', () => {
+    const byCard = currentCycleSpendByCard([
+      alert({ cardId: 'c1', amount: 100 }),
+      alert({ cardId: 'c1', amount: 50 }),
+      alert({ cardId: 'c2', amount: 300 }),
+      alert({ cardId: 'c1', amount: 999, supersededByStatement: true }),
+    ]);
+    expect(byCard).toEqual({ c1: 150, c2: 300 });
+  });
+
+  it('summarises live alerts by category with a running total and count', () => {
+    const summary = summariseLiveAlerts([
+      alert({ amount: 100, category: 'Food & Dining' }),
+      alert({ amount: 50, category: 'Shopping' }),
+      alert({ amount: 25, category: 'Food & Dining' }),
+      alert({ amount: 999, category: 'Shopping', supersededByStatement: true }),
+    ]);
+    expect(summary.total).toBe(175);
+    expect(summary.count).toBe(3);
+    expect(summary.byCategory).toEqual({ 'Food & Dining': 125, Shopping: 50 });
   });
 });
