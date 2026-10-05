@@ -27,12 +27,17 @@ export interface EmiPlan {
   installmentsTotal: number;
   installmentsRemaining: number;
   monthlyInstallment: number;
+  monthlyInterest: number;
+  monthlyGst: number;
   principalPaid: number;
   interestPaid: number;
   gstPaid: number;
   estimatedOutstanding: number;
+  startedOn: string;
   lastBilledOn: string;
 }
+
+export type EmiPlanStatus = 'active' | 'completed' | 'stale';
 
 export interface CardMonthSpend {
   monthKey: string;
@@ -127,10 +132,13 @@ export function groupEmiPlans(transactions: CreditCardTransaction[]): EmiPlan[] 
         installmentsTotal: tx.emiInstallment?.of ?? 0,
         installmentsRemaining: 0,
         monthlyInstallment: 0,
+        monthlyInterest: 0,
+        monthlyGst: 0,
         principalPaid: 0,
         interestPaid: 0,
         gstPaid: 0,
         estimatedOutstanding: 0,
+        startedOn: tx.date,
         lastBilledOn: tx.date,
       } satisfies EmiPlan);
 
@@ -140,31 +148,130 @@ export function groupEmiPlans(transactions: CreditCardTransaction[]): EmiPlan[] 
       plan.gstPaid += gstByInterestId.get(tx._id)?.amount ?? 0;
     }
     plan.installmentsPaid = Math.max(plan.installmentsPaid, tx.emiInstallment?.number ?? 0);
+    plan.startedOn = tx.date < plan.startedOn ? tx.date : plan.startedOn;
     plan.lastBilledOn = tx.date > plan.lastBilledOn ? tx.date : plan.lastBilledOn;
     plans.set(key, plan);
   }
 
-  return [...plans.values()].map((plan) => finalisePlan(plan, emiRows));
+  return [...plans.values()].map((plan) => finalisePlan(plan, emiRows, gstByInterestId));
 }
 
-function finalisePlan(plan: EmiPlan, emiRows: CreditCardTransaction[]): EmiPlan {
+function finalisePlan(
+  plan: EmiPlan,
+  emiRows: CreditCardTransaction[],
+  gstByInterestId: Map<string, CreditCardTransaction>
+): EmiPlan {
   const latestRows = emiRows.filter(
     (tx) => emiPlanKey(tx) === plan.key && tx.date === plan.lastBilledOn
   );
-  const monthlyInstallment = latestRows
-    .filter((tx) => tx.kind === 'emi_principal' || tx.kind === 'emi_interest')
-    .reduce((sum, tx) => sum + tx.amount, 0);
   const latestPrincipal = latestRows
     .filter((tx) => tx.kind === 'emi_principal')
     .reduce((sum, tx) => sum + tx.amount, 0);
+  const monthlyInterest = latestRows
+    .filter((tx) => tx.kind === 'emi_interest')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const monthlyGst = latestRows
+    .filter((tx) => tx.kind === 'emi_interest')
+    .reduce((sum, tx) => sum + (gstByInterestId.get(tx._id)?.amount ?? 0), 0);
+  const monthlyInstallment = roundToPaise(latestPrincipal + monthlyInterest);
   const installmentsRemaining = Math.max(plan.installmentsTotal - plan.installmentsPaid, 0);
 
   return {
     ...plan,
     monthlyInstallment,
+    monthlyInterest: roundToPaise(monthlyInterest),
+    monthlyGst: roundToPaise(monthlyGst),
     installmentsRemaining,
-    estimatedOutstanding: latestPrincipal * installmentsRemaining,
+    estimatedOutstanding: roundToPaise(latestPrincipal * installmentsRemaining),
   };
+}
+
+const STALE_EMI_MONTHS_BEHIND = 2;
+
+function monthsBetween(earlierIso: string, laterIso: string): number {
+  const earlier = parseISO(earlierIso);
+  const later = parseISO(laterIso);
+  return (
+    (later.getUTCFullYear() - earlier.getUTCFullYear()) * 12 +
+    (later.getUTCMonth() - earlier.getUTCMonth())
+  );
+}
+
+function latestBilledAcross(plans: EmiPlan[]): string | null {
+  return plans.reduce<string | null>(
+    (latest, plan) => (latest === null || plan.lastBilledOn > latest ? plan.lastBilledOn : latest),
+    null
+  );
+}
+
+export function emiPlanStatus(plan: EmiPlan, latestBilled: string | null): EmiPlanStatus {
+  if (plan.installmentsTotal > 0 && plan.installmentsRemaining === 0) return 'completed';
+  if (
+    latestBilled !== null &&
+    monthsBetween(plan.lastBilledOn, latestBilled) > STALE_EMI_MONTHS_BEHIND
+  ) {
+    return 'stale';
+  }
+  return 'active';
+}
+
+export interface ClassifiedEmiPlans {
+  active: EmiPlan[];
+  completed: EmiPlan[];
+  stale: EmiPlan[];
+}
+
+export function classifyEmiPlans(plans: EmiPlan[]): ClassifiedEmiPlans {
+  const latestBilled = latestBilledAcross(plans);
+  const result: ClassifiedEmiPlans = { active: [], completed: [], stale: [] };
+  for (const plan of plans) {
+    result[emiPlanStatus(plan, latestBilled)].push(plan);
+  }
+  return result;
+}
+
+export interface CardEmiCharge {
+  plan: EmiPlan;
+  interest: number;
+  gst: number;
+  total: number;
+}
+
+export interface CardEmiChargeBreakdown {
+  cardId: string;
+  plans: CardEmiCharge[];
+  interest: number;
+  gst: number;
+  total: number;
+}
+
+export function emiChargesByCard(activePlans: EmiPlan[]): CardEmiChargeBreakdown[] {
+  const byCard = new Map<string, CardEmiChargeBreakdown>();
+  for (const plan of activePlans) {
+    const charge: CardEmiCharge = {
+      plan,
+      interest: plan.monthlyInterest,
+      gst: plan.monthlyGst,
+      total: roundToPaise(plan.monthlyInterest + plan.monthlyGst),
+    };
+    if (charge.total <= 0) continue;
+    const card = byCard.get(plan.cardId) ?? {
+      cardId: plan.cardId,
+      plans: [],
+      interest: 0,
+      gst: 0,
+      total: 0,
+    };
+    card.plans.push(charge);
+    card.interest = roundToPaise(card.interest + charge.interest);
+    card.gst = roundToPaise(card.gst + charge.gst);
+    card.total = roundToPaise(card.total + charge.total);
+    byCard.set(plan.cardId, card);
+  }
+  for (const card of byCard.values()) {
+    card.plans.sort((a, b) => b.total - a.total);
+  }
+  return [...byCard.values()].sort((a, b) => b.total - a.total);
 }
 
 function monthKeyOf(isoDate: string): string {

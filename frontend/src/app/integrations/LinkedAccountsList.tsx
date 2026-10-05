@@ -13,7 +13,16 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, RefreshCw, Link, Link2Off } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { LinkedEmailAccount } from '@myfinances/core/types';
+import { LinkedEmailAccount, SyncWatermark } from '@myfinances/core/types';
+
+function lastSyncedAt(watermark: SyncWatermark | undefined): Date | null {
+  if (!watermark) return null;
+  if (typeof watermark === 'string') return new Date(watermark);
+  const times = Object.values(watermark)
+    .filter((value): value is string => !!value)
+    .map((value) => new Date(value).getTime());
+  return times.length > 0 ? new Date(Math.max(...times)) : null;
+}
 
 export default function LinkedAccountsList({
   accounts,
@@ -54,7 +63,7 @@ export default function LinkedAccountsList({
 
   const handleResetSync = async (email: string) => {
     try {
-      await resetSync(email);
+      await resetSync({ email });
       toast.success('Sync history cleared');
     } catch {
       toast.error('Failed to reset sync');
@@ -105,8 +114,8 @@ export default function LinkedAccountsList({
                 <div className="min-w-0">
                   <div className="font-medium text-sm break-all">{account.email}</div>
                   <div className="text-xs text-muted-foreground">
-                    {account.lastSyncAt
-                      ? `Last synced ${format(new Date(account.lastSyncAt), 'PPp')}`
+                    {lastSyncedAt(account.lastSyncAt)
+                      ? `Last synced ${format(lastSyncedAt(account.lastSyncAt)!, 'PPp')}`
                       : 'Never synced'}
                   </div>
                 </div>

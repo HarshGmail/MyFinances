@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { differenceInCalendarDays, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import Highcharts from 'highcharts';
@@ -25,10 +24,10 @@ import {
   useCreditCardsQuery,
 } from '@myfinances/core/api';
 import {
+  classifyEmiPlans,
   currentCycleSpendByCard,
   latestStatementByCard,
   summariseLiveAlerts,
-  type EmiPlan,
 } from '@myfinances/core/calc/creditCards';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
 import type { CardSyncResult } from '@myfinances/core/types';
@@ -54,14 +53,6 @@ import { ALL_CARDS, cardDisplayName, pluralise } from './cardDisplay';
 import { useCreditCardsData } from './useCreditCardsData';
 
 const ACTIVE_SYNC_JOB_STORAGE_KEY = 'cardSync_activeJobId';
-const EMI_BILLING_GRACE_DAYS = 45;
-
-function isActiveEmiPlan(plan: EmiPlan): boolean {
-  const billedRecently =
-    differenceInCalendarDays(new Date(), parseISO(plan.lastBilledOn)) <= EMI_BILLING_GRACE_DAYS;
-  const hasInstallmentsLeft = plan.installmentsTotal === 0 || plan.installmentsRemaining > 0;
-  return billedRecently && hasInstallmentsLeft;
-}
 
 function syncSummaryMessage(result: CardSyncResult): string {
   const parts = [
@@ -257,7 +248,7 @@ export function CreditCardsTab() {
   const { summary, emiPlans, monthlySpendOptions, categoryOptions, costOfCreditOptions } =
     useCreditCardsData({ cards, transactions, theme });
 
-  const activeEmiCount = emiPlans.filter(isActiveEmiPlan).length;
+  const activeEmiCount = useMemo(() => classifyEmiPlans(emiPlans).active.length, [emiPlans]);
 
   useEffect(() => {
     if (isFilteredToCard && !cardsLoading && !cards.some((card) => card._id === selectedCardId)) {

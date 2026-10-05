@@ -23,8 +23,36 @@ import { EmailSyncPreview as EmailSyncPreviewType } from '@myfinances/core/types
 import LinkedAccountsList from './LinkedAccountsList';
 import EmailSyncPreviewCard from './EmailSyncPreview';
 import CustomPasswordsCard from './CustomPasswordsCard';
+import { SyncNowAction } from '@/components/custom/SyncNowAction';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
+
+const PER_SOURCE_SYNCS = [
+  { source: 'cdsl' as const, label: 'Mutual funds & stocks' },
+  { source: 'safegold' as const, label: 'Gold & leases' },
+  { source: 'coindcx' as const, label: 'Crypto' },
+];
+
+function PerSourceSyncCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Sync by source</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {PER_SOURCE_SYNCS.map(({ source, label }) => (
+          <div
+            key={source}
+            className="flex items-center justify-between gap-3 rounded-lg border p-3 sm:flex-1"
+          >
+            <span className="text-sm font-medium">{label}</span>
+            <SyncNowAction source={source} label={label} />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function OAuthRedirectHandler({
   onEmailConnected,
@@ -132,7 +160,7 @@ export default function EmailIntegration({
 
   const handleSync = async () => {
     try {
-      const { jobId } = await sync();
+      const { jobId } = await sync(undefined);
       localStorage.setItem('emailSync_activeJobId', jobId);
       setSyncJobId(jobId);
       toast.info('Sync started — checking for new emails…');
@@ -281,6 +309,8 @@ export default function EmailIntegration({
               )}
             </CardContent>
           </Card>
+
+          {canSync && <PerSourceSyncCard />}
 
           {preview && (
             <EmailSyncPreviewCard

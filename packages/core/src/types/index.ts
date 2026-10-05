@@ -118,6 +118,14 @@ export interface EmailIntegrationStatus {
   accounts: LinkedEmailAccount[];
 }
 
+export type SyncSource = 'cdsl' | 'safegold' | 'coindcx';
+
+export interface SyncSourceReport {
+  new: number;
+  duplicatesSkipped: number;
+  errors: string[];
+}
+
 export interface EmailSyncPreview {
   mutualFunds: ParsedMFTransaction[];
   gold: ParsedGoldTransaction[];
@@ -125,6 +133,7 @@ export interface EmailSyncPreview {
   crypto: ParsedCryptoEmailTransaction[];
   duplicatesSkipped: number;
   errors: string[];
+  perSource?: Partial<Record<SyncSource, SyncSourceReport>>;
 }
 
 export interface EpfAccount {
@@ -315,9 +324,11 @@ export interface InflationResult {
   average?: number;
 }
 
+export type SyncWatermark = string | null | Partial<Record<SyncSource, string | null>>;
+
 export interface LinkedEmailAccount {
   email: string;
-  lastSyncAt?: string | null;
+  lastSyncAt?: SyncWatermark;
   safegoldSender?: string;
 }
 

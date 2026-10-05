@@ -20,12 +20,18 @@ const STATEMENT_SENDER_QUERY =
   'has:attachment filename:pdf newer_than:2y (subject:statement OR "credit card" OR "card statement")';
 const DEFAULT_SENDER_SCAN_LIMIT = 300;
 
+export interface PdfAttachment {
+  filename: string;
+  data: Buffer;
+}
+
 export interface StatementMessage {
   messageId: string;
   receivedAt: Date;
   subject: string;
   html: string | null;
   pdfs: Buffer[];
+  pdfFiles: PdfAttachment[];
 }
 
 export interface StatementSender {
@@ -98,12 +104,14 @@ export class GmailClient {
     for (const id of messageIds) {
       const msgRes = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
       const payload = msgRes.data.payload;
+      const pdfFiles = await this.downloadPdfFiles(id, payload);
       messages.push({
         messageId: id,
         receivedAt: new Date(Number(msgRes.data.internalDate ?? Date.now())),
         subject: findHeader(payload, 'Subject') ?? '',
         html: payload ? extractHtmlBody(payload) : null,
-        pdfs: await this.downloadPdfParts(id, payload),
+        pdfs: pdfFiles.map((file) => file.data),
+        pdfFiles,
       });
     }
 
@@ -173,8 +181,15 @@ export class GmailClient {
     messageId: string,
     payload: gmail_v1.Schema$MessagePart | undefined
   ): Promise<Buffer[]> {
+    return (await this.downloadPdfFiles(messageId, payload)).map((file) => file.data);
+  }
+
+  private async downloadPdfFiles(
+    messageId: string,
+    payload: gmail_v1.Schema$MessagePart | undefined
+  ): Promise<PdfAttachment[]> {
     const gmail = this.getGmail();
-    const pdfBuffers: Buffer[] = [];
+    const files: PdfAttachment[] = [];
 
     for (const part of collectPdfParts(payload)) {
       const attachmentId = part.body?.attachmentId;
@@ -186,11 +201,11 @@ export class GmailClient {
       });
       const data = attRes.data.data;
       if (data) {
-        pdfBuffers.push(Buffer.from(data, 'base64'));
+        files.push({ filename: part.filename ?? '', data: Buffer.from(data, 'base64') });
       }
     }
 
-    return pdfBuffers;
+    return files;
   }
 
   private async listMessageIds(

@@ -5,15 +5,20 @@ import {
   ParsedGoldTransaction,
   ParsedEmailStockHolding,
   ParsedCryptoEmailTransaction,
+  SyncSource,
 } from '../../types';
 
-async function syncEmails(): Promise<{ jobId: string }> {
-  const response = await apiRequest({ endpoint: '/email-integration/sync', method: 'POST' });
+async function syncEmails(sources?: SyncSource[]): Promise<{ jobId: string }> {
+  const response = await apiRequest({
+    endpoint: '/email-integration/sync',
+    method: 'POST',
+    body: sources && sources.length > 0 ? { sources } : undefined,
+  });
   return response.data;
 }
 
 export function useEmailSyncMutation() {
-  return useMutation({ mutationFn: syncEmails });
+  return useMutation({ mutationFn: (sources?: SyncSource[]) => syncEmails(sources) });
 }
 
 async function importTransactions(data: {
@@ -41,17 +46,21 @@ export function useEmailImportMutation() {
   return useMutation({
     mutationFn: importTransactions,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mfTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['mutual-fund-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['goldTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['goldLeases'] });
-      queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
-      queryClient.invalidateQueries({ queryKey: ['cryptoTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['crypto-transactions'] });
     },
   });
 }
 
-async function resetEmailSync(email: string) {
-  return apiRequest({ endpoint: '/email-integration/reset-sync', method: 'POST', body: { email } });
+async function resetEmailSync({ email, sources }: { email: string; sources?: SyncSource[] }) {
+  return apiRequest({
+    endpoint: '/email-integration/reset-sync',
+    method: 'POST',
+    body: sources && sources.length > 0 ? { email, sources } : { email },
+  });
 }
 
 export function useEmailResetSyncMutation() {

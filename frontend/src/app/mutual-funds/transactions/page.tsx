@@ -4,6 +4,7 @@ import { useMutualFundTransactionsQuery } from '@myfinances/core/api';
 import { useDeleteMutualFundTransactionMutation } from '@myfinances/core/api/mutations/mutual-funds';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
+import { SyncNowAction } from '@/components/custom/SyncNowAction';
 import { useRouter } from 'next/navigation';
 import { TrendingUp, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -75,13 +76,16 @@ export default function MutualFundsTransactionsPage() {
         title="Mutual Fund Transactions"
         titleIcon={<TrendingUp className="w-4 h-4" />}
         actions={
-          <Button
-            variant="outline"
-            onClick={() => router.push('/mutual-funds/portfolio')}
-            style={{ cursor: 'pointer' }}
-          >
-            Add Transaction
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SyncNowAction source="cdsl" label="Mutual funds & stocks" />
+            <Button
+              variant="outline"
+              onClick={() => router.push('/mutual-funds/portfolio')}
+              style={{ cursor: 'pointer' }}
+            >
+              Add Transaction
+            </Button>
+          </div>
         }
         actionsRenderer={(row) => (
           <Button

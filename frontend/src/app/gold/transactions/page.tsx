@@ -3,6 +3,7 @@
 import { useGoldTransactionsQuery } from '@myfinances/core/api';
 import { Button } from '@/components/ui/button';
 import { TransactionsTable, Column, Row } from '@/components/custom/TransactionsTable';
+import { SyncNowAction } from '@/components/custom/SyncNowAction';
 import { useRouter } from 'next/navigation';
 import { Receipt, Edit3, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -111,13 +112,16 @@ export default function GoldTransactionsPage() {
         title="Gold Transactions"
         titleIcon={<Receipt className="w-4 h-4" />}
         actions={
-          <Button
-            variant="outline"
-            onClick={() => router.push('/gold/updateGold')}
-            style={{ cursor: 'pointer' }}
-          >
-            Add Transaction
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SyncNowAction source="safegold" label="Gold" />
+            <Button
+              variant="outline"
+              onClick={() => router.push('/gold/updateGold')}
+              style={{ cursor: 'pointer' }}
+            >
+              Add Transaction
+            </Button>
+          </div>
         }
         actionsRenderer={(row) => (
           <div className="flex items-center gap-1">

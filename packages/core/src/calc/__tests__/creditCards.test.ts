@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyEmiPlans,
   currentCycleSpendByCard,
+  emiChargesByCard,
   groupEmiPlans,
   latestStatementByCard,
   linkGstToEmiInterest,
@@ -8,6 +10,7 @@ import {
   normaliseEmiDescription,
   summariseCardSpend,
   summariseLiveAlerts,
+  type EmiPlan,
 } from '../creditCards';
 import {
   CardTransactionAlert,
@@ -111,10 +114,14 @@ describe('credit card EMI plans', () => {
     expect(plan.installmentsPaid).toBe(3);
     expect(plan.installmentsRemaining).toBe(3);
     expect(plan.monthlyInstallment).toBe(1000);
+    expect(plan.monthlyInterest).toBe(90);
+    expect(plan.monthlyGst).toBeCloseTo(16.2);
     expect(plan.principalPaid).toBe(1810);
     expect(plan.interestPaid).toBe(190);
     expect(plan.gstPaid).toBeCloseTo(34.2);
     expect(plan.estimatedOutstanding).toBe(2730);
+    expect(plan.startedOn).toBe('2026-07-05');
+    expect(plan.lastBilledOn).toBe('2026-08-05');
   });
 });
 
@@ -196,5 +203,74 @@ describe('live transaction alerts', () => {
     expect(summary.total).toBe(175);
     expect(summary.count).toBe(3);
     expect(summary.byCategory).toEqual({ 'Food & Dining': 125, Shopping: 50 });
+  });
+});
+
+function emiPlan(partial: Partial<EmiPlan>): EmiPlan {
+  return {
+    key: 'k',
+    cardId: 'c1',
+    description: 'PLAN',
+    installmentsPaid: 1,
+    installmentsTotal: 12,
+    installmentsRemaining: 11,
+    monthlyInstallment: 1000,
+    monthlyInterest: 100,
+    monthlyGst: 18,
+    principalPaid: 900,
+    interestPaid: 100,
+    gstPaid: 18,
+    estimatedOutstanding: 9900,
+    startedOn: '2026-09-05',
+    lastBilledOn: '2026-10-05',
+    ...partial,
+  };
+}
+
+describe('EMI plan classification', () => {
+  it('splits completed, stale and active plans', () => {
+    const active = emiPlan({ key: 'a', lastBilledOn: '2026-10-05', installmentsRemaining: 5 });
+    const completed = emiPlan({
+      key: 'b',
+      installmentsTotal: 6,
+      installmentsPaid: 6,
+      installmentsRemaining: 0,
+      lastBilledOn: '2026-09-05',
+    });
+    const stale = emiPlan({ key: 'c', lastBilledOn: '2026-06-05', installmentsRemaining: 3 });
+
+    const result = classifyEmiPlans([active, completed, stale]);
+
+    expect(result.active.map((p) => p.key)).toEqual(['a']);
+    expect(result.completed.map((p) => p.key)).toEqual(['b']);
+    expect(result.stale.map((p) => p.key)).toEqual(['c']);
+  });
+
+  it('treats an unknown-tenure plan as active while it keeps billing', () => {
+    const plan = emiPlan({ installmentsTotal: 0, installmentsRemaining: 0 });
+    const result = classifyEmiPlans([plan]);
+    expect(result.active).toHaveLength(1);
+    expect(result.completed).toHaveLength(0);
+  });
+});
+
+describe('EMI charges by card', () => {
+  it('breaks each card down by plan and sums interest plus GST', () => {
+    const plans = [
+      emiPlan({ key: 'big', cardId: 'c1', monthlyInterest: 200, monthlyGst: 36 }),
+      emiPlan({ key: 'small', cardId: 'c1', monthlyInterest: 50, monthlyGst: 9 }),
+      emiPlan({ key: 'other', cardId: 'c2', monthlyInterest: 120, monthlyGst: 21.6 }),
+      emiPlan({ key: 'nocharge', cardId: 'c1', monthlyInterest: 0, monthlyGst: 0 }),
+    ];
+
+    const [first, second] = emiChargesByCard(plans);
+
+    expect(first.cardId).toBe('c1');
+    expect(first.plans.map((p) => p.plan.key)).toEqual(['big', 'small']);
+    expect(first.interest).toBe(250);
+    expect(first.gst).toBe(45);
+    expect(first.total).toBe(295);
+    expect(second.cardId).toBe('c2');
+    expect(second.total).toBeCloseTo(141.6);
   });
 });

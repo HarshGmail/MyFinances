@@ -5,6 +5,11 @@ import database from '../database';
 import { fundNameSimilarity, lookupMFAPIScheme } from '../utils/fundNameMatch';
 import { getUserFromRequest } from '../utils/jwtHelpers';
 import { GmailClient } from '../services/gmailService';
+import {
+  parseBailmentPdf,
+  commitIdFromFilename,
+  BailmentContext,
+} from '../services/safegoldBailmentParser';
 import { parseCdslMFTransactions, ParsedMFTransaction } from '../services/cdslParser';
 import { ParsedStockHolding } from '../services/cdslStocksParser';
 import {
@@ -21,6 +26,7 @@ import { isPdfServiceAvailable } from '../services/pdfParsingClient';
 import { parsePdfBatch, parsePdfBatchLocally, PdfBatchResult } from '../services/emailPdfParsing';
 import { parseSafeGoldLeaseStatement, ParsedGoldLease } from '../services/safegoldLeaseParser';
 import { parseSafeGoldInvoice } from '../services/safegoldInvoiceParser';
+import { extractTextFromPdf } from '../services/pdfParser';
 import { decrypt } from '../utils/encryption';
 import {
   loadCustomPdfPasswords,
@@ -70,6 +76,61 @@ function goldTransactionFromRust(tx: RustGoldTx): ParsedGoldTransaction {
     tax: tx.tax,
     platform: 'SafeGold',
   };
+}
+
+type SyncSource = 'cdsl' | 'safegold' | 'coindcx';
+const ALL_SYNC_SOURCES: SyncSource[] = ['cdsl', 'safegold', 'coindcx'];
+
+interface SyncSourceReport {
+  new: number;
+  duplicatesSkipped: number;
+  errors: string[];
+}
+
+function parseRequestedSources(raw: unknown): SyncSource[] {
+  if (!Array.isArray(raw)) return ALL_SYNC_SOURCES;
+  const wanted = raw.filter((value): value is SyncSource =>
+    ALL_SYNC_SOURCES.includes(value as SyncSource)
+  );
+  return wanted.length > 0 ? wanted : ALL_SYNC_SOURCES;
+}
+
+function sourceWatermark(
+  integration: Record<string, unknown>,
+  source: SyncSource
+): Date | undefined {
+  const stored = integration.lastSyncAt;
+  if (stored && typeof stored === 'object' && !(stored instanceof Date)) {
+    const perSource = (stored as Record<string, unknown>)[source];
+    return perSource ? new Date(perSource as string) : undefined;
+  }
+  return stored ? new Date(stored as string) : undefined;
+}
+
+function watermarkMapFrom(integration: Record<string, unknown>): Record<string, Date> {
+  const stored = integration.lastSyncAt;
+  if (stored && typeof stored === 'object' && !(stored instanceof Date)) {
+    return { ...(stored as Record<string, Date>) };
+  }
+  if (!stored) return {};
+  const legacy = new Date(stored as string);
+  return { cdsl: legacy, safegold: legacy, coindcx: legacy };
+}
+
+async function writeSourceWatermarks(
+  db: ReturnType<typeof database.getDb>,
+  userId: ObjectId,
+  integrations: Record<string, unknown>[],
+  sources: SyncSource[],
+  at: Date
+): Promise<void> {
+  for (const integration of integrations) {
+    const map = watermarkMapFrom(integration);
+    for (const source of sources) map[source] = at;
+    await db
+      .collection('emailIntegrations')
+      .updateOne({ userId, email: integration.email as string }, { $set: { lastSyncAt: map } });
+  }
 }
 
 // ─── Wake PDF Parser ──────────────────────────────────────────────────────────
@@ -202,11 +263,17 @@ export async function resetSync(req: Request, res: Response) {
       res.status(400).json({ success: false, message: 'email is required' });
       return;
     }
+    const sources = parseRequestedSources(req.body?.sources);
+    const resetsEverySource = sources.length === ALL_SYNC_SOURCES.length;
 
     const db = database.getDb();
-    await db
-      .collection('emailIntegrations')
-      .updateOne({ userId: new ObjectId(user.userId), email }, { $set: { lastSyncAt: null } });
+    const filter = { userId: new ObjectId(user.userId), email };
+    if (resetsEverySource) {
+      await db.collection('emailIntegrations').updateOne(filter, { $set: { lastSyncAt: null } });
+    } else {
+      const unset = Object.fromEntries(sources.map((source) => [`lastSyncAt.${source}`, '']));
+      await db.collection('emailIntegrations').updateOne(filter, { $unset: unset });
+    }
     res.json({ success: true, message: 'Sync history cleared — next sync will fetch all emails' });
   } catch (err) {
     logger.error({ err }, 'Reset sync error');
@@ -348,6 +415,8 @@ export async function syncEmails(req: Request, res: Response) {
       return;
     }
 
+    const sources = parseRequestedSources(req.body?.sources);
+
     // Create the job record and return its ID immediately — the actual work
     // happens in the background so the HTTP response is never held open.
     const jobId = new ObjectId().toHexString();
@@ -360,7 +429,7 @@ export async function syncEmails(req: Request, res: Response) {
 
     res.status(202).json({ success: true, data: { jobId } });
 
-    void runSyncInBackground(jobId, userId, userDoc, integrations, db);
+    void runSyncInBackground(jobId, userId, userDoc, integrations, db, sources);
   } catch (err) {
     logger.error({ err }, 'Sync error');
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -438,8 +507,10 @@ async function runSyncInBackground(
   userId: ObjectId,
   userDoc: Record<string, unknown>,
   integrations: Record<string, unknown>[],
-  db: ReturnType<typeof database.getDb>
+  db: ReturnType<typeof database.getDb>,
+  sources: SyncSource[] = ALL_SYNC_SOURCES
 ) {
+  const wanted = new Set(sources);
   const cdslPassword = derivesCdslPassword(userDoc.panNumber as string | undefined);
   const safegoldPassword = derivesSafeGoldPassword(
     userDoc.name as string,
@@ -447,7 +518,9 @@ async function runSyncInBackground(
   );
   const customPasswords = await loadCustomPdfPasswords(userId);
 
-  const errors: string[] = [];
+  const cdslErrors: string[] = [];
+  const safegoldErrors: string[] = [];
+  const coindcxErrors: string[] = [];
   const allMFTransactions: ReturnType<typeof parseCdslMFTransactions> = [];
   const allGoldTransactions: ReturnType<typeof parseSafeGoldTransactions> = [];
   const allStockHoldings: ParsedStockHolding[] = [];
@@ -458,6 +531,7 @@ async function runSyncInBackground(
     {
       jobId,
       accounts: integrations.length,
+      sources,
       hasPan: !!cdslPassword,
       hasPhone: !!safegoldPassword,
     },
@@ -472,7 +546,9 @@ async function runSyncInBackground(
         return;
       }
 
-      const afterDate: Date | undefined = (integration.lastSyncAt as Date | null) ?? undefined;
+      const cdslAfter = sourceWatermark(integration, 'cdsl');
+      const safegoldAfter = sourceWatermark(integration, 'safegold');
+      const coindcxAfter = sourceWatermark(integration, 'coindcx');
       const accountTag = integration.email as string;
       // Derived default first (most likely), then user custom passwords, then
       // the empty password (for unprotected PDFs). Deduped, empties stripped.
@@ -480,254 +556,294 @@ async function runSyncInBackground(
       const sgPasswords = buildPasswordList([safegoldPassword, ...customPasswords]);
       const gmailClient = new GmailClient(integration.refreshToken as string);
 
-      logger.info(
-        {
-          account: accountTag,
-          afterDate: afterDate?.toISOString() ?? 'full sync (no lastSyncAt)',
-        },
-        '[Sync] Processing account'
-      );
+      logger.info({ account: accountTag, sources }, '[Sync] Processing account');
 
       // ── CDSL ──────────────────────────────────────────────────────────────
-      try {
-        logger.info(
-          { account: accountTag, afterDate: afterDate?.toISOString() },
-          '[Sync] Fetching CDSL emails'
-        );
-        const cdslPdfs = await gmailClient.fetchPdfAttachments(
-          'from:eCAS@cdslstatement.com has:attachment',
-          afterDate
-        );
-        logger.info({ account: accountTag, count: cdslPdfs.length }, '[Sync] CDSL PDFs fetched');
-
-        if (cdslPdfs.length > 0) {
-          const outcome = await parsePdfBatch({
-            parserType: 'cdsl_cas',
-            buffers: cdslPdfs,
-            passwords: cdslPasswords,
-            fromRust: mfTransactionFromRust,
-            parseText: parseCdslMFTransactions,
-          });
-          allMFTransactions.push(...outcome.transactions);
+      if (wanted.has('cdsl'))
+        try {
           logger.info(
-            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
-            '[Sync] CDSL parsed'
+            { account: accountTag, afterDate: cdslAfter?.toISOString() },
+            '[Sync] Fetching CDSL emails'
           );
-          errors.push(
-            ...describePdfBatchProblems(
-              `[${accountTag}] CDSL`,
-              cdslPdfs.length,
-              outcome,
-              describeAttemptedPasswords(cdslPasswords, {
-                pan: cdslPassword,
-                custom: customPasswords,
-              })
-            )
+          const cdslPdfs = await gmailClient.fetchPdfAttachments(
+            'from:eCAS@cdslstatement.com has:attachment',
+            cdslAfter
+          );
+          logger.info({ account: accountTag, count: cdslPdfs.length }, '[Sync] CDSL PDFs fetched');
+
+          if (cdslPdfs.length > 0) {
+            const outcome = await parsePdfBatch({
+              parserType: 'cdsl_cas',
+              buffers: cdslPdfs,
+              passwords: cdslPasswords,
+              fromRust: mfTransactionFromRust,
+              parseText: parseCdslMFTransactions,
+            });
+            allMFTransactions.push(...outcome.transactions);
+            logger.info(
+              { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+              '[Sync] CDSL parsed'
+            );
+            cdslErrors.push(
+              ...describePdfBatchProblems(
+                `[${accountTag}] CDSL`,
+                cdslPdfs.length,
+                outcome,
+                describeAttemptedPasswords(cdslPasswords, {
+                  pan: cdslPassword,
+                  custom: customPasswords,
+                })
+              )
+            );
+          }
+        } catch (e) {
+          const msg = `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`;
+          cdslErrors.push(msg);
+          const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+          logger.error(
+            { err: e, account: accountTag, isInvalidGrant },
+            isInvalidGrant
+              ? '[Sync] CDSL fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
+              : '[Sync] CDSL email fetch error'
           );
         }
-      } catch (e) {
-        const msg = `[${accountTag}] CDSL email fetch error: ${e instanceof Error ? e.message : String(e)}`;
-        errors.push(msg);
-        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
-        logger.error(
-          { err: e, account: accountTag, isInvalidGrant },
-          isInvalidGrant
-            ? '[Sync] CDSL fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
-            : '[Sync] CDSL email fetch error'
-        );
-      }
 
       // ── SafeGold statement ────────────────────────────────────────────────
-      try {
-        const sgSender = (integration.safegoldSender as string) ?? 'estatements@safegold.in';
-        logger.info(
-          { account: accountTag, sender: sgSender, afterDate: afterDate?.toISOString() },
-          '[Sync] Fetching SafeGold statement emails'
-        );
-        const sgPdfs = await gmailClient.fetchPdfAttachments(
-          `from:${sgSender} has:attachment`,
-          afterDate
-        );
-        logger.info(
-          { account: accountTag, count: sgPdfs.length },
-          '[Sync] SafeGold statement PDFs fetched'
-        );
-
-        if (sgPdfs.length > 0) {
-          const outcome = await parsePdfBatchLocally({
-            parserType: 'safe_gold',
-            buffers: sgPdfs,
-            passwords: sgPasswords,
-            parseText: (text) => {
-              const summary = parseSafeGoldAccountSummary(text);
-              if (summary) accountSummaries.push(summary);
-              return parseSafeGoldTransactions(text);
-            },
-          });
-          allGoldTransactions.push(...outcome.transactions);
+      if (wanted.has('safegold'))
+        try {
+          const sgSender = (integration.safegoldSender as string) ?? 'estatements@safegold.in';
           logger.info(
-            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
-            '[Sync] SafeGold statement parsed'
+            { account: accountTag, sender: sgSender, afterDate: safegoldAfter?.toISOString() },
+            '[Sync] Fetching SafeGold statement emails'
           );
-          errors.push(
-            ...describePdfBatchProblems(
-              `[${accountTag}] SafeGold statement`,
-              sgPdfs.length,
-              outcome,
-              describeAttemptedPasswords(sgPasswords, {
-                derived: safegoldPassword,
-                derivedLabel: 'first 4 of name + last 4 of phone',
-                custom: customPasswords,
-              })
-            )
+          const sgPdfs = await gmailClient.fetchPdfAttachments(
+            `from:${sgSender} has:attachment`,
+            safegoldAfter
+          );
+          logger.info(
+            { account: accountTag, count: sgPdfs.length },
+            '[Sync] SafeGold statement PDFs fetched'
+          );
+
+          if (sgPdfs.length > 0) {
+            const outcome = await parsePdfBatchLocally({
+              parserType: 'safe_gold',
+              buffers: sgPdfs,
+              passwords: sgPasswords,
+              parseText: (text) => {
+                const summary = parseSafeGoldAccountSummary(text);
+                if (summary) accountSummaries.push(summary);
+                return parseSafeGoldTransactions(text);
+              },
+            });
+            allGoldTransactions.push(...outcome.transactions);
+            logger.info(
+              { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+              '[Sync] SafeGold statement parsed'
+            );
+            safegoldErrors.push(
+              ...describePdfBatchProblems(
+                `[${accountTag}] SafeGold statement`,
+                sgPdfs.length,
+                outcome,
+                describeAttemptedPasswords(sgPasswords, {
+                  derived: safegoldPassword,
+                  derivedLabel: 'first 4 of name + last 4 of phone',
+                  custom: customPasswords,
+                })
+              )
+            );
+          }
+        } catch (e) {
+          const msg = `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`;
+          safegoldErrors.push(msg);
+          const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+          logger.error(
+            { err: e, account: accountTag, isInvalidGrant },
+            isInvalidGrant
+              ? '[Sync] SafeGold fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
+              : '[Sync] SafeGold email fetch error'
           );
         }
-      } catch (e) {
-        const msg = `[${accountTag}] SafeGold email fetch error: ${e instanceof Error ? e.message : String(e)}`;
-        errors.push(msg);
-        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
-        logger.error(
-          { err: e, account: accountTag, isInvalidGrant },
-          isInvalidGrant
-            ? '[Sync] SafeGold fetch failed — invalid_grant means the OAuth token was revoked or expired; user must reconnect Gmail'
-            : '[Sync] SafeGold email fetch error'
-        );
-      }
 
       // ── SafeGold invoices ─────────────────────────────────────────────────
-      try {
-        logger.info(
-          { account: accountTag, afterDate: afterDate?.toISOString() },
-          '[Sync] Fetching SafeGold invoice emails'
-        );
-        const sgInvoicePdfs = await gmailClient.fetchPdfAttachments(
-          'from:noreply@safegold.in has:attachment',
-          afterDate
-        );
-        logger.info(
-          { account: accountTag, count: sgInvoicePdfs.length },
-          '[Sync] SafeGold invoice PDFs fetched'
-        );
-
-        if (sgInvoicePdfs.length > 0) {
-          const invoicePasswords = buildPasswordList(customPasswords);
-          const outcome = await parsePdfBatch({
-            parserType: 'safe_gold_invoice',
-            buffers: sgInvoicePdfs,
-            passwords: invoicePasswords,
-            fromRust: goldTransactionFromRust,
-            parseText: (text) => {
-              const invoice = parseSafeGoldInvoice(text);
-              return invoice ? [invoice] : [];
-            },
-          });
-          allGoldTransactions.push(...outcome.transactions);
+      if (wanted.has('safegold'))
+        try {
           logger.info(
-            { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
-            '[Sync] SafeGold invoices parsed'
+            { account: accountTag, afterDate: safegoldAfter?.toISOString() },
+            '[Sync] Fetching SafeGold invoice emails'
           );
-          errors.push(
-            ...describePdfBatchProblems(
-              `[${accountTag}] SafeGold invoice`,
-              sgInvoicePdfs.length,
-              outcome,
-              describeAttemptedPasswords(invoicePasswords, { custom: customPasswords }),
-              { zeroTransactionsIsExpected: true }
-            )
+          const sgInvoicePdfs = await gmailClient.fetchPdfAttachments(
+            'from:noreply@safegold.in has:attachment',
+            safegoldAfter
+          );
+          logger.info(
+            { account: accountTag, count: sgInvoicePdfs.length },
+            '[Sync] SafeGold invoice PDFs fetched'
+          );
+
+          if (sgInvoicePdfs.length > 0) {
+            const invoicePasswords = buildPasswordList(customPasswords);
+            const outcome = await parsePdfBatch({
+              parserType: 'safe_gold_invoice',
+              buffers: sgInvoicePdfs,
+              passwords: invoicePasswords,
+              fromRust: goldTransactionFromRust,
+              parseText: (text) => {
+                const invoice = parseSafeGoldInvoice(text);
+                return invoice ? [invoice] : [];
+              },
+            });
+            allGoldTransactions.push(...outcome.transactions);
+            logger.info(
+              { account: accountTag, count: outcome.transactions.length, via: outcome.parsedBy },
+              '[Sync] SafeGold invoices parsed'
+            );
+            safegoldErrors.push(
+              ...describePdfBatchProblems(
+                `[${accountTag}] SafeGold invoice`,
+                sgInvoicePdfs.length,
+                outcome,
+                describeAttemptedPasswords(invoicePasswords, { custom: customPasswords }),
+                { zeroTransactionsIsExpected: true }
+              )
+            );
+          }
+        } catch (e) {
+          const msg = `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`;
+          safegoldErrors.push(msg);
+          const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+          logger.error(
+            { err: e, account: accountTag, isInvalidGrant },
+            isInvalidGrant
+              ? '[Sync] SafeGold invoice fetch failed — invalid_grant; user must reconnect Gmail'
+              : '[Sync] SafeGold invoice fetch error'
           );
         }
-      } catch (e) {
-        const msg = `[${accountTag}] SafeGold invoice fetch error: ${e instanceof Error ? e.message : String(e)}`;
-        errors.push(msg);
-        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
-        logger.error(
-          { err: e, account: accountTag, isInvalidGrant },
-          isInvalidGrant
-            ? '[Sync] SafeGold invoice fetch failed — invalid_grant; user must reconnect Gmail'
-            : '[Sync] SafeGold invoice fetch error'
-        );
-      }
 
-      // ── SafeGold lease statements ─────────────────────────────────────────
-      try {
-        const leasePdfs = await gmailClient.fetchPdfAttachments(
-          'from:noreply@safegold.in subject:"Lease Monthly Yield Payout" has:attachment',
-          afterDate
-        );
-        logger.info(
-          { account: accountTag, count: leasePdfs.length },
-          '[Sync] SafeGold lease statement PDFs fetched'
-        );
+      // ── SafeGold lease statements (monthly payout PDF) ────────────────────
+      if (wanted.has('safegold'))
+        try {
+          const leasePdfs = await gmailClient.fetchPdfAttachments(
+            'from:noreply@safegold.in subject:"Lease Monthly Yield Payout" has:attachment',
+            safegoldAfter
+          );
+          logger.info(
+            { account: accountTag, count: leasePdfs.length },
+            '[Sync] SafeGold lease statement PDFs fetched'
+          );
 
-        if (leasePdfs.length > 0) {
-          const leasePasswords = buildPasswordList([safegoldPassword, ...customPasswords]);
-          const outcome = await parsePdfBatchLocally({
-            parserType: 'safe_gold_lease',
-            buffers: leasePdfs,
-            passwords: leasePasswords,
-            parseText: parseSafeGoldLeaseStatement,
-          });
-          allLeases.push(...outcome.transactions);
-          errors.push(
-            ...describePdfBatchProblems(
-              `[${accountTag}] SafeGold lease statement`,
-              leasePdfs.length,
-              outcome,
-              describeAttemptedPasswords(leasePasswords, {
-                derived: safegoldPassword,
-                derivedLabel: 'first 4 of name + last 4 of phone',
-                custom: customPasswords,
-              })
-            )
+          if (leasePdfs.length > 0) {
+            const leasePasswords = buildPasswordList([safegoldPassword, ...customPasswords]);
+            const outcome = await parsePdfBatchLocally({
+              parserType: 'safe_gold_lease',
+              buffers: leasePdfs,
+              passwords: leasePasswords,
+              parseText: parseSafeGoldLeaseStatement,
+            });
+            allLeases.push(...outcome.transactions);
+            safegoldErrors.push(
+              ...describePdfBatchProblems(
+                `[${accountTag}] SafeGold lease statement`,
+                leasePdfs.length,
+                outcome,
+                describeAttemptedPasswords(leasePasswords, {
+                  derived: safegoldPassword,
+                  derivedLabel: 'first 4 of name + last 4 of phone',
+                  custom: customPasswords,
+                })
+              )
+            );
+          }
+        } catch (e) {
+          safegoldErrors.push(
+            `[${accountTag}] SafeGold lease statement fetch error: ${errorMessage(e)}`
+          );
+          logger.error({ err: e, account: accountTag }, '[Sync] SafeGold lease statement error');
+        }
+
+      // ── SafeGold metal lease applied (bailment PDF, unprotected) ──────────
+      if (wanted.has('safegold'))
+        try {
+          const bailmentMessages = await gmailClient.fetchStatementMessages(
+            'from:noreply@safegold.in subject:"Metal lease applied"',
+            safegoldAfter
+          );
+          logger.info(
+            { account: accountTag, count: bailmentMessages.length },
+            '[Sync] SafeGold metal-lease-applied emails fetched'
+          );
+          for (const message of bailmentMessages) {
+            for (const file of message.pdfFiles) {
+              try {
+                const text = await extractTextFromPdf(file.data, ['']);
+                const context: BailmentContext = {
+                  commitId: commitIdFromFilename(file.filename) ?? message.messageId,
+                  appliedOn: message.receivedAt,
+                };
+                const lease = parseBailmentPdf(text, context);
+                if (lease) allLeases.push(lease);
+              } catch (e) {
+                logger.warn(
+                  { err: e, account: accountTag, messageId: message.messageId },
+                  '[Sync] Could not read a metal-lease-applied PDF'
+                );
+              }
+            }
+          }
+        } catch (e) {
+          safegoldErrors.push(
+            `[${accountTag}] SafeGold metal-lease-applied fetch error: ${errorMessage(e)}`
+          );
+          logger.error(
+            { err: e, account: accountTag },
+            '[Sync] SafeGold metal-lease-applied error'
           );
         }
-      } catch (e) {
-        errors.push(`[${accountTag}] SafeGold lease statement fetch error: ${errorMessage(e)}`);
-        logger.error({ err: e, account: accountTag }, '[Sync] SafeGold lease statement error');
-      }
 
       // ── CoinDCX (email body, not PDF — always in Node.js) ─────────────────
-      try {
-        logger.info(
-          { account: accountTag, afterDate: afterDate?.toISOString() },
-          '[Sync] Fetching CoinDCX trade emails'
-        );
-        const cdxBodies = await gmailClient.fetchEmailBodies(
-          'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
-          afterDate
-        );
-        logger.info(
-          { account: accountTag, count: cdxBodies.length },
-          '[Sync] CoinDCX emails fetched'
-        );
+      if (wanted.has('coindcx'))
+        try {
+          logger.info(
+            { account: accountTag, afterDate: coindcxAfter?.toISOString() },
+            '[Sync] Fetching CoinDCX trade emails'
+          );
+          const cdxBodies = await gmailClient.fetchEmailBodies(
+            'from:no-reply@coindcx.com subject:"CoinDCX Trade Executed"',
+            coindcxAfter
+          );
+          logger.info(
+            { account: accountTag, count: cdxBodies.length },
+            '[Sync] CoinDCX emails fetched'
+          );
 
-        for (const body of cdxBodies) {
-          try {
-            const trade = parseCoinDCXTradeEmail(body);
-            if (trade) {
-              allCryptoTrades.push(trade);
-              logger.info(
-                { account: accountTag, coin: trade.coinSymbol, date: trade.date },
-                '[Sync] CoinDCX trade parsed'
-              );
+          for (const body of cdxBodies) {
+            try {
+              const trade = parseCoinDCXTradeEmail(body);
+              if (trade) {
+                allCryptoTrades.push(trade);
+                logger.info(
+                  { account: accountTag, coin: trade.coinSymbol, date: trade.date },
+                  '[Sync] CoinDCX trade parsed'
+                );
+              }
+            } catch (e) {
+              const msg = `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`;
+              coindcxErrors.push(msg);
+              logger.error({ err: e, account: accountTag }, '[Sync] CoinDCX email parse error');
             }
-          } catch (e) {
-            const msg = `[${accountTag}] CoinDCX parse error: ${e instanceof Error ? e.message : String(e)}`;
-            errors.push(msg);
-            logger.error({ err: e, account: accountTag }, '[Sync] CoinDCX email parse error');
           }
+        } catch (e) {
+          const msg = `[${accountTag}] CoinDCX fetch error: ${e instanceof Error ? e.message : String(e)}`;
+          coindcxErrors.push(msg);
+          const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
+          logger.error(
+            { err: e, account: accountTag, isInvalidGrant },
+            isInvalidGrant
+              ? '[Sync] CoinDCX fetch failed — invalid_grant; user must reconnect Gmail'
+              : '[Sync] CoinDCX fetch error'
+          );
         }
-      } catch (e) {
-        const msg = `[${accountTag}] CoinDCX fetch error: ${e instanceof Error ? e.message : String(e)}`;
-        errors.push(msg);
-        const isInvalidGrant = e instanceof Error && e.message.includes('invalid_grant');
-        logger.error(
-          { err: e, account: accountTag, isInvalidGrant },
-          isInvalidGrant
-            ? '[Sync] CoinDCX fetch failed — invalid_grant; user must reconnect Gmail'
-            : '[Sync] CoinDCX fetch error'
-        );
-      }
     }
 
     // ── Deduplicate and resolve names ────────────────────────────────────────
@@ -743,20 +859,44 @@ async function runSyncInBackground(
 
     await saveGoldLeaseSnapshot(db, userId, allLeases, accountSummaries);
 
-    await db
-      .collection('emailIntegrations')
-      .updateMany({ userId }, { $set: { lastSyncAt: new Date() } });
+    const now = new Date();
+    await writeSourceWatermarks(db, userId, integrations, sources, now);
+
+    const combinedErrors = [...cdslErrors, ...safegoldErrors, ...coindcxErrors];
+    const perSource: Partial<Record<SyncSource, SyncSourceReport>> = {};
+    if (wanted.has('cdsl')) {
+      perSource.cdsl = {
+        new: newMF.length + newStocks.length,
+        duplicatesSkipped: skippedMF + skippedStocks,
+        errors: cdslErrors,
+      };
+    }
+    if (wanted.has('safegold')) {
+      perSource.safegold = {
+        new: newGold.length,
+        duplicatesSkipped: skippedGold,
+        errors: safegoldErrors,
+      };
+    }
+    if (wanted.has('coindcx')) {
+      perSource.coindcx = {
+        new: newCrypto.length,
+        duplicatesSkipped: skippedCrypto,
+        errors: coindcxErrors,
+      };
+    }
 
     logger.info(
       {
         jobId,
+        sources,
         newMF: newMF.length,
         newGold: newGold.length,
         newStocks: newStocks.length,
         newCrypto: newCrypto.length,
         skipped: skippedMF + skippedGold + skippedStocks + skippedCrypto,
-        errorCount: errors.length,
-        errors,
+        errorCount: combinedErrors.length,
+        errors: combinedErrors,
       },
       '[Sync] Sync complete'
     );
@@ -773,7 +913,8 @@ async function runSyncInBackground(
             stocks: newStocks,
             crypto: newCrypto,
             duplicatesSkipped: skippedMF + skippedGold + skippedStocks + skippedCrypto,
-            errors,
+            errors: combinedErrors,
+            perSource,
           },
         },
       }
@@ -1298,13 +1439,32 @@ async function saveGoldLeaseSnapshot(
   if (latestLeaseById.size === 0 && !latestSummary) return;
 
   const updatedAt = new Date();
-  const leaseWrites = [...latestLeaseById.values()].map((lease) => ({
-    updateOne: {
-      filter: { userId, commitId: lease.commitId },
-      update: { $set: { ...lease, userId, platform: 'SafeGold', updatedAt } },
-      upsert: true,
-    },
-  }));
+  const leaseWrites = [...latestLeaseById.values()].map((lease) => {
+    const isStub = lease.statementMonth === null && lease.payouts.length === 0;
+    if (isStub) {
+      // A "metal lease applied" bailment stub seeds the lease the day it starts,
+      // before any monthly payout statement exists. Never let a later re-synced
+      // stub overwrite the richer payout data a monthly statement has filled in.
+      const { payouts, earnedGrams, remainingPayouts, statementMonth, ...stub } = lease;
+      return {
+        updateOne: {
+          filter: { userId, commitId: lease.commitId },
+          update: {
+            $set: { ...stub, userId, platform: 'SafeGold', updatedAt },
+            $setOnInsert: { payouts, earnedGrams, remainingPayouts, statementMonth },
+          },
+          upsert: true,
+        },
+      };
+    }
+    return {
+      updateOne: {
+        filter: { userId, commitId: lease.commitId },
+        update: { $set: { ...lease, userId, platform: 'SafeGold', updatedAt } },
+        upsert: true,
+      },
+    };
+  });
   if (leaseWrites.length > 0) {
     await db.collection('goldLeases').bulkWrite(leaseWrites);
   }
