@@ -18,12 +18,18 @@ import { toast } from 'sonner';
 import {
   invalidateCreditCardQueries,
   useCardSyncJobStatusQuery,
+  useCreditCardAlertsQuery,
   useCreditCardStatementsQuery,
   useCreditCardSyncMutation,
   useCreditCardTransactionsQuery,
   useCreditCardsQuery,
 } from '@myfinances/core/api';
-import { latestStatementByCard, type EmiPlan } from '@myfinances/core/calc/creditCards';
+import {
+  currentCycleSpendByCard,
+  latestStatementByCard,
+  summariseLiveAlerts,
+  type EmiPlan,
+} from '@myfinances/core/calc/creditCards';
 import { formatCurrency } from '@myfinances/core/calc/numbers';
 import type { CardSyncResult } from '@myfinances/core/types';
 import { SummaryStatCard } from '@/components/custom/SummaryStatCard';
@@ -145,7 +151,8 @@ function EmptyCardsState({ onAddCard }: { onAddCard: () => void }) {
           <p className="text-sm text-muted-foreground">
             Add a card with the email address its statements come from. The PDF password is optional
             — if you leave it blank we try common name and date-of-birth formats and remember the
-            one that works.
+            one that works. We also read your bank&apos;s spend-alert emails to show this
+            cycle&apos;s spending live, before the statement arrives.
           </p>
         </div>
         <Button onClick={onAddCard}>
@@ -221,6 +228,7 @@ export function CreditCardsTab() {
   const { data: statements = [] } = useCreditCardStatementsQuery();
   const { data: allTransactions = [], isLoading: transactionsLoading } =
     useCreditCardTransactionsQuery();
+  const { data: allAlerts = [] } = useCreditCardAlertsQuery();
 
   const isFilteredToCard = selectedCardId !== ALL_CARDS;
   const visibleCards = useMemo(
@@ -234,10 +242,17 @@ export function CreditCardsTab() {
         : allTransactions,
     [allTransactions, isFilteredToCard, selectedCardId]
   );
+  const alerts = useMemo(
+    () =>
+      isFilteredToCard ? allAlerts.filter((alert) => alert.cardId === selectedCardId) : allAlerts,
+    [allAlerts, isFilteredToCard, selectedCardId]
+  );
   const dueSummaries = useMemo(
     () => latestStatementByCard(visibleCards, statements),
     [visibleCards, statements]
   );
+  const cycleSpendByCard = useMemo(() => currentCycleSpendByCard(alerts), [alerts]);
+  const liveSummary = useMemo(() => summariseLiveAlerts(alerts), [alerts]);
 
   const { summary, emiPlans, monthlySpendOptions, categoryOptions, costOfCreditOptions } =
     useCreditCardsData({ cards, transactions, theme });
@@ -295,23 +310,25 @@ export function CreditCardsTab() {
 
       <SyncWarnings warnings={syncWarnings} onDismiss={dismissWarnings} />
 
-      <CardSummaryStrip summaries={dueSummaries} />
+      <CardSummaryStrip summaries={dueSummaries} cycleSpendByCard={cycleSpendByCard} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <SummaryStatCard
+          label="This cycle (live)"
+          value={formatCurrency(liveSummary.total)}
+          loading={transactionsLoading}
+        >
+          <p className="text-[10px] text-muted-foreground mt-1">
+            From alert emails since the last statement
+          </p>
+        </SummaryStatCard>
         <SummaryStatCard
           label="Spent this month"
           value={formatCurrency(summary.spend.thisMonth)}
           loading={transactionsLoading}
         >
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Salary-cycle month, not calendar month
-          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">Billed statements only</p>
         </SummaryStatCard>
-        <SummaryStatCard
-          label="Spent total"
-          value={formatCurrency(summary.spend.total)}
-          loading={transactionsLoading}
-        />
         <SummaryStatCard
           label="Cost of credit"
           value={formatCurrency(summary.costOfCreditTotal)}
@@ -338,6 +355,7 @@ export function CreditCardsTab() {
       <CardTransactionsTable
         cards={cards}
         transactions={transactions}
+        alerts={alerts}
         isLoading={transactionsLoading}
       />
 

@@ -11,13 +11,30 @@ export const KNOWN_CARD_SENDERS: readonly { email: string; issuer: CreditCardIss
   { email: 'liccardsstatements@axis.bank.in', issuer: 'axis' },
 ];
 
+export const KNOWN_CARD_ALERT_SENDERS: readonly { email: string; issuer: CreditCardIssuer }[] = [
+  { email: 'onlinesbicard@sbicard.com', issuer: 'sbi' },
+  { email: 'alerts@hdfcbank.bank.in', issuer: 'hdfc' },
+  { email: 'alerts@yes.bank.in', issuer: 'yes' },
+  { email: 'alerts@axis.bank.in', issuer: 'axis' },
+  { email: 'hsbc@mail.hsbc.co.in', issuer: 'hsbc' },
+];
+
 const HONORIFICS = new Set(['MR', 'MRS', 'MS', 'MISS', 'DR', 'SHRI', 'SMT']);
 const MAX_HINT_LENGTH = 300;
 const PASSWORD_MENTION_RE = /password/i;
 
 export function issuerForSender(email: string): CreditCardIssuer | null {
   const normalised = email.trim().toLowerCase();
-  return KNOWN_CARD_SENDERS.find((sender) => sender.email === normalised)?.issuer ?? null;
+  return (
+    KNOWN_CARD_SENDERS.find((sender) => sender.email === normalised)?.issuer ??
+    KNOWN_CARD_ALERT_SENDERS.find((sender) => sender.email === normalised)?.issuer ??
+    null
+  );
+}
+
+export function isKnownAlertSender(email: string): boolean {
+  const normalised = email.trim().toLowerCase();
+  return KNOWN_CARD_ALERT_SENDERS.some((sender) => sender.email === normalised);
 }
 
 export interface CardPasswordInput {
@@ -75,7 +92,7 @@ function issuerRuleCandidates(issuer: CreditCardIssuer, ctx: CandidateContext): 
 
   switch (issuer) {
     case 'sbi':
-      return dob ? [first4 + dob.ddmm, first4 + dob.ddmmyyyy] : [];
+      return dob ? [first4 + dob.ddmm, first4 + dob.ddmmyyyy, dob.ddmmyyyy + ctx.last4] : [];
     case 'icici':
       return dob ? [first4Lower + dob.ddmm, first4 + dob.ddmm] : [];
     case 'axis':

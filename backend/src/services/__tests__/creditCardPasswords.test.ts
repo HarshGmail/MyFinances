@@ -13,6 +13,12 @@ describe('issuerForSender', () => {
     expect(issuerForSender('estatement@yes.bank.in')).toBe('yes');
   });
 
+  it('maps known transaction-alert senders', () => {
+    expect(issuerForSender('onlinesbicard@sbicard.com')).toBe('sbi');
+    expect(issuerForSender('alerts@hdfcbank.bank.in')).toBe('hdfc');
+    expect(issuerForSender('hsbc@mail.hsbc.co.in')).toBe('hsbc');
+  });
+
   it('returns null for unknown senders', () => {
     expect(issuerForSender('alerts@example.com')).toBeNull();
   });
@@ -26,7 +32,7 @@ describe('buildCardPasswordCandidates', () => {
       dob: DOB,
       lastDigits: '4321',
     });
-    expect(candidates.slice(0, 2)).toEqual(['HARS0703', 'HARS07031994']);
+    expect(candidates.slice(0, 3)).toEqual(['HARS0703', 'HARS07031994', '070319944321']);
   });
 
   it('builds ICICI lower and upper variants', () => {

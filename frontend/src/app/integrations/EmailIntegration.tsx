@@ -318,8 +318,8 @@ export default function EmailIntegration({
                   Credit card statements (monthly email)
                 </p>
                 <p>
-                  Spends, EMIs, interest, fees and GST from your card statement PDFs. Add your cards
-                  and sync them from{' '}
+                  Spends, EMIs, interest, fees and GST from your card statement PDFs, plus live
+                  spend-alert emails for the current cycle. Add your cards and sync them from{' '}
                   <a href="/expenses?tab=cards" className="text-primary underline">
                     Expenses › Credit Cards
                   </a>

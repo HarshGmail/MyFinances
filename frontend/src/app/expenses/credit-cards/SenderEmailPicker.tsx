@@ -40,9 +40,16 @@ function SuggestionRow({
               {issuerLabel(suggestion.issuer)}
             </Badge>
           )}
+          {suggestion.isAlertSender && (
+            <Badge variant="outline" className="font-normal">
+              Spend alerts
+            </Badge>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
-          {pluralise(suggestion.count, 'statement email')} found
+          {suggestion.count > 0
+            ? `${pluralise(suggestion.count, 'email')} found`
+            : 'Known bank sender'}
         </p>
         {suggestion.latestSubject && (
           <p className="text-xs text-muted-foreground truncate" title={suggestion.latestSubject}>

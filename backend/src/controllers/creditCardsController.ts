@@ -10,9 +10,11 @@ import {
 import { GmailClient, StatementMessage, StatementSender } from '../services/gmailService';
 import { PdfPasswordError, extractTextFromPdfWithPassword } from '../services/pdfParser';
 import {
+  KNOWN_CARD_ALERT_SENDERS,
   KNOWN_CARD_SENDERS,
   buildCardPasswordCandidates,
   extractPasswordHint,
+  isKnownAlertSender,
   issuerForSender,
 } from '../services/creditCardPasswords';
 import {
@@ -20,6 +22,11 @@ import {
   parseCreditCardStatement,
   statementMentionsCard,
 } from '../services/creditCardStatementParser';
+import {
+  ParsedCardAlert,
+  alertMentionsCard,
+  parseCardAlert,
+} from '../services/creditCardAlertParser';
 import { sendPush } from '../services/pushService';
 import { decrypt, encrypt } from '../utils/encryption';
 import { loadCustomPdfPasswords } from '../utils/customPasswords';
@@ -30,6 +37,7 @@ import logger from '../utils/logger';
 const CARDS_COLLECTION = 'creditCards';
 const STATEMENTS_COLLECTION = 'creditCardStatements';
 const TRANSACTIONS_COLLECTION = 'creditCardTransactions';
+const ALERTS_COLLECTION = 'creditCardAlerts';
 const SYNC_JOB_KIND = 'credit-cards';
 const NO_PASSWORD = '';
 const MASKED_DIGITS_PREFIX = '••';
@@ -37,6 +45,7 @@ const MASKED_DIGITS_PREFIX = '••';
 interface CardSyncResult {
   statementsImported: number;
   transactionsImported: number;
+  alertsImported: number;
   passwordsDiscovered: number;
   errors: string[];
 }
@@ -47,6 +56,7 @@ interface CardSenderSuggestion {
   count: number;
   latestSubject?: string;
   isKnown: boolean;
+  isAlertSender: boolean;
 }
 
 function requireUserId(req: Request, res: Response): ObjectId | null {
@@ -76,6 +86,7 @@ function withoutFields(doc: WithId<Document>, hiddenFields: readonly string[]) {
 const HIDDEN_CARD_FIELDS = ['userId', 'pdfPassword'] as const;
 const HIDDEN_STATEMENT_FIELDS = ['userId', 'gmailMessageId'] as const;
 const HIDDEN_TRANSACTION_FIELDS = ['userId'] as const;
+const HIDDEN_ALERT_FIELDS = ['userId'] as const;
 
 function toCreditCardResponse(card: WithId<Document>) {
   return {
@@ -101,6 +112,15 @@ function toTransactionResponse(transaction: WithId<Document>) {
     _id: transaction._id.toHexString(),
     cardId: idString(transaction.cardId),
     statementId: idString(transaction.statementId),
+  };
+}
+
+function toAlertResponse(alert: WithId<Document>) {
+  return {
+    ...withoutFields(alert, HIDDEN_ALERT_FIELDS),
+    _id: alert._id.toHexString(),
+    cardId: idString(alert.cardId),
+    supersededByStatement: !!alert.supersededByStatement,
   };
 }
 
@@ -185,6 +205,7 @@ export async function deleteCreditCard(req: Request, res: Response) {
     const cardScope = { userId: filter.userId, cardId: filter._id };
     await db.collection(TRANSACTIONS_COLLECTION).deleteMany(cardScope);
     await db.collection(STATEMENTS_COLLECTION).deleteMany(cardScope);
+    await db.collection(ALERTS_COLLECTION).deleteMany(cardScope);
     res.status(200).json({ success: true, message: 'Card deleted' });
   } catch (error) {
     handleCardError(res, error, 'Delete credit card error');
@@ -198,7 +219,9 @@ export async function resetCardSync(req: Request, res: Response) {
     const result = await database
       .getDb()
       .collection(CARDS_COLLECTION)
-      .updateOne(filter, { $set: { lastSyncAt: null, updatedAt: new Date() } });
+      .updateOne(filter, {
+        $set: { lastSyncAt: null, alertsSyncedAt: null, updatedAt: new Date() },
+      });
     if (result.matchedCount === 0) {
       res.status(404).json({ success: false, message: 'Card not found' });
       return;
@@ -258,13 +281,33 @@ export async function getCardTransactions(req: Request, res: Response) {
   }
 }
 
+export async function getCardAlerts(req: Request, res: Response) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+  const filter = resolveCardFilter(req, res, userId);
+  if (!filter) return;
+  try {
+    const alerts = await database
+      .getDb()
+      .collection(ALERTS_COLLECTION)
+      .find({ ...filter, supersededByStatement: { $ne: true } })
+      .sort({ date: -1 })
+      .toArray();
+    res.status(200).json({ success: true, data: alerts.map(toAlertResponse) });
+  } catch (error) {
+    handleCardError(res, error, 'Fetch card alerts error');
+  }
+}
+
 function knownSenderSuggestions(): Map<string, CardSenderSuggestion> {
-  return new Map(
-    KNOWN_CARD_SENDERS.map(({ email, issuer }) => [
-      email,
-      { email, issuer, count: 0, isKnown: true },
-    ])
-  );
+  const suggestions = new Map<string, CardSenderSuggestion>();
+  for (const { email, issuer } of KNOWN_CARD_SENDERS) {
+    suggestions.set(email, { email, issuer, count: 0, isKnown: true, isAlertSender: false });
+  }
+  for (const { email, issuer } of KNOWN_CARD_ALERT_SENDERS) {
+    suggestions.set(email, { email, issuer, count: 0, isKnown: true, isAlertSender: true });
+  }
+  return suggestions;
 }
 
 function mergeSender(suggestions: Map<string, CardSenderSuggestion>, sender: StatementSender) {
@@ -280,6 +323,7 @@ function mergeSender(suggestions: Map<string, CardSenderSuggestion>, sender: Sta
     count: sender.count,
     latestSubject: sender.latestSubject,
     isKnown: false,
+    isAlertSender: isKnownAlertSender(sender.email),
   });
 }
 
@@ -439,6 +483,18 @@ function senderQuery(senderEmails: string[]): string {
   return `from:(${senderEmails.join(' OR ')}) has:attachment`;
 }
 
+function alertSenderQuery(senderEmails: string[]): string {
+  return `from:(${senderEmails.join(' OR ')})`;
+}
+
+function alertSendersForCard(card: WithId<Document>): string[] {
+  const issuerAlertSenders = KNOWN_CARD_ALERT_SENDERS.filter(
+    (sender) => sender.issuer === (card.issuer as CreditCardIssuer)
+  ).map((sender) => sender.email);
+  const cardSenders = (card.senderEmails as string[]) ?? [];
+  return [...new Set([...issuerAlertSenders, ...cardSenders.map((email) => email.toLowerCase())])];
+}
+
 async function saveStatement(
   db: Db,
   userId: ObjectId,
@@ -474,6 +530,8 @@ async function saveStatement(
   const statementId = statement?._id;
   if (!statementId) throw new Error('Statement upsert returned no document');
 
+  await supersedeAlertsInStatementPeriod(db, userId, cardId, summary.periodStart, periodEnd);
+
   await db.collection(TRANSACTIONS_COLLECTION).deleteMany({ userId, statementId });
   if (parsed.transactions.length === 0) return 0;
   await db
@@ -482,6 +540,109 @@ async function saveStatement(
       parsed.transactions.map((transaction) => ({ ...transaction, userId, cardId, statementId }))
     );
   return parsed.transactions.length;
+}
+
+async function supersedeAlertsInStatementPeriod(
+  db: Db,
+  userId: ObjectId,
+  cardId: ObjectId,
+  periodStart: Date | null,
+  periodEnd: Date
+) {
+  const dateFilter: Record<string, Date> = { $lte: periodEnd };
+  if (periodStart) dateFilter.$gte = periodStart;
+  await db
+    .collection(ALERTS_COLLECTION)
+    .updateMany(
+      { userId, cardId, date: dateFilter },
+      { $set: { supersededByStatement: true, updatedAt: new Date() } }
+    );
+}
+
+async function latestStatementPeriodEnd(
+  db: Db,
+  userId: ObjectId,
+  cardId: ObjectId
+): Promise<Date | null> {
+  const statement = await db
+    .collection(STATEMENTS_COLLECTION)
+    .find({ userId, cardId })
+    .sort({ periodEnd: -1 })
+    .limit(1)
+    .next();
+  return (statement?.periodEnd as Date | undefined) ?? null;
+}
+
+async function saveAlert(
+  ctx: CardSyncContext,
+  message: StatementMessage,
+  parsed: ParsedCardAlert,
+  latestPeriodEnd: Date | null
+): Promise<boolean> {
+  const supersededByStatement = latestPeriodEnd !== null && parsed.date <= latestPeriodEnd;
+  const now = new Date();
+  const outcome = await ctx.db.collection(ALERTS_COLLECTION).updateOne(
+    { userId: ctx.userId, cardId: ctx.card._id, gmailMessageId: message.messageId },
+    {
+      $set: {
+        date: parsed.date,
+        description: parsed.description,
+        amount: parsed.amount,
+        direction: 'debit',
+        category: parsed.category,
+        supersededByStatement,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        userId: ctx.userId,
+        cardId: ctx.card._id,
+        gmailMessageId: message.messageId,
+        createdAt: now,
+      },
+    },
+    { upsert: true }
+  );
+  return outcome.upsertedCount > 0;
+}
+
+async function importAlerts(ctx: CardSyncContext, integrations: WithId<Document>[]) {
+  const { card, result } = ctx;
+  const senders = alertSendersForCard(card);
+  if (senders.length === 0) return;
+
+  const query = alertSenderQuery(senders);
+  const afterDate = (card.alertsSyncedAt as Date | null) ?? undefined;
+  const latestPeriodEnd = await latestStatementPeriodEnd(ctx.db, ctx.userId, card._id);
+  let fetchFailed = false;
+
+  for (const integration of integrations) {
+    const account = integration.email as string;
+    try {
+      const client = new GmailClient(integration.refreshToken as string);
+      const messages = await client.fetchStatementMessages(query, afterDate);
+      for (const message of messages) {
+        if (!message.html) continue;
+        const parsed = parseCardAlert(message.html, card.issuer as CreditCardIssuer);
+        if (!parsed) continue;
+        if (!alertMentionsCard(message.html, card.lastDigits as string)) continue;
+        const inserted = await saveAlert(ctx, message, parsed, latestPeriodEnd);
+        if (inserted) result.alertsImported += 1;
+      }
+    } catch (err) {
+      fetchFailed = true;
+      const isInvalidGrant = err instanceof Error && err.message.includes('invalid_grant');
+      logger.error(
+        { err, account, cardId: card._id, isInvalidGrant },
+        '[CardSync] Transaction alert fetch error'
+      );
+    }
+  }
+
+  if (!fetchFailed) {
+    await ctx.db
+      .collection(CARDS_COLLECTION)
+      .updateOne({ _id: card._id }, { $set: { alertsSyncedAt: new Date() } });
+  }
 }
 
 interface CardSyncContext {
@@ -639,6 +800,8 @@ async function syncCard(ctx: CardSyncContext, integrations: WithId<Document>[]) 
       .collection(CARDS_COLLECTION)
       .updateOne({ _id: ctx.card._id }, { $set: { lastSyncAt: new Date() } });
   }
+
+  await importAlerts(ctx, integrations);
 }
 
 async function isJobCancelled(db: Db, jobId: string): Promise<boolean> {
@@ -652,6 +815,13 @@ function describeImportedCounts({ statementsImported, transactionsImported }: Ca
   return `${statementsImported} ${statementWord}, ${transactionsImported} ${transactionWord} imported`;
 }
 
+function describeSyncOutcome(result: CardSyncResult): string {
+  const statementSummary = describeImportedCounts(result);
+  if (result.alertsImported === 0) return statementSummary;
+  const alertWord = result.alertsImported === 1 ? 'live alert' : 'live alerts';
+  return `${statementSummary} · ${result.alertsImported} ${alertWord}`;
+}
+
 async function runCardSyncInBackground(
   jobId: string,
   userId: ObjectId,
@@ -663,6 +833,7 @@ async function runCardSyncInBackground(
   const result: CardSyncResult = {
     statementsImported: 0,
     transactionsImported: 0,
+    alertsImported: 0,
     passwordsDiscovered: 0,
     errors: [],
   };
@@ -703,7 +874,7 @@ async function runCardSyncInBackground(
 
     await sendPush(userId.toString(), {
       title: 'Card statements synced',
-      body: describeImportedCounts(result),
+      body: describeSyncOutcome(result),
       url: '/expenses?tab=cards',
       tag: 'card-sync',
     });

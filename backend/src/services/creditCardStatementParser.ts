@@ -508,13 +508,47 @@ interface SummaryParseResult {
   balancesFromBox: boolean;
 }
 
-function parseSummary(text: string, allLines: string[]): SummaryParseResult {
+const SBI_CARD_NUMBER_RE = /X{2,}[\sX-]*\d{2,4}\b/;
+const STANDALONE_AMOUNT_RE = /^[\d,]+\.\d{2}$/;
+const SBI_DUE_DATE_RE = /\b(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\b/;
+const STANDALONE_DATE_RE = /^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}$/;
+
+function deriveSbiSummary(allLines: string[]): Partial<ParsedCardStatementSummary> {
+  const lines = allLines.map((line) => line.trim());
+  const cardIndex = lines.findIndex((line) => SBI_CARD_NUMBER_RE.test(line));
+  if (cardIndex === -1) return {};
+  const standaloneValues: number[] = [];
+  for (let index = cardIndex + 1; index < lines.length && standaloneValues.length < 2; index += 1) {
+    if (STANDALONE_AMOUNT_RE.test(lines[index])) {
+      standaloneValues.push(Number(lines[index].replace(/,/g, '')));
+    }
+  }
+  const [totalDue, minimumDue] = standaloneValues;
+  const dateLines = lines
+    .slice(cardIndex)
+    .map((line) => (STANDALONE_DATE_RE.test(line) ? line.match(SBI_DUE_DATE_RE)?.[1] : undefined))
+    .filter((value): value is string => value !== undefined);
+  const paymentDueRaw = dateLines[1] ?? dateLines[0];
+  return {
+    totalDue: totalDue ?? null,
+    minimumDue,
+    dueDate: paymentDueRaw ? (parseStatementDate(paymentDueRaw) ?? undefined) : undefined,
+  };
+}
+
+function parseSummary(
+  text: string,
+  allLines: string[],
+  issuer: CreditCardIssuer
+): SummaryParseResult {
   const lines = summaryRegion(allLines);
   const period = findPeriod(text);
   const statementDate = findDate(lines, 'statementDate');
   const balanceBox = deriveTotalFromBalanceBox(lines) ?? deriveTotalFromHdfcDues(lines);
   const labelledTotal = findAmount(lines, 'totalDue');
-  const totalDue = deriveTotalFromEquation(lines) ?? labelledTotal ?? balanceBox?.totalDue ?? null;
+  const sbi = issuer === 'sbi' ? deriveSbiSummary(allLines) : {};
+  const totalDue =
+    deriveTotalFromEquation(lines) ?? labelledTotal ?? balanceBox?.totalDue ?? sbi.totalDue ?? null;
   const balancesFromBox =
     balanceBox !== null && labelledTotal !== undefined
       ? Math.abs(balanceBox.totalDue - labelledTotal) <= RECONCILIATION_TOLERANCE
@@ -524,9 +558,9 @@ function parseSummary(text: string, allLines: string[]): SummaryParseResult {
       periodStart: period.start,
       periodEnd: period.end ?? statementDate ?? null,
       statementDate,
-      dueDate: findDate(lines, 'dueDate'),
+      dueDate: sbi.dueDate ?? findDate(lines, 'dueDate'),
       totalDue,
-      minimumDue: findAmount(lines, 'minimumDue'),
+      minimumDue: sbi.minimumDue ?? findAmount(lines, 'minimumDue'),
       previousBalance: findAmount(lines, 'previousBalance') ?? balanceBox?.previousBalance,
       creditLimit: findAmount(lines, 'creditLimit'),
       availableLimit: findAmount(lines, 'availableLimit'),
@@ -736,7 +770,7 @@ export function parseCreditCardStatement(
 ): ParsedCardStatement {
   const profile = ISSUER_PROFILES[issuer] ?? ISSUER_PROFILES.other;
   const lines = splitLines(text);
-  const { summary, balancesFromBox } = parseSummary(text, lines);
+  const { summary, balancesFromBox } = parseSummary(text, lines, issuer);
   const fallbackYear =
     summary.periodEnd?.getUTCFullYear() ?? summary.statementDate?.getUTCFullYear() ?? null;
   const transactions = parseTransactions(
@@ -765,5 +799,9 @@ export function statementMentionsCard(text: string, lastDigits: string): boolean
     `(?:${MASK_CHARACTER_SRC}[\\s-]*){2,}(?:\\d{0,2}[\\s-]*)?${last4}(?!\\d)`
   );
   const endingWith = new RegExp(`ending\\s*(?:with|in)?\\s*:?\\s*${last4}(?!\\d)`, 'i');
-  return maskedRun.test(text) || endingWith.test(text);
+  if (maskedRun.test(text) || endingWith.test(text)) return true;
+
+  const last2 = escapeRegExp(digits.slice(-2));
+  const maskedLastTwo = new RegExp(`(?:${MASK_CHARACTER_SRC}[\\s-]*){4,}${last2}(?!\\d)`);
+  return maskedLastTwo.test(text);
 }

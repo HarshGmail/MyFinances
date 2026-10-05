@@ -3,6 +3,7 @@ import { apiRequest } from '../client';
 import {
   CardSenderSuggestion,
   CardSyncJobStatus,
+  CardTransactionAlert,
   CreditCard,
   CreditCardStatement,
   CreditCardTransaction,
@@ -46,6 +47,20 @@ export function useCreditCardTransactionsQuery(cardId?: string) {
     queryFn: async () => {
       const response = await apiRequest({
         endpoint: `/credit-cards/transactions${cardIdQuery(cardId)}`,
+        method: 'GET',
+      });
+      return response.data;
+    },
+    staleTime: FIVE_MINUTES_MS,
+  });
+}
+
+export function useCreditCardAlertsQuery(cardId?: string) {
+  return useQuery<CardTransactionAlert[]>({
+    queryKey: ['credit-card-alerts', cardId ?? 'all'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        endpoint: `/credit-cards/alerts${cardIdQuery(cardId)}`,
         method: 'GET',
       });
       return response.data;
