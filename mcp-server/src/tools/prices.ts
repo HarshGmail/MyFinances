@@ -1,7 +1,39 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BackendClient } from '../backendClient.js';
-import { compactJSON } from '../compact.js';
+import { compactJSON, toCSV } from '../compact.js';
+
+const NAVS_FOR_DAY_CHANGE = 2;
+
+interface MfapiNavHistory {
+  meta?: { scheme_name?: string };
+  data?: { date: string; nav: string }[];
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function toLatestNavRow(schemeNumber: string, history: MfapiNavHistory | null) {
+  const [latest, previous] = history?.data ?? [];
+  const currentNav = latest ? Number(latest.nav) : null;
+  const previousNav = previous ? Number(previous.nav) : null;
+  const hasDayChange = currentNav !== null && previousNav !== null && previousNav > 0;
+  return {
+    schemeNumber,
+    fundName: history?.meta?.scheme_name ?? null,
+    currentNav,
+    navDate: latest?.date ?? null,
+    previousNav,
+    previousNavDate: previous?.date ?? null,
+    oneDayChange: hasDayChange ? roundTo(currentNav - previousNav, 4) : null,
+    oneDayChangePercent: hasDayChange
+      ? roundTo(((currentNav - previousNav) / previousNav) * 100, 2)
+      : null,
+    error: latest ? null : 'NAV unavailable',
+  };
+}
 
 export function registerPriceTools(server: McpServer, client: BackendClient): void {
   server.registerTool(
@@ -28,7 +60,7 @@ export function registerPriceTools(server: McpServer, client: BackendClient): vo
     'prices_get_mf_navs',
     {
       description:
-        'Fetch current NAV (Net Asset Value) for mutual funds. Returns current NAV, NAV date, and 1-day change for each fund. These are the same NAVs shown on the frontend dashboard. Call mf_get_tracked first to get scheme numbers. WARNING: calls MFAPI and may take a few seconds. If this tool fails or times out, retry it once.',
+        'Fetch current NAV (Net Asset Value) for mutual funds. Returns one CSV row per scheme: fund name, current NAV and its date, previous NAV and its date, and 1-day change (absolute and %). These are the same NAVs shown on the frontend dashboard. Call mf_get_tracked first to get scheme numbers. WARNING: calls MFAPI and may take a few seconds. If this tool fails or times out, retry it once.',
       inputSchema: z.object({
         schemeNumbers: z
           .array(z.number())
@@ -36,8 +68,14 @@ export function registerPriceTools(server: McpServer, client: BackendClient): vo
       }),
     },
     async (input) => {
-      const data = await client.post('/funds/nav-batch', { schemeNumbers: input.schemeNumbers });
-      return { content: [{ type: 'text' as const, text: compactJSON(data) }] };
+      const navHistoryByScheme = await client.post<Record<string, MfapiNavHistory | null>>(
+        '/funds/nav-batch',
+        { schemeNumbers: input.schemeNumbers, latestCount: NAVS_FOR_DAY_CHANGE }
+      );
+      const rows = Object.entries(navHistoryByScheme ?? {}).map(([schemeNumber, history]) =>
+        toLatestNavRow(schemeNumber, history)
+      );
+      return { content: [{ type: 'text' as const, text: toCSV(rows) }] };
     }
   );
 

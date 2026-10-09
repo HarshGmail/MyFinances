@@ -11,7 +11,7 @@
     "lint:strict": "eslint . --max-warnings 0",
     "sort:interfaces": "node scripts/sort-ts-interfaces.js",
     "prettier:check": "prettier --check .",
-    "prettier:fix": "npm run sort:interfaces && prettier --write ."
+    "prettier:fix": "prettier --write ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",

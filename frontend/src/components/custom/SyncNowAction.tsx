@@ -3,12 +3,7 @@
 import { RefreshCw } from 'lucide-react';
 import type { SyncSource } from '@myfinances/core/types';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useEmailSyncJob } from '@/hooks/useEmailSyncJob';
 import EmailSyncPreviewCard from '@/app/integrations/EmailSyncPreview';
 import { useEmailImportMutation } from '@myfinances/core/api';

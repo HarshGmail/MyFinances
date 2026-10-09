@@ -59,6 +59,32 @@ describe('credit card EMI plans', () => {
     expect(normaliseEmiDescription('Amazon EMI Interest 4 of 12')).toBe('AMAZON');
   });
 
+  it('ignores the per-month tax note so SBI FlexiPay installments land in one plan', () => {
+    const rows = [
+      { date: '2026-08-02', number: 1, amount: 2533.41, tax: '53.55' },
+      { date: '2026-09-02', number: 2, amount: 2459.04, tax: '35.89' },
+      { date: '2026-10-02', number: 3, amount: 2459.04, tax: '31.56' },
+    ].map(({ date, number, amount, tax }) =>
+      tx({
+        date,
+        statementId: date,
+        kind: 'emi_principal',
+        amount,
+        description: `FP EMI 0${number}/09(EXCL TAX ${tax})`,
+        emiInstallment: { number, of: 9 },
+      })
+    );
+
+    const plans = groupEmiPlans(rows);
+
+    expect(plans).toHaveLength(1);
+    expect(plans[0].description).toBe('FP');
+    expect(plans[0].installmentsPaid).toBe(3);
+    expect(plans[0].installmentsRemaining).toBe(6);
+    expect(plans[0].startedOn).toBe('2026-08-02');
+    expect(plans[0].principalPaid).toBeCloseTo(7451.49);
+  });
+
   it('links GST to the EMI interest it is 18% of, within the same statement', () => {
     const interest = tx({ kind: 'emi_interest', amount: 250 });
     const gst = tx({ kind: 'tax', amount: 45 });
