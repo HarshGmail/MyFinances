@@ -17,6 +17,8 @@ const roundToPaise = (value: number) => Math.round(value * 100) / 100;
 
 const EMI_KINDS: readonly CardTransactionKind[] = ['emi_principal', 'emi_interest'];
 const INSTALLMENT_MARKER = /\b\d{1,2}\s*(?:\/|of)\s*\d{1,2}\b/gi;
+const TAX_NOTE = /\(?\s*\b(?:excl|incl)(?:uding|usive)?\.?\s*(?:of\s+)?(?:tax|gst)\b[^)]*\)?/gi;
+const RUPEE_AMOUNT = /\b\d[\d,]*\.\d{1,2}\b/g;
 const EMI_NOISE_WORDS = /\b(emi|principal|interest|amount|amt|inst(?:allment)?|no|loan|on)\b/gi;
 
 export interface EmiPlan {
@@ -73,6 +75,8 @@ export function isCostOfCredit(tx: CreditCardTransaction): boolean {
 
 export function normaliseEmiDescription(description: string): string {
   return description
+    .replace(TAX_NOTE, ' ')
+    .replace(RUPEE_AMOUNT, ' ')
     .replace(INSTALLMENT_MARKER, ' ')
     .replace(EMI_NOISE_WORDS, ' ')
     .replace(/[^a-z0-9 ]/gi, ' ')
