@@ -5,3 +5,6 @@ mcp-server/dist
 
 # Rust build output (can be several GB)
 pdf-parsing/target
+
+deploy/home/*.env
+deploy/home/.env
