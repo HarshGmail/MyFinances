@@ -9,7 +9,7 @@ Two machines at home, joined privately by Tailscale, split by what each is good 
 | Runs | snappy (photo library) | MyFinances backend, MCP, PDF parsing; later Ved's backend |
 | Address | 192.168.31.28 | reserved on the Jio router once installed |
 
-MyFinances moves to noddy once it is installed; until then it can run on
+MyFinances moves to noddy once it is installed; until then it runs on
 pingu with the same `deploy/home/myfinances up`. Moving it is copying
 `deploy/home/*.env` across and running that command there. The Cloudflare
 tunnel token works from either machine.
