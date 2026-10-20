@@ -31,7 +31,13 @@ tunnel connects outwards.
    - `api.my-finances.site` → `http://backend:5000`
    - `mcp.my-finances.site` → `http://mcp:4000`
 6. `deploy/home/myfinances up` again. It starts the tunnel too.
-7. Once the site works through pingu, suspend the Render services.
+7. **Render as a fallback.** Keep the Render services running. A Cloudflare
+   Worker (`deploy/cloudflare/failover-worker.js`) sends every request to pingu
+   first, and to Render only when the tunnel is down (502, 503, 504 or 530).
+   Both use the same Atlas database and `JWT_SECRET`, so a login made on one
+   works on the other. Responses carry `x-served-by: pingu` or `render`.
+   Deploy it in Workers & Pages, then add the routes `api.my-finances.site/*`
+   and `mcp.my-finances.site/*` to it.
 
 ## Day to day
 
