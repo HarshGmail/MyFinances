@@ -39,12 +39,40 @@ tunnel connects outwards.
    Deploy it in Workers & Pages, then add the routes `api.my-finances.site/*`
    and `mcp.my-finances.site/*` to it.
 
+## Deploying
+
+Merge to `main`. Render redeploys itself; pingu checks GitHub every 5 minutes
+and deploys on its own, from anywhere you merged. It only deploys when:
+
+- something under `backend/`, `mcp-server/`, `pdf-parsing/` or `deploy/home/`
+  changed (frontend-only merges just move the checkout forward), and
+- the CI workflow for every changed part passed on that commit. A failed CI
+  leaves pingu on the version it already runs.
+
+Turn it on once, on pingu: `deploy/home/myfinances install-auto-deploy`.
+
+**Seeing results.** Each deploy shows on GitHub as a `deploy / pingu` check
+next to the commit, the same place CI shows: pending, then **Live on pingu**,
+**Deploy failed**, or **Not deployed: CI failed**. That needs a token in
+`deploy/home/github.env`:
+
+```bash
+GITHUB_STATUS_TOKEN=github_pat_...
+```
+
+Create it at GitHub → Settings → Developer settings → Fine-grained tokens:
+only this repository, permission **Commit statuses: Read and write**, nothing
+else. Without the file, deploys still happen; they just aren't reported.
+
+On pingu, `deploy/home/myfinances history` shows the same events in detail.
+
 ## Day to day
 
 ```bash
 deploy/home/myfinances status
 deploy/home/myfinances logs backend
-deploy/home/myfinances deploy    # git pull + rebuild + restart
+deploy/home/myfinances history   # what auto-deploy did
+deploy/home/myfinances deploy    # deploy right now, by hand
 ```
 
 Everything restarts on its own after a reboot or power cut. During a power or

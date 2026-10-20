@@ -8,3 +8,6 @@ pdf-parsing/target
 
 deploy/home/*.env
 deploy/home/.env
+deploy/home/.last-refused-commit
+deploy/home/github.env
+
