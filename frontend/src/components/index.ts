@@ -15,3 +15,4 @@ export * from './ui/sonner';
 export * from './ui/tabs';
 export * from './custom/Tabs';
 export { BackendWarmup } from './custom/BackendWarmup';
+export { InstallBanner } from './custom/InstallBanner';

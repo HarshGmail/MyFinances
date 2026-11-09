@@ -10,12 +10,14 @@ import {
   DemoBanner,
   ServiceWorkerRegistrar,
   BackendWarmup,
+  InstallBanner,
 } from '@/components';
 import Providers from './providers';
 import { AuthProvider } from '@/context/AuthContext';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
 import { PWA_THEME_COLOR_DARK, PWA_THEME_COLOR_LIGHT } from '@/lib/pwa';
+import { INSTALL_CAPTURE_SCRIPT } from '@/lib/install';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,7 +33,6 @@ export const metadata: Metadata = {
   title: 'My Finance',
   description: 'Manage Your Finances',
   applicationName: 'MyFinance',
-  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     title: 'MyFinance',
@@ -59,6 +60,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="manifest" href="/app-manifest" crossOrigin="use-credentials" />
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
       >
@@ -71,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="flex flex-col min-h-dvh">
                 <Navbar />
                 <DemoBanner />
+                <InstallBanner />
                 <div className="flex-1 overflow-auto pb-4">
                   <Suspense>{children}</Suspense>
                 </div>
